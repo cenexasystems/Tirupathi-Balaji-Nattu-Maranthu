@@ -3,7 +3,7 @@ import { X, Trash2, Plus, Minus, ShoppingBag, MessageCircle } from 'lucide-react
 import { useCartStore, useFavStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { Link } from 'react-router-dom'
-import { BRAND_EN } from '../lib/brand'
+import { BRAND_EN, BRAND_WHATSAPP_LINK } from '../lib/brand'
 import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, getDefaultQuantityForProduct } from '../lib/retail'
 
 export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -20,7 +20,6 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
       predefinedOptions: item.predefinedOptions,
     })
   }
-  const PHONE = '918610632662'
   const waText = encodeURIComponent(
     `🌿 *${BRAND_EN}* — Cart Order\n\n` +
     items.map(i => {
@@ -91,7 +90,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                 <div className="flex justify-between font-bold text-textMain text-base border-t pt-3">
                   <span>{t('drawer.total')}</span><span>{formatCurrency(grand)}</span>
                 </div>
-                <a href={`https://wa.me/${PHONE}?text=${waText}`} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl transition-colors">
+                <a href={`${BRAND_WHATSAPP_LINK}?text=${waText}`} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl transition-colors">
                   <MessageCircle size={16} /> {t('drawer.send_wa')}
                 </a>
                 <Link to="/cart" onClick={onClose} className="flex items-center justify-center w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3 rounded-xl transition-colors">

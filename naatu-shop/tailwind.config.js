@@ -21,7 +21,7 @@ export default {
       },
       fontFamily: {
         sans:      ['Inter', 'sans-serif'],
-        headline:  ['Poppins', 'sans-serif'],
+        headline:  ['Playfair Display', 'serif'],
       },
       boxShadow: {
         soft:   '0 4px 16px rgba(0,0,0,0.06)',

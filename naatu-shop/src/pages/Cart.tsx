@@ -3,8 +3,8 @@ import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft } from 'lucide-react'
 import { useCartStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { Link } from 'react-router-dom'
-import { BRAND_EN, BRAND_TA, BRAND_SUBTITLE, BRAND_WHATSAPP } from '../lib/brand'
-import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, getDefaultQuantityForProduct } from '../lib/retail'
+import { BRAND_EN, BRAND_TA, BRAND_SUBTITLE, BRAND_WHATSAPP, BRAND_WHATSAPP_LINK } from '../lib/brand'
+import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, getQuantityStepForProduct } from '../lib/retail'
 
 export default function Cart() {
   const { items, remove, updateQty, total, count, clear } = useCartStore()
@@ -13,32 +13,29 @@ export default function Cart() {
   const shipping = sub === 0 ? 0 : sub >= 500 ? 0 : 50
   const grand = sub + shipping
 
-  const getStep = (item: (typeof items)[number]) => {
-    if (item.unitType === 'unit' || item.unitType === 'bundle') return 1
-    return getDefaultQuantityForProduct({
-      unitType: item.unitType,
-      baseQuantity: item.baseQuantity,
-      predefinedOptions: item.predefinedOptions,
-    })
-  }
+  const getStep = (item: (typeof items)[number]) => getQuantityStepForProduct({
+    unitType: item.unitType,
+    baseQuantity: item.baseQuantity,
+    allowDecimalQuantity: item.allowDecimalQuantity,
+  })
 
   return (
     <div className="bg-bgMain min-h-screen">
-      <div className="bg-gradient-to-r from-[#eaf2e5] to-bgMain border-b border-sand/50 py-8">
-        <div className="max-w-7xl mx-auto px-4 flex items-center gap-4">
-          <ShoppingBag className="text-sageDark" size={26} />
+      <div className="bg-gradient-to-r from-[#eaf2e5] to-bgMain border-b border-sand/50 py-6 sm:py-8">
+        <div className="max-w-7xl mx-auto px-4 flex items-center gap-3 sm:gap-4">
+          <ShoppingBag className="text-sageDark shrink-0" size={24} />
           <div>
-            <h1 className="text-3xl font-bold font-headline text-textMain">{t('cart.title')}</h1>
-            <p className="text-textMuted text-sm">{count()} {t('cart.items_in_cart')}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold font-headline text-textMain">{t('cart.title')}</h1>
+            <p className="text-textMuted text-xs sm:text-sm">{count()} {t('cart.items_in_cart')}</p>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8">
+      <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8 flex flex-col lg:flex-row gap-6 sm:gap-8">
         {/* Cart items */}
         <div className="w-full lg:w-[62%]">
           {items.length === 0 ? (
-            <div className="bg-white rounded-2xl p-16 text-center border border-sand/50 shadow-soft">
+            <div className="bg-white rounded-2xl p-10 sm:p-16 text-center border border-sand/50 shadow-soft">
               <p className="text-6xl mb-4">🛒</p>
               <h3 className="text-xl font-bold text-textMain mb-2 font-headline">{t('cart.empty')}</h3>
               <p className="text-textMuted text-sm mb-6">{t('cart.empty_sub')}</p>
@@ -55,26 +52,26 @@ export default function Cart() {
               <div className="divide-y divide-sand/30">
                 {items.map(item => (
                   <motion.div key={item.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="flex flex-col sm:flex-row items-start sm:items-center gap-4 px-6 py-5">
-                    <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-gray-50 border border-sand/40">
+                    className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4 sm:py-5">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden shrink-0 bg-gray-50 border border-sand/40">
                       <img src={item.image} alt={item.name}
                         onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=200&q=80' }}
                         className="w-full h-full object-cover" />
                     </div>
-                    <div className="flex-grow flex flex-col items-start gap-1">
-                      <h3 className="font-bold text-textMain">
+                    <div className="flex-grow flex flex-col items-start gap-0.5 sm:gap-1">
+                      <h3 className="font-bold text-sm sm:text-base text-textMain">
                         {lang === 'ta' && item.nameTa ? item.nameTa : item.name}
                       </h3>
-                      <p className="text-xs text-sageDark font-bold mt-0.5">{t('cat.' + item.category)}</p>
-                      <p className="text-xs text-gray-400">{formatPricePerUnit(item.basePrice, item.baseQuantity, item.unitLabel, item.unitType)}</p>
+                      <p className="text-xs text-sageDark font-bold">{t('cat.' + item.category)}</p>
+                      <p className="text-[11px] text-gray-400">{formatPricePerUnit(item.basePrice, item.baseQuantity, item.unitLabel, item.unitType)}</p>
                     </div>
                     <div className="flex items-center gap-4 flex-wrap">
-                      <div className="flex items-center gap-0.5 border-2 border-sand rounded-xl overflow-hidden bg-white">
-                        <button onClick={() => updateQty(item.id, item.qty - getStep(item))} className="w-9 h-9 flex items-center justify-center text-textMuted hover:bg-bgMain hover:text-textMain transition-colors"><Minus size={14} /></button>
-                        <span className="min-w-14 px-2 text-center font-bold text-sm text-textMain">{formatQuantityDisplay(item.qty, item.selectedUnit, item.unitType)}</span>
-                        <button onClick={() => updateQty(item.id, item.qty + getStep(item))} className="w-9 h-9 flex items-center justify-center text-textMuted hover:bg-bgMain hover:text-textMain transition-colors"><Plus size={14} /></button>
+                      <div className="flex items-center gap-0 border-2 border-sand rounded-lg overflow-hidden bg-white">
+                        <button onClick={() => updateQty(item.id, item.qty - getStep(item))} className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-textMuted hover:bg-bgMain hover:text-textMain transition-colors touch-target"><Minus size={14} /></button>
+                        <span className="min-w-12 sm:min-w-14 px-1 sm:px-2 text-center font-bold text-sm text-textMain">{formatQuantityDisplay(item.qty, item.selectedUnit, item.unitType)}</span>
+                        <button onClick={() => updateQty(item.id, item.qty + getStep(item))} className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-textMuted hover:bg-bgMain hover:text-textMain transition-colors touch-target"><Plus size={14} /></button>
                       </div>
-                      <span className="text-lg font-bold text-textMain font-headline w-24 text-right">{formatCurrency(item.lineTotal)}</span>
+                      <span className="text-lg font-bold text-textMain font-headline w-24 text-right whitespace-nowrap">{formatCurrency(item.lineTotal)}</span>
                       <button onClick={() => remove(item.id)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={15} /></button>
                     </div>
                   </motion.div>
@@ -89,7 +86,7 @@ export default function Cart() {
 
         {/* Invoice + actions */}
         <div className="w-full lg:w-[38%]">
-          <div className="bg-white rounded-2xl border border-sand/50 shadow-soft p-6 sticky top-[110px]">
+          <div className="bg-white rounded-2xl border border-sand/50 shadow-soft p-6 sticky top-24 sm:top-[110px]">
             <h2 className="font-bold text-xl font-headline text-textMain mb-5 pb-4 border-b border-sand/40">{t('cart.bill_summary')}</h2>
 
             {/* Invoice printable area */}
@@ -99,6 +96,7 @@ export default function Cart() {
                 <p className="text-[11px] font-semibold text-textMuted">{BRAND_TA}</p>
                 <p className="text-[10px] uppercase tracking-[0.18em] text-sageDark font-bold">{BRAND_SUBTITLE}</p>
                 <p className="text-xs text-textMuted mt-1">Contact: WhatsApp {BRAND_WHATSAPP}</p>
+                <p className="text-[10px] text-textMuted mt-1">{BRAND_WHATSAPP_LINK}</p>
               </div>
               {items.length === 0 ? (
                 <p className="text-center text-gray-400 text-xs py-3">{t('cart.empty')}</p>

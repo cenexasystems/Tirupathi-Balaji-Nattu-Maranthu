@@ -1,287 +1,236 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { FormEvent } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Leaf, Eye, EyeOff } from 'lucide-react'
+import { useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { Leaf, Mail, Shield, ArrowLeft } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { authService } from '../services/authService'
 import { useAuthStore } from '../store/store'
+import { BRAND_EN, BRAND_TA } from '../lib/brand'
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const isEmail = (value: string) => EMAIL_REGEX.test(value.trim())
-const isPhone = (value: string) => /^\d{10,15}$/.test(value.replace(/\D/g, ''))
-const ADMIN_EMAIL = 'admin@srisiddha.com'
-
-const toE164Phone = (value: string) => {
-  const digits = value.replace(/\D/g, '')
-  if (digits.length === 10) return `+91${digits}`
-  return `+${digits}`
-}
+const ADMIN_EMAILS = ['admin@srisiddha.com', 'eshwarbalaji07@gmail.com']
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function Login() {
-  const [form, setForm] = useState({ identifier: '', password: '' })
+  const [step, setStep] = useState<'email' | 'otp'>('email')
+  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
   const [otp, setOtp] = useState('')
-  const [otpSent, setOtpSent] = useState(false)
-  const [phoneForOtp, setPhoneForOtp] = useState('')
-  const [error, setError] = useState('')
-  const [info, setInfo] = useState('')
   const [loading, setLoading] = useState(false)
-  const [showPwd, setShowPwd] = useState(false)
+  const [error, setError] = useState('')
+
   const navigate = useNavigate()
   const location = useLocation()
-  const searchParams = new URLSearchParams(location.search)
-  const redirectPath = searchParams.get('redirect') || '/'
+  const redirectPath = new URLSearchParams(location.search).get('redirect') || '/'
   const setAuth = useAuthStore((s) => s.setAuth)
 
-  const normalizedIdentifier = form.identifier.trim()
-  const identifierType = useMemo(() => {
-    if (isEmail(normalizedIdentifier)) return 'email' as const
-    if (isPhone(normalizedIdentifier)) return 'phone' as const
-    return 'unknown' as const
-  }, [normalizedIdentifier])
-
-  useEffect(() => {
-    setOtpSent(false)
-    setOtp('')
-    setPhoneForOtp('')
-    setInfo('')
+  // ── Step 1: Send OTP ──────────────────────────────────────────
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const cleanEmail = email.trim().toLowerCase()
+    if (!EMAIL_RE.test(cleanEmail)) {
+      setError('Please enter a valid email address')
+      return
+    }
+    setLoading(true)
     setError('')
-  }, [normalizedIdentifier])
 
-  const setSessionUser = async () => {
-    const { data: userData, error: userError } = await supabase.auth.getUser()
-    if (userError || !userData.user) throw new Error('Unable to load user session')
+    if (!isSupabaseConfigured) {
+      // Dev fallback — skip OTP
+      const { user } = await authService.signIn(cleanEmail, 'devpass')
+      if (user) {
+        setAuth({ id: user.id, name: user.name, email: user.email, mobile: user.mobile, role: user.role })
+        navigate(redirectPath)
+      } else {
+        setError('Unable to sign in in dev mode')
+      }
+      setLoading(false)
+      return
+    }
+
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email: cleanEmail,
+      options: {
+        shouldCreateUser: true,
+        data: name.trim() ? { name: name.trim() } : undefined,
+      },
+    })
+
+    setLoading(false)
+
+    if (otpError) {
+      setError(otpError.message)
+      return
+    }
+
+    setStep('otp')
+  }
+
+  // ── Step 2: Verify OTP ────────────────────────────────────────
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (otp.trim().length < 6) {
+      setError('Enter the 6-digit code from your email')
+      return
+    }
+    setLoading(true)
+    setError('')
+
+    const { data, error: verifyError } = await supabase.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: otp.trim(),
+      type: 'email',
+    })
+
+    if (verifyError || !data.session) {
+      setLoading(false)
+      setError(verifyError?.message || 'Invalid or expired code. Please try again.')
+      return
+    }
 
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', userData.user.id)
+      .eq('id', data.session.user.id)
       .single()
 
+    const isAdmin =
+      profile?.role === 'admin' ||
+      ADMIN_EMAILS.includes((data.session.user.email || '').toLowerCase())
+
     setAuth({
-      id: userData.user.id,
-      name: profile?.name || userData.user.email || userData.user.phone || 'Customer',
-      email: userData.user.email || '',
-      mobile: profile?.mobile || userData.user.phone || '',
-      role: profile?.role === 'admin' || userData.user.email?.toLowerCase() === ADMIN_EMAIL ? 'admin' : 'customer',
-    })
-  }
-
-  const signInAdmin = async (password: string) => {
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email: ADMIN_EMAIL,
-      password,
+      id: data.session.user.id,
+      name: profile?.name || name.trim() || data.session.user.email || 'Customer',
+      email: data.session.user.email || '',
+      mobile: profile?.mobile || '',
+      role: isAdmin ? 'admin' : 'customer',
     })
 
-    if (!signInError && data.session) {
-      await setSessionUser()
-      navigate('/admin')
-      return
-    }
-
-    if (signInError?.status === 429) {
-      throw new Error('Too many login attempts. Please wait 1-2 minutes and try again.')
-    }
-
-    throw new Error(signInError?.message || 'Unable to sign in admin account')
+    setLoading(false)
+    navigate(redirectPath)
   }
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setInfo('')
-    setLoading(true)
+  // ── OTP verification screen ──────────────────────────────────
+  if (step === 'otp') {
+    return (
+      <div className="bg-gradient-to-br from-[#eaf2e5] to-[#f7f6f2] min-h-screen flex items-center justify-center p-4">
+        <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-xl border border-sand/40 w-full max-w-md">
+          <div className="flex flex-col items-center mb-8">
+            <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-3">
+              <Shield size={28} className="text-blue-600" />
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold font-headline text-textMain">Check Your Email</h1>
+            <p className="text-sm text-textMuted mt-2 text-center leading-relaxed">
+              We sent a <strong>6-digit code</strong> to<br />
+              <span className="text-sageDark font-bold">{email}</span>
+            </p>
+          </div>
 
-    try {
-      if (!isSupabaseConfigured) {
-        const { user, error: loginError } = await authService.signIn(normalizedIdentifier, form.password)
-        if (loginError || !user) {
-          throw new Error(loginError || 'Login failed')
-        }
-        setAuth({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          mobile: user.mobile,
-          role: user.role,
-        })
-        navigate(redirectPath)
-        return
-      }
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-4">{error}</div>
+          )}
 
-      if (identifierType === 'email') {
-        if (!form.password.trim()) {
-          throw new Error('Password is required for email login')
-        }
+          <form onSubmit={handleVerifyOtp} className="space-y-5">
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="0  0  0  0  0  0"
+              className="w-full text-center text-3xl font-bold tracking-[0.6em] py-4 bg-gray-50 border-2 border-sand focus:border-sageDark rounded-xl outline-none transition-all placeholder:text-gray-200 placeholder:tracking-[0.4em]"
+              value={otp}
+              onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '')); setError('') }}
+              autoFocus
+            />
 
-        if (normalizedIdentifier.toLowerCase() === ADMIN_EMAIL) {
-          await signInAdmin(form.password)
-          return
-        }
+            <button
+              type="submit"
+              disabled={loading || otp.length < 6}
+              className="w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {loading
+                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Verifying...</>
+                : 'Verify & Sign In →'}
+            </button>
 
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email: normalizedIdentifier,
-          password: form.password,
-        })
+            <button
+              type="button"
+              onClick={() => { setStep('email'); setOtp(''); setError('') }}
+              className="w-full flex items-center justify-center gap-1.5 text-sm text-textMuted hover:text-textMain transition-colors py-1"
+            >
+              <ArrowLeft size={14} /> Use a different email
+            </button>
+          </form>
 
-        if (signInError || !data.session) {
-          throw new Error(signInError?.message || 'Login failed')
-        }
-
-        await setSessionUser()
-        navigate(redirectPath)
-        return
-      }
-
-      if (identifierType === 'phone') {
-        const e164Phone = toE164Phone(normalizedIdentifier)
-
-        if (!otpSent) {
-          const { error: otpError } = await supabase.auth.signInWithOtp({
-            phone: e164Phone,
-            options: { shouldCreateUser: false },
-          })
-
-          if (otpError) {
-            throw new Error(otpError.message)
-          }
-
-          setPhoneForOtp(e164Phone)
-          setOtpSent(true)
-          setInfo('OTP sent to your mobile number')
-          return
-        }
-
-        if (!otp.trim() || otp.trim().length < 4) {
-          throw new Error('Enter the OTP sent to your mobile number')
-        }
-
-        const { data, error: verifyError } = await supabase.auth.verifyOtp({
-          phone: phoneForOtp || e164Phone,
-          token: otp.trim(),
-          type: 'sms',
-        })
-
-        if (verifyError || !data.session) {
-          throw new Error(verifyError?.message || 'OTP verification failed')
-        }
-
-        await setSessionUser()
-        navigate(redirectPath)
-        return
-      }
-
-      throw new Error('Enter a valid email or mobile number')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
-    } finally {
-      setLoading(false)
-    }
+          <p className="text-center text-xs text-gray-400 mt-6 leading-relaxed">
+            Didn't receive the code? Check your spam folder.<br />The code expires in <strong>60 minutes</strong>.
+          </p>
+        </div>
+      </div>
+    )
   }
 
+  // ── Email entry screen ────────────────────────────────────────
   return (
     <div className="bg-gradient-to-br from-[#eaf2e5] to-[#f7f6f2] min-h-screen flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-3xl shadow-xl border border-sand/40 w-full max-w-md">
+      <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-xl border border-sand/40 w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 bg-sage/30 rounded-2xl flex items-center justify-center mb-3">
             <Leaf size={28} className="text-sageDark" />
           </div>
-          <h1 className="text-2xl font-bold font-headline text-textMain">Welcome Back</h1>
-          <p className="text-sm text-textMuted mt-1">Sign in to your account</p>
+          <h1 className="text-xl sm:text-2xl font-bold font-headline text-textMain text-center">{BRAND_EN}</h1>
+          <p className="text-sm text-textMuted mt-1">{BRAND_TA}</p>
+          <p className="mt-2 text-xs font-bold text-sageDark bg-sage/10 px-3 py-1 rounded-full">
+            No password needed — sign in with email OTP
+          </p>
         </div>
-
-        {isSupabaseConfigured && (
-          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl text-sm mb-5">
-            Use your registered email and password, or mobile OTP, to sign in.
-          </div>
-        )}
-
-        {info && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm mb-4">{info}</div>
-        )}
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-4">{error}</div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSendOtp} className="space-y-4">
           <div>
-            <label className="block text-sm font-bold text-textMain mb-1.5">Email or Mobile Number</label>
+            <label className="block text-sm font-bold text-textMain mb-1.5">
+              Your Name <span className="text-textMuted font-normal text-xs">(for new accounts)</span>
+            </label>
             <input
               type="text"
-              required
-              autoComplete="username"
-              placeholder="Email or 10-digit mobile"
+              placeholder="Full name"
               className="w-full px-4 py-3 rounded-xl border-2 border-sand focus:border-sageDark outline-none transition-colors"
-              value={form.identifier}
-              onChange={(e) => setForm({ ...form, identifier: e.target.value })}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
             />
           </div>
 
-          {identifierType !== 'phone' && (
-            <div>
-              <label className="block text-sm font-bold text-textMain mb-1.5">Password</label>
-              <div className="relative">
-                <input
-                  type={showPwd ? 'text' : 'password'}
-                  required={identifierType === 'email'}
-                  autoComplete="current-password"
-                  placeholder="Enter your password"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-sand focus:border-sageDark outline-none transition-colors pr-12"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPwd(!showPwd)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-textMain transition-colors"
-                >
-                  {showPwd ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {identifierType === 'phone' && otpSent && (
-            <div>
-              <label className="block text-sm font-bold text-textMain mb-1.5">OTP</label>
+          <div>
+            <label className="block text-sm font-bold text-textMain mb-1.5">Email Address *</label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" size={18} />
               <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
+                type="email"
                 required
-                placeholder="Enter OTP"
-                className="w-full px-4 py-3 rounded-xl border-2 border-sand focus:border-sageDark outline-none transition-colors"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                autoComplete="email"
+                placeholder="you@example.com"
+                className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-sand focus:border-sageDark outline-none transition-colors"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError('') }}
               />
             </div>
-          )}
+          </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed mt-2 flex items-center justify-center gap-2"
+            className="w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
           >
-            {loading ? (
-              <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Processing...
-              </>
-            ) : identifierType === 'phone' ? (
-              otpSent ? 'Verify OTP' : 'Send OTP'
-            ) : (
-              'Sign In'
-            )}
+            {loading
+              ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending Code...</>
+              : 'Send OTP Code to Email →'}
           </button>
         </form>
 
-        <div className="mt-6 pt-5 border-t border-sand/50 text-center space-y-2">
-          <p className="text-sm text-textMuted">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-sageDark font-bold hover:underline">
-              Create Account
-            </Link>
+        <div className="mt-6 pt-5 border-t border-sand/50 space-y-2 text-center">
+          <p className="text-xs text-gray-400">
+            New users get an account automatically.<br />Existing users log in with the same OTP flow.
           </p>
-          <p className="text-xs text-gray-400">Admin login: admin@srisiddha.com</p>
         </div>
       </div>
     </div>

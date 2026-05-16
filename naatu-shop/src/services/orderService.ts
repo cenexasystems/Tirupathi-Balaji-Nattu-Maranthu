@@ -25,6 +25,10 @@ export const createOrderWithStock = async (input: CreateOrderInput): Promise<Cre
   const status = input.status || 'pending'
 
   if (!isSupabaseConfigured) {
+    if (!import.meta.env.DEV) {
+      throw new Error('Supabase is required to create orders in production')
+    }
+
     const subtotal = input.items.reduce((sum, item) => sum + Number(item.line_total || 0), 0)
     const total = subtotal + shipping
 
@@ -81,19 +85,9 @@ export const createOrderWithStock = async (input: CreateOrderInput): Promise<Cre
     throw new Error('Order RPC returned an invalid payload')
   }
 
-  const { data: orderRow, error: orderError } = await supabase
-    .from('orders')
-    .select('created_at')
-    .eq('id', row.order_id)
-    .single()
-
-  if (orderError) {
-    throw orderError
-  }
-
   return {
     orderId: String(row.order_id),
     invoiceNo: String(row.invoice_no),
-    createdAt: String(orderRow?.created_at || new Date().toISOString()),
+    createdAt: new Date().toISOString(),
   }
 }

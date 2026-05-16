@@ -1,5 +1,5 @@
 import React from 'react'
-import { BRAND_EN, BRAND_TA, BRAND_SUBTITLE, BRAND_WHATSAPP } from '../lib/brand'
+import { BRAND_EN, BRAND_TA, BRAND_SUBTITLE, BRAND_EMAIL, BRAND_LOCATION_LINK, BRAND_PHONE_DISPLAY, BRAND_WHATSAPP_LINK } from '../lib/brand'
 import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, normalizeStructuredOrderItem } from '../lib/retail'
 
 export interface InvoiceItem {
@@ -196,7 +196,9 @@ export const Invoice: React.FC<InvoiceProps> = ({
         <div>
           <div style={{ fontSize: 13, fontWeight: 800, color: '#2d5a27' }}>Thank you for shopping!</div>
           <div style={{ fontSize: 12, color: '#4a7c59', marginTop: 2 }}>இங்கு வாங்கியதற்கு மிக்க நன்றி!</div>
-          <div style={{ fontSize: 10, color: '#aaa', marginTop: 6 }}>Contact: {BRAND_WHATSAPP}</div>
+          <div style={{ fontSize: 10, color: '#aaa', marginTop: 6 }}>Contact: {BRAND_PHONE_DISPLAY} | Email: {BRAND_EMAIL}</div>
+          <div style={{ fontSize: 10, color: '#aaa', marginTop: 4 }}>WhatsApp: {BRAND_WHATSAPP_LINK}</div>
+          <div style={{ fontSize: 10, color: '#aaa', marginTop: 4 }}>Location: {BRAND_LOCATION_LINK}</div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 10, color: '#ccc', marginBottom: 6 }}>Authorised Signature</div>

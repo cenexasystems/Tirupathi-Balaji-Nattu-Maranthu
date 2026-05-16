@@ -17,6 +17,31 @@
   }
 }
 
+@layer components {
+  /* Touch-friendly button targets for mobile */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Consistent soft shadow for cards */
+  .shadow-soft {
+    @apply shadow-sm;
+  }
+  
+  /* Consistent button styles */
+  .btn-primary { 
+    @apply px-6 py-3 rounded-2xl bg-textMain text-white font-bold hover:bg-[#1e2817] transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply px-6 py-3 rounded-2xl border-2 border-sand bg-white text-textMain font-bold hover:bg-bgMain transition-colors;
+  }
+  
+  .btn-small {
+    @apply px-3 py-2 rounded-xl font-bold text-sm transition-colors;
+  }
+}
+
 @layer utilities {
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -40,11 +65,11 @@
 }
 
 
-/* ── PRINT STYLES — A4 single-page invoice ─────────────────────────── */
+/* ── PRINT STYLES — A4 invoice ─────────────────────────── */
 @media print {
   @page {
     size: A4 portrait;
-    margin: 15mm 15mm 15mm 15mm;
+    margin: 12mm 12mm 12mm 12mm;
   }
 
   html, body, #root {
@@ -58,24 +83,33 @@
     color: #000 !important;
   }
 
-  #invoice-print-root,
-  .print-receipt {
+  /* Everything with print:hidden Tailwind class or legacy class */
+  .print\:hidden,
+  .print-hidden,
+  nav,
+  footer { display: none !important; }
+
+  /* Invoice fills full page width */
+  #invoice-print-root {
     width: 100% !important;
-    max-width: 180mm !important;
-    margin: 0 auto !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
     box-shadow: none !important;
+    border: none !important;
     border-radius: 0 !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
+    min-height: 0 !important;
   }
 
-  #invoice-print-root *,
-  .print-receipt * {
+  /* Preserve background colors (green header, badges) */
+  #invoice-print-root * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  .print-hidden,
-  nav,
-  footer { display: none !important; }
+  /* Outer wrapper containers — transparent so invoice fills cleanly */
+  .bg-bgMain {
+    background: #fff !important;
+    padding: 0 !important;
+  }
 }

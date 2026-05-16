@@ -33,12 +33,12 @@ export default function ProductDetails() {
           localProduct = useProductStore.getState().products.find((item) => String(item.id) === id)
         }
 
-        if (localProduct) {
+        if (localProduct && localProduct.isActive) {
           setProduct(localProduct)
           return
         }
 
-        throw new Error('Product not found')
+        throw new Error('Product not available')
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load')
       } finally {
@@ -56,8 +56,8 @@ export default function ProductDetails() {
   const displayBen = lang === 'ta' && product.benefitsTa ? product.benefitsTa : product.benefits
 
   return (
-    <div className="bg-bgMain min-h-screen py-10">
-      <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-10">
+    <div className="bg-bgMain min-h-screen py-8 sm:py-10">
+      <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-10">
         <div className="rounded-3xl overflow-hidden border border-sand/50 bg-white shadow-soft" style={{ aspectRatio: '1' }}>
           <img src={product.image} alt={product.name} loading="lazy"
             onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=800&q=80' }}
@@ -67,13 +67,13 @@ export default function ProductDetails() {
         <div className="flex flex-col">
           <div className="mb-6 pb-6 border-b border-sand/50">
             <span className="text-xs font-bold text-sageDark uppercase tracking-wider mb-2 block">{t('cat.' + product.category)}</span>
-            <h1 className="text-4xl font-bold font-headline text-textMain mb-2">{displayName}</h1>
+            <h1 className="text-2xl sm:text-4xl font-bold font-headline text-textMain mb-2">{displayName}</h1>
             
             {product.remedy && product.remedy.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-3">
                 {product.remedy.map(r => (
                   <span key={r} className="bg-sand/40 text-textMuted px-3 py-1 rounded-full text-xs font-bold">
-                    {t('remedy.' + r) || r}
+                    {t('remedy.' + r)}
                   </span>
                 ))}
               </div>
@@ -117,7 +117,7 @@ export default function ProductDetails() {
 
             <button
               onClick={() => add(product)}
-              className="w-full flex items-center justify-center gap-2 font-bold py-4 rounded-xl transition-colors bg-sageDark hover:bg-sageDeep text-white"
+              className="w-full flex items-center justify-center gap-2 font-bold py-3.5 sm:py-4 rounded-xl transition-colors bg-sageDark hover:bg-sageDeep text-white"
             >
               <ShoppingCart size={18} /> Add to Cart
             </button>

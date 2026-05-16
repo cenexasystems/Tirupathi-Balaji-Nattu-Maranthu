@@ -1,6 +1,6 @@
 /**
  * authService.ts
- * Wraps Supabase Auth with localStorage fallback
+ * Wraps Supabase Auth with a development-only localStorage fallback.
  */
 
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
@@ -13,7 +13,18 @@ export interface AuthUser {
   role: 'admin' | 'customer'
 }
 
-const ADMIN_EMAIL = 'admin@srisiddha.com'
+// Admin email: use env variable if set, otherwise fall back to known admin emails.
+// Set VITE_ADMIN_EMAIL in .env to override.
+const ADMIN_EMAIL_PRIMARY = (import.meta.env.VITE_ADMIN_EMAIL as string || '').toLowerCase().trim()
+const ADMIN_EMAIL_FALLBACKS = ['admin@srisiddha.com', 'eshwarbalaji07@gmail.com']
+
+const isAdminEmail = (email: string) => {
+  const normalized = (email || '').toLowerCase().trim()
+  if (ADMIN_EMAIL_PRIMARY && normalized === ADMIN_EMAIL_PRIMARY) return true
+  return ADMIN_EMAIL_FALLBACKS.includes(normalized)
+}
+
+const USE_LOCAL_AUTH_FALLBACK = import.meta.env.DEV && !isSupabaseConfigured
 
 type LocalUser = {
   id: string
@@ -69,6 +80,8 @@ const getUsers = (): LocalUser[] => {
 
 const saveUsers = (u: LocalUser[]) => localStorage.setItem('siddha_users', JSON.stringify(u))
 
+const getProductionAuthError = () => ({ user: null, error: 'Supabase is required for authentication in production' })
+
 // ── auth exposed API ─────────────────────────────────────────
 export const authService = {
 
@@ -104,10 +117,14 @@ export const authService = {
           name: profile?.name || data.user.user_metadata?.name || params.name,
           mobile: profile?.mobile || data.user.user_metadata?.mobile || params.mobile,
           email: data.user.email || params.email,
-          role: profile?.role === 'admin' || (data.user.email || params.email).toLowerCase() === ADMIN_EMAIL ? 'admin' : 'customer',
+          role: profile?.role === 'admin' || isAdminEmail(data.user.email || params.email) ? 'admin' : 'customer',
         },
         error: null,
       }
+    }
+
+    if (!USE_LOCAL_AUTH_FALLBACK) {
+      return getProductionAuthError()
     }
 
     // localStorage fallback
@@ -151,10 +168,14 @@ export const authService = {
           name: profile?.name || data.user.user_metadata?.name || data.user.email || '',
           mobile: profile?.mobile || data.user.user_metadata?.mobile || '',
           email: data.user.email || '',
-          role: profile?.role === 'admin' || (data.user.email || '').toLowerCase() === ADMIN_EMAIL ? 'admin' : 'customer',
+          role: profile?.role === 'admin' || isAdminEmail(data.user.email || '') ? 'admin' : 'customer',
         },
         error: null,
       }
+    }
+
+    if (!USE_LOCAL_AUTH_FALLBACK) {
+      return { user: null, error: 'Supabase is required for authentication in production' }
     }
 
     // localStorage fallback — support email or mobile login
@@ -171,7 +192,9 @@ export const authService = {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut()
     }
-    localStorage.removeItem('siddha_session')
+    if (USE_LOCAL_AUTH_FALLBACK) {
+      localStorage.removeItem('siddha_session')
+    }
   },
 
   getCurrentUser: async (): Promise<AuthUser | null> => {
@@ -190,8 +213,12 @@ export const authService = {
         name: profile?.name || user.user_metadata?.name || user.email || '',
         mobile: profile?.mobile || user.user_metadata?.mobile || '',
         email: user.email || '',
-        role: profile?.role === 'admin' || (user.email || '').toLowerCase() === ADMIN_EMAIL ? 'admin' : 'customer',
+        role: profile?.role === 'admin' || isAdminEmail(user.email || '') ? 'admin' : 'customer',
       }
+    }
+
+    if (!USE_LOCAL_AUTH_FALLBACK) {
+      return null
     }
 
     // localStorage fallback
@@ -213,6 +240,10 @@ export const authService = {
         .eq('id', user.id)
       return { error: error?.message || null }
     }
+    if (!USE_LOCAL_AUTH_FALLBACK) {
+      return { error: 'Supabase is required for profile updates in production' }
+    }
+
     const sid = localStorage.getItem('siddha_session')
     if (sid) {
       const users = getUsers()
@@ -236,7 +267,7 @@ export const authService = {
             name: profile?.name || session.user.user_metadata?.name || session.user.email || '',
             mobile: profile?.mobile || session.user.user_metadata?.mobile || '',
             email: session.user.email || '',
-            role: profile?.role === 'admin' || (session.user.email || '').toLowerCase() === ADMIN_EMAIL ? 'admin' : 'customer',
+            role: profile?.role === 'admin' || isAdminEmail(session.user.email || '') ? 'admin' : 'customer',
           })
         } else {
           callback(null)
@@ -244,6 +275,11 @@ export const authService = {
       })
       return () => subscription.unsubscribe()
     }
+    if (!USE_LOCAL_AUTH_FALLBACK) {
+      callback(null)
+      return () => {}
+    }
+
     // No-op for localStorage mode
     return () => {}
   },
@@ -259,6 +295,10 @@ export const authService = {
       if (!data.session) return { error: 'Verification failed' }
       return { error: null }
     }
+    if (!USE_LOCAL_AUTH_FALLBACK) {
+      return { error: 'Supabase is required for verification in production' }
+    }
+
     // localStorage mode simulation
     if (token === '123456') return { error: null }
     return { error: 'Invalid OTP' }

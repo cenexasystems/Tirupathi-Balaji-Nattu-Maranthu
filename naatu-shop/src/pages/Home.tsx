@@ -1,223 +1,431 @@
-import React, { useEffect, useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { 
-  ArrowRight, 
-  ShieldCheck, 
-  Truck, 
-  Leaf, 
-  Award, 
+import {
+  ArrowRight,
+  ShieldCheck,
+  Truck,
+  Leaf,
+  Award,
   Sparkles,
   ChevronRight,
   TrendingUp,
-  Activity
+  Star,
+  MapPin,
+  Phone,
+  MessageCircle,
+  Send,
+  ExternalLink,
 } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useProductStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import ProductCard from '../components/ProductCard'
+import {
+  BRAND_TA,
+  BRAND_EN,
+  BRAND_LOCATION_LINK,
+  BRAND_PHONE_DISPLAY,
+  BRAND_WHATSAPP_LINK,
+} from '../lib/brand'
 
-/**
- * SRI SIDDHA HERBAL STORE - HOME PAGE
- * Premium, Dynamic, and Fully Localized
- */
-
-const C = {
-  textMain:   '#2C392A',
-  textMuted:  '#5F6D59',
-  sageDark:   '#7DAA8F',
-  sageDeep:   '#5e8c72',
-  sage:       '#B2C7A5',
-  sand:       '#EAD7B7',
-  bgMain:     '#F7F6F2',
-  forestDark: '#2C392A'
+// ── Customer review helpers ───────────────────────────────────────────
+interface CustomerReview {
+  id: string
+  name: string
+  location: string
+  rating: number
+  text: string
+  createdAt: string
+}
+const REVIEWS_KEY = 'siddha_customer_reviews'
+function getStoredReviews(): CustomerReview[] {
+  try { return JSON.parse(localStorage.getItem(REVIEWS_KEY) || '[]') } catch { return [] }
+}
+function saveReview(r: CustomerReview) {
+  const all = getStoredReviews()
+  localStorage.setItem(REVIEWS_KEY, JSON.stringify([r, ...all].slice(0, 50)))
 }
 
-const REMEDY_MAP: Record<string, {emoji: string, bg: string, border: string}> = {
-  'Cold & Cough':  { emoji: '🤧', bg: '#EFF6FF', border: '#93C5FD' },
+// ── Category image map ────────────────────────────────────────────────
+const CAT_IMAGES: Record<string, string> = {
+  'Pooja Items':         'https://images.unsplash.com/photo-1567335743949-70f2b6b6e36d?auto=format&fit=crop&w=400&q=80',
+  'Herbal Powder':       'https://images.unsplash.com/photo-1615485291234-9d694218aeb5?auto=format&fit=crop&w=400&q=80',
+  'Herbal Oil':          'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=400&q=80',
+  'Spices & Condiments': 'https://images.unsplash.com/photo-1532944138793-3a7bab2b5c1c?auto=format&fit=crop&w=400&q=80',
+  'Grains & Pulses':     'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=400&q=80',
+  'Honey & Liquids':     'https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?auto=format&fit=crop&w=400&q=80',
+  'Bundle Packages':     'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=400&q=80',
+  // Legacy
+  'Herbal Root':    'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=400&q=80',
+  'Herbal Leaf':    'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?auto=format&fit=crop&w=400&q=80',
+  'Herbal Spice':   'https://images.unsplash.com/photo-1532944138793-3a7bab2b5c1c?auto=format&fit=crop&w=400&q=80',
+  'Herbal Product': 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=400&q=80',
+}
+const CAT_DEFAULT = 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=400&q=80'
+
+const REMEDY_MAP: Record<string, { emoji: string; bg: string; border: string }> = {
+  'Immunity':      { emoji: '🛡️', bg: '#FFF7ED', border: '#FDBA74' },
   'Digestion':     { emoji: '🌿', bg: '#F0FDF4', border: '#86EFAC' },
   'Hair Growth':   { emoji: '💆', bg: '#FFFBEB', border: '#FCD34D' },
-  'Immunity':      { emoji: '🛡️', bg: '#FFF7ED', border: '#FDBA74' },
   'Skin Care':     { emoji: '✨', bg: '#FFF1F2', border: '#FDA4AF' },
+  'Joint Pain':    { emoji: '🦵', bg: '#F5F3FF', border: '#DDD6FE' },
+  'Cold & Cough':  { emoji: '🤧', bg: '#EFF6FF', border: '#93C5FD' },
+  'Diabetes':      { emoji: '🩸', bg: '#F1F5F9', border: '#94A3B8' },
   'Stress':        { emoji: '🧘', bg: '#FAF5FF', border: '#C4B5FD' },
   'Fever':         { emoji: '🤒', bg: '#FEF2F2', border: '#FECACA' },
-  'Joint Pain':    { emoji: '🦵', bg: '#F5F3FF', border: '#DDD6FE' },
-  'Diabetes':      { emoji: '🩸', bg: '#F1F5F9', border: '#94A3B8' },
+  'Ritual Purity': { emoji: '🪔', bg: '#FFFBF0', border: '#FDE68A' },
 }
 
-const CAT_ICONS: Record<string, string> = {
-  'Pooja Items':      '🪔',
-  'Spices & Powders': '🌶️',
-  'Grains':           '🌾',
-  'Liquids':          '🍶',
-  'Clothing':         '👕',
-  'Misc':             '📦',
-  'Flowers':          '🌸',
-  'Sweets & Edibles': '🍯',
-  'Herbal Powder':    '🌿',
-  'Herbal Oil':       '🧪',
-}
+const TESTIMONIALS = [
+  {
+    name: 'Priya Krishnamurthy',
+    location: 'Chennai',
+    rating: 5,
+    text: 'Exceptional quality herbal products! Been using them for 6 months — truly authentic Siddha remedies that actually work. Packaging is perfect and delivery is fast.',
+    initials: 'PK',
+    color: '#7DAA8F',
+  },
+  {
+    name: 'Ramesh Murugan',
+    location: 'Coimbatore',
+    rating: 5,
+    text: 'The herbal oils are absolutely pure and give real results. Ordered multiple times and every batch smells fresh and aromatic. Best nattu marundhu shop online!',
+    initials: 'RM',
+    color: '#8B7355',
+  },
+  {
+    name: 'Kavitha Sundaram',
+    location: 'Madurai',
+    rating: 5,
+    text: "Genuine Siddha products at very reasonable prices. Customer service via WhatsApp is very responsive. The herbal powders improved my family's immunity greatly.",
+    initials: 'KS',
+    color: '#5e8c72',
+  },
+  {
+    name: 'Anand Thiagarajan',
+    location: 'Trichy',
+    rating: 5,
+    text: 'Outstanding quality. The moringa powder and ashwagandha are the best I have ever tried. Have been recommending to all my friends and relatives. 100% authentic!',
+    initials: 'AT',
+    color: '#C4845C',
+  },
+]
 
 export default function Home() {
   const { t } = useLangStore()
   const { products, fetchProducts } = useProductStore()
 
-  useEffect(() => {
-    void fetchProducts()
-  }, [fetchProducts])
+  // ── Review state ──────────────────────────────────────────────
+  const [customerReviews, setCustomerReviews] = useState<CustomerReview[]>(getStoredReviews)
+  const [showForm, setShowForm] = useState(false)
+  const [reviewForm, setReviewForm] = useState({ name: '', location: '', rating: 5, text: '' })
+  const [reviewSubmitted, setReviewSubmitted] = useState(false)
 
-  // Derive display data
-  const topSelling = useMemo(() => 
-    products.filter(p => p.isActive).sort((a,b) => (b.rating || 0) - (a.rating || 0)).slice(0, 4), 
+  const handleReviewSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!reviewForm.name.trim() || !reviewForm.text.trim()) return
+    const newReview: CustomerReview = {
+      id: Date.now().toString(),
+      name: reviewForm.name.trim(),
+      location: reviewForm.location.trim() || 'Tamil Nadu',
+      rating: reviewForm.rating,
+      text: reviewForm.text.trim(),
+      createdAt: new Date().toISOString(),
+    }
+    saveReview(newReview)
+    setCustomerReviews(getStoredReviews())
+    setReviewForm({ name: '', location: '', rating: 5, text: '' })
+    setShowForm(false)
+    setReviewSubmitted(true)
+    setTimeout(() => setReviewSubmitted(false), 4000)
+  }
+
+  useEffect(() => { void fetchProducts() }, [fetchProducts])
+
+  const topSelling = useMemo(() =>
+    products.filter(p => p.isActive).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 4),
   [products])
 
-  const featured = useMemo(() => 
-    products.filter(p => p.isActive).slice(4, 12), 
+  const featured = useMemo(() =>
+    products.filter(p => p.isActive).slice(4, 8),
   [products])
 
   const derivedCats = useMemo(() => {
     const names = Array.from(new Set(products.filter(p => p.isActive).map(p => p.category))).filter(Boolean)
-    return names.map(name => ({ name, icon: CAT_ICONS[name] || '🌿' }))
+    return names.map(name => ({ name, image: CAT_IMAGES[name] || CAT_DEFAULT }))
   }, [products])
 
   const derivedRemedies = useMemo(() => {
     const raw = Array.from(new Set(products.filter(p => p.isActive).flatMap(p => p.remedy || []))).filter(Boolean)
     return raw.map(label => ({
       label,
-      ...(REMEDY_MAP[label] || { emoji: '✨', bg: '#F3F4F6', border: '#E5E7EB' })
+      ...(REMEDY_MAP[label] || { emoji: '✨', bg: '#F3F4F6', border: '#D1D5DB' }),
     }))
   }, [products])
 
   return (
-    <div style={{ backgroundColor: C.bgMain, color: C.textMain, fontFamily: 'Inter, sans-serif' }}>
-      
-      {/* ═══ HERO SECTION ═══ */}
-      <section className="relative overflow-hidden flex items-center min-h-[85vh] py-12"
-        style={{ background: 'linear-gradient(135deg, #e8f5e2 0%, #f7f6f2 50%, #fdf7ed 100%)' }}>
-        
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-20 -right-20 w-96 h-96 rounded-full blur-3xl opacity-20" style={{ background: C.sageDark }} />
-          <div className="absolute bottom-0 left-0 w-80 h-80 rounded-full blur-3xl opacity-10" style={{ background: C.sand }} />
+    <div className="bg-[#F7F6F2] text-[#2C392A]">
+
+      {/* ═══════════════════════════════════════════════════════════
+          HERO SECTION
+      ════════════════════════════════════════════════════════════ */}
+      <section
+        className="relative overflow-hidden flex items-center min-h-[60vh] sm:min-h-[68vh] lg:min-h-[78vh] py-10 sm:py-14"
+        style={{ background: 'linear-gradient(140deg, #f4f8f1 0%, #f9f8f5 55%, #fffaf4 100%)' }}
+      >
+        {/* Ambient background glows — very subtle, premium feel */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-24 -right-12 w-[480px] h-[480px] rounded-full blur-[140px] opacity-[0.055]"
+            style={{ background: '#7DAA8F' }} />
+          <div className="absolute -bottom-16 -left-16 w-[380px] h-[380px] rounded-full blur-[120px] opacity-[0.04]"
+            style={{ background: '#EAD7B7' }} />
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8 }}>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6 bg-white/70 border border-sage/30 shadow-sm backdrop-blur-md">
-              <Sparkles size={14} className="text-sageDark" />
-              <span className="text-[11px] font-black uppercase tracking-widest">{t('hero.badge')}</span>
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 w-full grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+
+          {/* ── Left: Text Column ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {/* Eyebrow badge */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full mb-6
+              bg-[#7DAA8F]/10 border border-[#7DAA8F]/20">
+              <Sparkles size={11} className="text-[#5e8c72]" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#5e8c72]">
+                {t('hero.badge')}
+              </span>
             </div>
-            
-            <h1 className="text-5xl lg:text-7xl font-black leading-[1.1] mb-6 tracking-tight">
-              {t('hero.title1')} <br />
-              <span style={{ color: C.sageDark }}>{t('hero.title2')}</span>
+
+            {/* Headline — primary visual anchor */}
+            <h1 className="font-headline font-black leading-[1.0] tracking-[-0.02em] mb-5
+              text-[40px] sm:text-[54px] lg:text-[66px]">
+              <span className="block text-[#2C392A]">{t('hero.title1')}</span>
+              <span className="block text-[#7DAA8F]">{t('hero.title2')}</span>
             </h1>
-            
-            <p className="text-lg md:text-xl text-textMuted mb-10 max-w-lg leading-relaxed font-medium">
+
+            {/* English subtitle */}
+            <p className="text-[15px] sm:text-[16px] text-[#5F6D59] leading-[1.7] font-medium
+              mb-2.5 max-w-[420px]">
               {t('hero.subtitle')}
             </p>
 
-            <div className="flex flex-wrap gap-4">
-              <Link to="/products" className="px-8 py-4 bg-[#2C392A] text-white font-black rounded-2xl shadow-xl hover:scale-105 transition-transform flex items-center gap-2">
-                {t('common.shopNow') || 'Shop Now'} <ArrowRight size={18} />
+            {/* Tamil brand name — hardcoded, not a translation key, styled as elegant accent */}
+            <p className="text-[13px] sm:text-[14px] font-semibold text-[#7DAA8F]/75
+              tracking-[0.03em] mb-8 sm:mb-10">
+              {BRAND_TA}
+            </p>
+
+            {/* CTA buttons */}
+            <div className="flex flex-wrap gap-3 items-center">
+              <Link
+                to="/products"
+                className="group inline-flex items-center gap-2.5 px-7 py-3.5
+                  bg-[#2C392A] text-white font-bold rounded-full
+                  text-[13px] sm:text-[14px]
+                  shadow-[0_4px_22px_rgba(44,57,42,0.28)]
+                  hover:bg-[#1e2817]
+                  hover:shadow-[0_8px_32px_rgba(44,57,42,0.38)]
+                  hover:-translate-y-px
+                  transition-all duration-200"
+              >
+                <ShieldCheck size={14} />
+                {t('common.shopNow')}
+                <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform duration-200" />
               </Link>
-              <a href="#concerns" className="px-8 py-4 bg-white/50 text-textMain font-black rounded-2xl border border-sand/50 hover:bg-white transition-colors">
-                 {t('remedy.title')}
+
+              <a
+                href="#concerns"
+                className="inline-flex items-center gap-2 px-6 py-3.5
+                  bg-white text-[#2C392A] font-semibold rounded-full
+                  border border-[#2C392A]/10
+                  text-[13px] sm:text-[14px]
+                  shadow-sm
+                  hover:bg-[#F7F6F2] hover:border-[#2C392A]/20
+                  transition-all duration-200"
+              >
+                <Leaf size={13} className="text-[#7DAA8F]" />
+                {t('remedy.title')}
               </a>
             </div>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8 }} className="relative flex justify-center">
-            <div className="relative w-full max-w-[500px] aspect-square rounded-[3rem] overflow-hidden shadow-2xl border-[12px] border-white/50 bg-[#2C392A]">
-              <video 
-                src="/Add_shoot_video_202604072031.mp4" 
-                className="w-full h-full object-cover" 
-                autoPlay 
-                muted 
-                loop 
-                playsInline
+          {/* ── Right: Video / Image Column ── */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            className="relative flex justify-center lg:justify-end"
+          >
+            {/* Main video container */}
+            <div className="relative w-full max-w-[620px] aspect-[4/3] rounded-[2rem] overflow-hidden
+              shadow-[0_28px_80px_rgba(44,57,42,0.22)]
+              ring-1 ring-white/25">
+              <video
+                src="/Add_shoot_video_202604072031.mp4"
+                className="w-full h-full object-cover"
+                autoPlay muted loop playsInline
                 poster="/Gemini_Generated_Image_zb6vuxzb6vuxzb6v.png"
               />
-              <div className="absolute inset-0 bg-forestDark/10 pointer-events-none" />
+              {/* Subtle bottom vignette for depth */}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#2C392A]/10 via-transparent to-transparent pointer-events-none" />
             </div>
-            <motion.div 
-               animate={{ y: [0, -10, 0] }}
-               transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-               className="absolute -right-4 top-1/4 bg-white p-4 rounded-2xl shadow-xl border border-sand/30 hidden md:block"
+
+            {/* ─ Floating card: top-right — Organic badge ─ */}
+            <motion.div
+              animate={{ y: [0, -7, 0] }}
+              transition={{ repeat: Infinity, duration: 4.2, ease: 'easeInOut' }}
+              className="absolute -right-3 sm:-right-5 top-6 hidden md:block"
             >
-               <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500">
-                     <Activity size={20} />
-                  </div>
-                  <div>
-                     <p className="text-[10px] uppercase font-black text-textMuted tracking-tighter">Wellness</p>
-                     <p className="text-sm font-black text-textMain">Pure Extract</p>
-                  </div>
-               </div>
+              <div className="bg-white rounded-2xl px-4 py-3.5
+                shadow-[0_6px_28px_rgba(44,57,42,0.11)]
+                border border-[#EAD7B7]/50
+                flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-[#7DAA8F] flex items-center justify-center shrink-0">
+                  <Leaf size={14} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-[12px] font-black text-[#2C392A] leading-tight">100% Natural</p>
+                  <p className="text-[10px] text-[#5F6D59] font-medium mt-0.5">Siddha Certified</p>
+                </div>
+              </div>
             </motion.div>
+
+            {/* ─ Floating card: bottom-left — Social proof ─ */}
+            <motion.div
+              animate={{ y: [0, 7, 0] }}
+              transition={{ repeat: Infinity, duration: 5.2, ease: 'easeInOut', delay: 0.9 }}
+              className="absolute -left-3 sm:-left-5 bottom-6 hidden md:block"
+            >
+              <div className="bg-white rounded-2xl px-4 py-3.5
+                shadow-[0_6px_28px_rgba(44,57,42,0.11)]
+                border border-[#EAD7B7]/50">
+                <div className="flex items-center gap-0.5 mb-1.5">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <Star key={i} size={11} className="text-amber-400 fill-amber-400" />
+                  ))}
+                </div>
+                <p className="text-[13px] font-black text-[#2C392A] leading-tight">4.9 / 5.0</p>
+                <p className="text-[10px] text-[#5F6D59] font-medium mt-0.5">500+ Happy Customers</p>
+              </div>
+            </motion.div>
+
           </motion.div>
         </div>
       </section>
 
       {/* ═══ TRUST BADGES ═══ */}
-      <section className="max-w-7xl mx-auto px-4 -mt-10 relative z-20">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 -mt-8 sm:-mt-10 relative z-20">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           {[
-            { icon: <ShieldCheck />, title: t('trust.organic'), sub: t('trust.organic_sub') },
-            { icon: <Truck />, title: t('trust.shipping'), sub: t('trust.shipping_sub') },
-            { icon: <Leaf />, title: t('trust.pure'), sub: t('trust.pure_sub') },
-            { icon: <Award />, title: t('trust.gmp'), sub: t('trust.gmp_sub') },
+            { icon: <ShieldCheck size={17} />, title: t('trust.organic'),  sub: t('trust.organic_sub')  },
+            { icon: <Truck size={17} />,        title: t('trust.shipping'), sub: t('trust.shipping_sub') },
+            { icon: <Leaf size={17} />,          title: t('trust.pure'),    sub: t('trust.pure_sub')     },
+            { icon: <Award size={17} />,         title: t('trust.gmp'),     sub: t('trust.gmp_sub')      },
           ].map((item, idx) => (
-            <div key={idx} className="p-5 rounded-2xl bg-white border border-sand/20 shadow-soft flex items-center gap-4 transition-transform hover:-translate-y-1">
-              <div style={{ color: C.sageDark }}>{item.icon}</div>
-              <div>
-                <h4 className="font-black text-[13px] text-textMain">{item.title}</h4>
-                <p className="text-[10px] text-textMuted font-medium">{item.sub}</p>
+            <div key={idx}
+              className="flex items-center gap-3.5 p-4 sm:p-5
+                bg-white rounded-2xl
+                border border-[#EAD7B7]/35
+                shadow-sm
+                hover:-translate-y-0.5 transition-transform duration-200"
+            >
+              <div className="w-9 h-9 rounded-xl bg-[#7DAA8F]/12 flex items-center justify-center shrink-0 text-[#7DAA8F]">
+                {item.icon}
+              </div>
+              <div className="min-w-0">
+                <h4 className="font-bold text-[12px] sm:text-[13px] text-[#2C392A] leading-tight">{item.title}</h4>
+                <p className="text-[10px] text-[#5F6D59] font-medium mt-0.5 leading-snug">{item.sub}</p>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ═══ GENERAL CATEGORIES ═══ */}
-      <section className="max-w-7xl mx-auto px-4 py-24">
-        <div className="flex justify-between items-end mb-12">
+      {/* ═══ SHOP BY CATEGORIES ═══ */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+        <div className="flex justify-between items-end mb-10">
           <div>
-            <h2 className="text-3xl font-black tracking-tight">{t('cat.explore_title')}</h2>
-            <p className="text-sm text-textMuted mt-2 font-medium">{t('cat.explore_sub')}</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7DAA8F] mb-2">Browse Collection</p>
+            <h2 className="text-3xl sm:text-[38px] font-black tracking-tight text-[#2C392A]">{t('cat.title')}</h2>
           </div>
-          <Link to="/products" className="text-sageDark font-black flex items-center gap-1 group text-sm">
-            {t('cat.view_all')} <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+          <Link to="/products"
+            className="text-[13px] font-bold text-[#7DAA8F] flex items-center gap-1 group hover:text-[#5e8c72] transition-colors">
+            {t('cat.view_all')}
+            <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
           </Link>
         </div>
-        
-        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-6">
-          {derivedCats.map((c, idx) => (
-            <Link key={idx} to={`/products?cat=${encodeURIComponent(c.name)}`} className="flex flex-col items-center gap-3 group">
-              <div className="w-16 h-16 md:w-20 md:h-20 rounded-3xl bg-white shadow-soft flex items-center justify-center text-3xl group-hover:scale-110 group-hover:rotate-3 transition-transform border border-sand/10">
-                {c.icon}
+
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-4 sm:gap-5">
+          {derivedCats.slice(0, 6).map((c, idx) => (
+            <motion.div key={idx}
+              whileHover={{ y: -4 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 24 }}
+            >
+              <Link to={`/products?cat=${encodeURIComponent(c.name)}`} className="flex flex-col items-center group">
+                <div className="w-full aspect-square rounded-2xl overflow-hidden bg-[#EAD7B7]/20
+                  border border-[#EAD7B7]/30 shadow-sm group-hover:shadow-md
+                  transition-shadow duration-300 mb-2.5">
+                  <img
+                    src={c.image}
+                    alt={c.name}
+                    loading="lazy"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    onError={e => { (e.target as HTMLImageElement).src = CAT_DEFAULT }}
+                  />
+                </div>
+                <span className="text-[10px] sm:text-[11px] font-bold text-[#2C392A] text-center leading-tight
+                  group-hover:text-[#7DAA8F] transition-colors duration-200">
+                  {c.name}
+                </span>
+              </Link>
+            </motion.div>
+          ))}
+
+          {/* All Products tile */}
+          <motion.div
+            whileHover={{ y: -4 }}
+            transition={{ type: 'spring', stiffness: 340, damping: 24 }}
+          >
+            <Link to="/products" className="flex flex-col items-center group">
+              <div className="w-full aspect-square rounded-2xl bg-[#2C392A] flex items-center justify-center
+                shadow-sm group-hover:shadow-md transition-shadow duration-300 mb-2.5">
+                <div className="text-center">
+                  <ChevronRight size={26} className="text-white mx-auto mb-1 opacity-90" />
+                  <p className="text-white text-[9px] font-black uppercase tracking-wider opacity-75">All</p>
+                </div>
               </div>
-              <span className="text-[11px] sm:text-[12px] font-bold text-textMain text-center leading-tight group-hover:text-sageDark transition-colors">
-                 {t('cat.' + c.name) || c.name}
+              <span className="text-[10px] sm:text-[11px] font-bold text-[#2C392A] text-center leading-tight
+                group-hover:text-[#7DAA8F] transition-colors duration-200">
+                All Products
               </span>
             </Link>
-          ))}
+          </motion.div>
         </div>
       </section>
 
       {/* ═══ HEALTH CONCERNS ═══ */}
-      <section id="concerns" className="bg-white/60 py-24 border-y border-sand/10 scroll-mt-20">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <div className="mb-14">
-            <span className="text-sageDark font-black text-[11px] tracking-[0.2em] uppercase">{t('remedy.badge') || 'Targeted Healing'}</span>
-            <h2 className="text-4xl font-black mt-3 mb-4 tracking-tight">{t('remedy.title')}</h2>
-            <p className="text-lg text-textMuted max-w-2xl mx-auto font-medium">{t('remedy.sub')}</p>
+      <section id="concerns" className="bg-white py-16 sm:py-24 border-y border-[#EAD7B7]/30 scroll-mt-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
+          <div className="mb-12">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7DAA8F]">{t('remedy.badge')}</p>
+            <h2 className="text-3xl sm:text-[38px] font-black mt-3 mb-3 tracking-tight text-[#2C392A]">{t('remedy.title')}</h2>
+            <p className="text-[15px] text-[#5F6D59] max-w-xl mx-auto font-medium leading-relaxed">{t('remedy.sub')}</p>
           </div>
-          <div className="flex flex-wrap justify-center gap-4">
+          <div className="flex flex-wrap justify-center gap-3">
             {derivedRemedies.map((r, idx) => (
-              <Link key={idx} to={`/products?remedy=${encodeURIComponent(r.label)}`} 
+              <Link
+                key={idx}
+                to={`/products?remedy=${encodeURIComponent(r.label)}`}
                 style={{ background: r.bg, borderColor: r.border }}
-                className="inline-flex items-center gap-3 px-6 py-4 rounded-2xl border-2 hover:scale-105 transition-transform shadow-sm group">
-                <span className="text-2xl transition-transform group-hover:scale-125">{r.emoji}</span>
-                <h3 className="font-bold text-[14px] text-textMain m-0">{t('remedy.' + r.label) || r.label}</h3>
+                className="inline-flex items-center gap-2.5 px-5 py-3 rounded-2xl
+                  border-2 shadow-sm
+                  hover:scale-[1.03] hover:shadow-md
+                  transition-all duration-200 group"
+              >
+                <span className="text-[18px] group-hover:scale-110 transition-transform duration-200">{r.emoji}</span>
+                <span className="font-bold text-[13px] text-[#2C392A]">{t('remedy.' + r.label)}</span>
               </Link>
             ))}
           </div>
@@ -225,57 +433,375 @@ export default function Home() {
       </section>
 
       {/* ═══ TOP SELLING ═══ */}
-      <section className="max-w-7xl mx-auto px-4 py-24">
-        <div className="flex justify-between items-end mb-12">
-            <div className="flex items-center gap-3">
-               <div className="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500">
-                  <TrendingUp size={22} />
-               </div>
-               <h2 className="text-3xl font-black tracking-tight">{t('top.title')}</h2>
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+        <div className="flex justify-between items-center mb-10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 shrink-0">
+              <TrendingUp size={19} />
             </div>
-            <Link to="/products" className="text-sm font-black text-sageDark hover:underline">{t('cat.view_all')}</Link>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7DAA8F]">Customer Favourites</p>
+              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[#2C392A]">{t('top.title')}</h2>
+            </div>
+          </div>
+          <Link to="/products"
+            className="text-[13px] font-bold text-[#7DAA8F] hover:text-[#5e8c72] flex items-center gap-1 transition-colors">
+            {t('cat.view_all')} <ChevronRight size={15} />
+          </Link>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-           {topSelling.map(p => <ProductCard key={p.id} product={p} />)}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          {topSelling.map(p => <ProductCard key={p.id} product={p} />)}
+        </div>
+      </section>
+
+      {/* ═══ TESTIMONIALS + CUSTOMER REVIEWS ═══ */}
+      <section className="bg-white py-16 sm:py-24 border-y border-[#EAD7B7]/30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-12">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7DAA8F]">Customer Reviews</p>
+              <h2 className="text-3xl sm:text-[38px] font-black mt-3 mb-2 tracking-tight text-[#2C392A]">
+                Trusted by Thousands
+              </h2>
+              <p className="text-[14px] text-[#5F6D59] max-w-md font-medium leading-relaxed">
+                Real results from real customers across Tamil Nadu
+              </p>
+            </div>
+            <button
+              onClick={() => setShowForm(v => !v)}
+              className="shrink-0 inline-flex items-center gap-2 px-5 py-3 rounded-xl
+                bg-[#2C392A] text-white font-bold text-[13px]
+                hover:bg-[#1e2817] transition-colors"
+            >
+              <Star size={14} className="fill-amber-300 text-amber-300" />
+              Write a Review
+            </button>
+          </div>
+
+          {/* Success toast */}
+          <AnimatePresence>
+            {reviewSubmitted && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="mb-6 bg-green-50 border border-green-200 text-green-700 px-5 py-3.5 rounded-xl text-sm font-bold"
+              >
+                ✅ Thank you! Your review has been posted.
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Review form */}
+          <AnimatePresence>
+            {showForm && (
+              <motion.form
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                onSubmit={handleReviewSubmit}
+                className="mb-10 bg-[#F7F6F2] rounded-2xl p-6 border border-[#EAD7B7]/40 overflow-hidden"
+              >
+                <h3 className="font-bold text-[#2C392A] mb-5 text-[15px]">Share Your Experience</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#5F6D59] mb-1.5 uppercase tracking-wide">Your Name *</label>
+                    <input
+                      required
+                      placeholder="e.g. Priya S."
+                      className="w-full px-4 py-2.5 rounded-xl border-2 border-[#EAD7B7] focus:border-[#7DAA8F] outline-none bg-white text-[13px]"
+                      value={reviewForm.name}
+                      onChange={e => setReviewForm(f => ({ ...f, name: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#5F6D59] mb-1.5 uppercase tracking-wide">City / Location</label>
+                    <input
+                      placeholder="e.g. Chennai"
+                      className="w-full px-4 py-2.5 rounded-xl border-2 border-[#EAD7B7] focus:border-[#7DAA8F] outline-none bg-white text-[13px]"
+                      value={reviewForm.location}
+                      onChange={e => setReviewForm(f => ({ ...f, location: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-xs font-bold text-[#5F6D59] mb-2 uppercase tracking-wide">Rating *</label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setReviewForm(f => ({ ...f, rating: n }))}
+                        className="transition-transform hover:scale-110"
+                      >
+                        <Star
+                          size={28}
+                          className={n <= reviewForm.rating ? 'fill-amber-400 text-amber-400' : 'text-[#D1C9B8]'}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mb-5">
+                  <label className="block text-xs font-bold text-[#5F6D59] mb-1.5 uppercase tracking-wide">Your Review *</label>
+                  <textarea
+                    required
+                    rows={3}
+                    placeholder="Tell others about your experience with our products..."
+                    className="w-full px-4 py-2.5 rounded-xl border-2 border-[#EAD7B7] focus:border-[#7DAA8F] outline-none bg-white text-[13px] resize-none"
+                    value={reviewForm.text}
+                    onChange={e => setReviewForm(f => ({ ...f, text: e.target.value }))}
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button type="submit"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#7DAA8F] hover:bg-[#5e8c72] text-white font-bold text-[13px] transition-colors">
+                    <Send size={14} /> Post Review
+                  </button>
+                  <button type="button" onClick={() => setShowForm(false)}
+                    className="px-5 py-2.5 rounded-xl border-2 border-[#EAD7B7] text-[#5F6D59] font-bold text-[13px] hover:bg-[#F7F6F2] transition-colors">
+                    Cancel
+                  </button>
+                </div>
+              </motion.form>
+            )}
+          </AnimatePresence>
+
+          {/* Hardcoded + customer reviews grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {TESTIMONIALS.map((review, idx) => (
+              <motion.div
+                key={`static-${idx}`}
+                initial={{ opacity: 0, y: 18 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.45, delay: idx * 0.08 }}
+                className="bg-[#F7F6F2] rounded-2xl p-5 sm:p-6 border border-[#EAD7B7]/30 flex flex-col gap-3.5 hover:shadow-md transition-shadow duration-300"
+              >
+                <div className="flex items-center gap-0.5">
+                  {Array.from({ length: review.rating }).map((_, i) => (
+                    <Star key={i} size={13} className="text-amber-400 fill-amber-400" />
+                  ))}
+                </div>
+                <p className="text-[13px] text-[#5F6D59] leading-[1.65] flex-grow">&ldquo;{review.text}&rdquo;</p>
+                <div className="flex items-center gap-2.5 pt-3 border-t border-[#EAD7B7]/40">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-black shrink-0"
+                    style={{ backgroundColor: review.color }}>
+                    {review.initials}
+                  </div>
+                  <div>
+                    <p className="font-bold text-[12px] text-[#2C392A] leading-tight">{review.name}</p>
+                    <p className="text-[10px] text-[#5F6D59] mt-0.5">{review.location}</p>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+
+            {/* Customer-submitted reviews */}
+            {customerReviews.slice(0, 4).map((review) => {
+              const colors = ['#7DAA8F', '#C4845C', '#8B7355', '#5e8c72']
+              const color = colors[review.name.charCodeAt(0) % colors.length]
+              return (
+                <motion.div
+                  key={review.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-[#F7F6F2] rounded-2xl p-5 sm:p-6 border border-[#7DAA8F]/20 flex flex-col gap-3.5 hover:shadow-md transition-shadow duration-300"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-0.5">
+                      {Array.from({ length: review.rating }).map((_, i) => (
+                        <Star key={i} size={13} className="text-amber-400 fill-amber-400" />
+                      ))}
+                    </div>
+                    <span className="text-[9px] font-bold text-[#7DAA8F] bg-[#7DAA8F]/10 px-2 py-0.5 rounded-full">Verified</span>
+                  </div>
+                  <p className="text-[13px] text-[#5F6D59] leading-[1.65] flex-grow">&ldquo;{review.text}&rdquo;</p>
+                  <div className="flex items-center gap-2.5 pt-3 border-t border-[#EAD7B7]/40">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-black shrink-0"
+                      style={{ backgroundColor: color }}>
+                      {review.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-bold text-[12px] text-[#2C392A] leading-tight">{review.name}</p>
+                      <p className="text-[10px] text-[#5F6D59] mt-0.5">{review.location}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </div>
         </div>
       </section>
 
       {/* ═══ FEATURED BANNER ═══ */}
-      <section className="max-w-7xl mx-auto px-4 py-8">
-        <div className="relative rounded-[3rem] overflow-hidden bg-forestDark text-white p-12 lg:p-24 shadow-2xl">
-           <div className="absolute inset-0 opacity-15 pointer-events-none">
-              <img src="https://images.unsplash.com/photo-1512103522279-9e54d799db91?auto=format&fit=crop&q=80&w=1200" alt="bg" className="w-full h-full object-cover" />
-           </div>
-           <div className="relative z-10 grid lg:grid-cols-2 gap-12 items-center">
-              <div>
-                 <div className="inline-block px-4 py-1 bg-white/10 rounded-full text-[10px] uppercase font-black tracking-widest mb-6 border border-white/20">
-                    {t('banner.badge')}
-                 </div>
-                 <h2 className="text-4xl lg:text-7xl font-black mb-8 leading-tight">{t('banner.title')}</h2>
-                 <p className="text-xl opacity-70 mb-12 max-w-md font-medium leading-relaxed">{t('banner.sub')}</p>
-                 <Link to="/products" className="px-12 py-5 bg-white text-forestDark font-black rounded-2xl hover:scale-105 transition-transform inline-flex items-center gap-2 shadow-xl">
-                    {t('banner.cta')} <ArrowRight size={20} />
-                 </Link>
-              </div>
-           </div>
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+        <div className="relative rounded-[2rem] overflow-hidden bg-[#2C392A] text-white
+          p-10 sm:p-14 lg:p-20
+          shadow-[0_24px_80px_rgba(44,57,42,0.28)]">
+          <div className="absolute inset-0 opacity-[0.09] pointer-events-none">
+            <img
+              src="https://images.unsplash.com/photo-1512103522279-9e54d799db91?auto=format&fit=crop&q=80&w=1400"
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-r from-[#2C392A] via-[#2C392A]/80 to-transparent pointer-events-none" />
+
+          <div className="relative z-10 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full
+              bg-white/10 border border-white/15 mb-6">
+              <Sparkles size={11} className="text-[#B2C7A5]" />
+              <span className="text-[9px] font-black uppercase tracking-[0.22em] text-white/75">
+                {t('banner.badge')}
+              </span>
+            </div>
+            <h2 className="text-[36px] sm:text-5xl lg:text-[58px] font-black mb-5 leading-[1.05] tracking-tight">
+              {t('banner.title')}
+            </h2>
+            <p className="text-[14px] sm:text-[16px] text-white/65 mb-10 max-w-sm font-medium leading-relaxed">
+              {t('banner.sub')}
+            </p>
+            <Link
+              to="/products"
+              className="inline-flex items-center gap-2.5 px-9 py-4
+                bg-white text-[#2C392A] font-black rounded-2xl
+                hover:bg-[#F7F6F2] hover:scale-[1.02]
+                transition-all duration-200
+                shadow-[0_4px_20px_rgba(0,0,0,0.2)]
+                text-[13px] sm:text-[14px]"
+            >
+              {t('banner.cta')} <ArrowRight size={16} />
+            </Link>
+          </div>
         </div>
       </section>
 
-      {/* ═══ BOTTOM NAVIGATION ═══ */}
-      <section className="max-w-7xl mx-auto px-4 py-24 text-center">
-         <div className="max-w-3xl mx-auto">
-            <h2 className="text-3xl font-black mb-6">{t('more.title')}</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-               {featured.slice(0, 4).map(p => (
-                 <div key={p.id} className="opacity-70 grayscale hover:grayscale-0 hover:opacity-100 transition-all">
-                    <ProductCard product={p} />
-                 </div>
-               ))}
+      {/* ═══ GOOGLE MAP LOCATION ═══ */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 items-stretch">
+          {/* Map — tap-to-open card (avoids wrong-location iframe embedding) */}
+          <a
+            href={BRAND_LOCATION_LINK}
+            target="_blank"
+            rel="noreferrer"
+            className="group relative rounded-[2rem] overflow-hidden
+              border border-[#EAD7B7]/40 shadow-sm
+              min-h-[280px] sm:min-h-[340px] block
+              bg-gradient-to-br from-[#eaf2e5] to-[#d4e8d0]"
+          >
+            {/* Decorative map-like grid */}
+            <div className="absolute inset-0 opacity-10"
+              style={{ backgroundImage: 'linear-gradient(#2C392A 1px, transparent 1px), linear-gradient(90deg, #2C392A 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+            {/* Center pin */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10">
+              <div className="w-16 h-16 rounded-full bg-[#2C392A] flex items-center justify-center shadow-xl
+                group-hover:scale-110 transition-transform duration-300">
+                <MapPin size={30} className="text-white" />
+              </div>
+              <div className="text-center">
+                <p className="font-black text-[#2C392A] text-[15px]">{BRAND_EN}</p>
+                <p className="text-[#5F6D59] text-[12px] mt-1">Tamil Nadu, India</p>
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl
+                bg-[#2C392A] text-white text-[12px] font-bold
+                group-hover:bg-[#7DAA8F] transition-colors duration-300">
+                <ExternalLink size={12} /> Open in Google Maps
+              </div>
             </div>
-            <Link to="/products" className="inline-flex items-center gap-3 px-10 py-5 rounded-full bg-sageDark text-white font-black shadow-xl hover:scale-105 transition-all">
-               {t('more.cta')} <ArrowRight size={20} />
-            </Link>
-         </div>
+          </a>
+
+          {/* Info card */}
+          <div className="bg-white rounded-[2rem] p-8 sm:p-10
+            border border-[#EAD7B7]/40 shadow-sm
+            flex flex-col justify-between gap-6">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7DAA8F]">Find Us</p>
+              <h2 className="text-2xl sm:text-3xl font-black mt-2.5 mb-4 text-[#2C392A] tracking-tight">
+                Visit Our Store
+              </h2>
+              <p className="text-[#5F6D59] text-[14px] leading-[1.7] font-medium mb-6">
+                Come experience our authentic Siddha herbal products in person. Our knowledgeable staff will help you find the right remedies for your needs.
+              </p>
+
+              <div className="space-y-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-[#7DAA8F]/12 flex items-center justify-center shrink-0">
+                    <MapPin size={16} className="text-[#7DAA8F]" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-[13px] text-[#2C392A] leading-tight">Store Location</p>
+                    <p className="text-[13px] text-[#5F6D59] mt-0.5">{BRAND_EN}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-[#7DAA8F]/12 flex items-center justify-center shrink-0">
+                    <Phone size={16} className="text-[#7DAA8F]" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-[13px] text-[#2C392A] leading-tight">Call / WhatsApp</p>
+                    <p className="text-[13px] text-[#5F6D59] mt-0.5">{BRAND_PHONE_DISPLAY}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <a
+                href={BRAND_LOCATION_LINK}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 inline-flex items-center justify-center gap-2
+                  px-5 py-3.5
+                  bg-[#2C392A] text-white font-bold rounded-xl
+                  hover:bg-[#1e2817] transition-colors
+                  text-[13px]"
+              >
+                <MapPin size={14} /> Get Directions
+              </a>
+              <a
+                href={BRAND_WHATSAPP_LINK}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 inline-flex items-center justify-center gap-2
+                  px-5 py-3.5
+                  bg-[#25D366] hover:bg-[#1eb858] text-white font-bold rounded-xl
+                  transition-colors
+                  text-[13px]"
+              >
+                <MessageCircle size={14} /> WhatsApp Us
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ MORE PRODUCTS ═══ */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24 text-center">
+        <h2 className="text-2xl sm:text-3xl font-black mb-8 text-[#2C392A] tracking-tight">
+          {t('more.title')}
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-5 mb-10">
+          {featured.map(p => (
+            <div key={p.id}>
+              <ProductCard product={p} />
+            </div>
+          ))}
+        </div>
+        <Link
+          to="/products"
+          className="inline-flex items-center gap-2.5 px-10 py-4 rounded-full
+            bg-[#7DAA8F] text-white font-black
+            shadow-[0_4px_20px_rgba(125,170,143,0.35)]
+            hover:bg-[#5e8c72] hover:scale-[1.02] hover:shadow-[0_6px_28px_rgba(125,170,143,0.45)]
+            transition-all duration-200
+            text-[13px] sm:text-[14px]"
+        >
+          {t('more.cta')} <ArrowRight size={16} />
+        </Link>
       </section>
 
     </div>

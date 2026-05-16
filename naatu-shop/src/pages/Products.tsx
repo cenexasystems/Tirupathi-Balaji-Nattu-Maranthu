@@ -33,7 +33,7 @@ function FilterSideBlock({
         <div className="flex items-center gap-2 mb-4">
            <div className="w-1 h-4 bg-sageDark rounded-full"></div>
            <h3 className="text-[13px] font-black text-textMain uppercase tracking-wider">
-              {t('cat.explore_title') || t('admin.category')}
+              {t('cat.title')}
            </h3>
         </div>
         <div className="space-y-1">
@@ -43,7 +43,7 @@ function FilterSideBlock({
                onClick={() => setActiveCategory(cat)}
                className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-between group ${activeCategory === cat ? 'bg-sageDark text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-sageDark'}`}
              >
-              <span>{cat === 'All' ? t('cat.view_all') : (t('cat.' + cat) || cat)}</span>
+              <span>{cat === 'All' ? t('cat.view_all') : t('cat.' + cat)}</span>
               <div className={`w-1.5 h-1.5 rounded-full transition-all ${activeCategory === cat ? 'bg-white' : 'bg-transparent group-hover:bg-sage/40'}`}></div>
             </button>
           ))}
@@ -52,22 +52,22 @@ function FilterSideBlock({
 
       <div>
         <div className="flex items-center gap-2 mb-4">
-           <div className="w-1 h-4 bg-purple-400 rounded-full"></div>
+           <div className="w-1 h-4 bg-sageDark rounded-full"></div>
            <h3 className="text-[13px] font-black text-textMain uppercase tracking-wider">
               {t('remedy.title')}
            </h3>
         </div>
         <div className="flex flex-col gap-1.5">
           {healthConcerns.map(rem => (
-            <label key={rem} className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-colors border ${activeRem.includes(rem) ? 'bg-purple-50 border-purple-100' : 'border-transparent hover:bg-gray-50'}`}>
+            <label key={rem} className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-colors border ${activeRem.includes(rem) ? 'bg-sage/10 border-sage/20' : 'border-transparent hover:bg-gray-50'}`}>
               <input
                 type="checkbox"
                 checked={activeRem.includes(rem)}
                 onChange={() => toggle(activeRem, setActiveRem, rem)}
-                className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                className="w-4 h-4 rounded border-gray-300 text-sageDark focus:ring-sage"
               />
-              <span className={`text-[13px] font-bold transition-colors ${activeRem.includes(rem) ? 'text-purple-700' : 'text-gray-500'}`}>
-                {t('remedy.' + rem) || rem}
+              <span className={`text-[13px] font-bold transition-colors ${activeRem.includes(rem) ? 'text-sageDark' : 'text-gray-500'}`}>
+                {t('remedy.' + rem)}
               </span>
             </label>
           ))}
@@ -141,13 +141,33 @@ export default function Products() {
     return out
   }, [products, search, activeCategory, activeRem, sort])
 
+  const SkeletonCard = () => (
+    <div className="rounded-2xl border border-[#EAD7B7]/50 bg-white overflow-hidden animate-pulse">
+      <div className="aspect-square bg-[#EAD7B7]/30" />
+      <div className="p-3 space-y-2">
+        <div className="h-2 bg-[#EAD7B7]/40 rounded w-1/2" />
+        <div className="h-3 bg-[#EAD7B7]/40 rounded w-4/5" />
+        <div className="h-3 bg-[#EAD7B7]/30 rounded w-3/5" />
+        <div className="flex gap-1 mt-2">
+          {[1,2,3,4].map(i => <div key={i} className="h-5 bg-[#EAD7B7]/30 rounded-lg w-10" />)}
+        </div>
+        <div className="flex justify-between items-center pt-2 border-t border-[#EAD7B7]/30 mt-2">
+          <div className="h-5 bg-[#EAD7B7]/40 rounded w-14" />
+          <div className="h-8 bg-[#EAD7B7]/40 rounded-xl w-16" />
+        </div>
+      </div>
+    </div>
+  )
+
   return (
-    <div className="bg-[#f8f9fa] min-h-screen">
+    <div className="bg-bgMain min-h-screen">
       {/* Header Panel */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="mx-auto max-w-7xl px-4 py-12 text-center">
-          <motion.h1 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="text-4xl font-black font-headline text-[#232f3e] mb-2">{t('products.title')}</motion.h1>
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="text-gray-500 font-medium">{t('products.sub')}</motion.p>
+      <div className="bg-white border-b border-[#EAD7B7]/30">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:py-10 text-center">
+          <motion.h1 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+            className="text-2xl sm:text-4xl font-black font-headline text-[#2C392A] mb-2">{t('products.title')}</motion.h1>
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}
+            className="text-sm sm:text-base text-[#5F6D59] font-medium">{t('products.sub')}</motion.p>
         </div>
       </div>
 
@@ -180,10 +200,10 @@ export default function Products() {
           <div className="flex flex-col sm:flex-row gap-4 mb-8">
             <div className="relative flex-grow">
                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-               <input 
+               <input
                  value={search}
                  onChange={e => setSearch(e.target.value)}
-                 className="w-full h-12 pl-12 pr-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-sage focus:border-transparent outline-none shadow-sm transition-all" 
+                 className="w-full h-10 sm:h-12 pl-12 pr-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-sage focus:border-transparent outline-none shadow-sm transition-all" 
                  placeholder={t('nav.search_placeholder')}
                />
             </div>
@@ -191,14 +211,14 @@ export default function Products() {
                <select 
                  value={sort}
                  onChange={e => setSort(e.target.value)}
-                 className="h-12 px-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold shadow-sm outline-none cursor-pointer"
+                 className="h-10 sm:h-12 px-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold shadow-sm outline-none cursor-pointer"
                >
                  <option value="default">{t('products.sort.default')}</option>
                  <option value="price-asc">{t('products.sort.price_low')}</option>
                  <option value="price-desc">{t('products.sort.price_high')}</option>
                  <option value="rating">{t('products.sort.rating')}</option>
                </select>
-               <button onClick={() => setShowFilters(!showFilters)} className="lg:hidden h-12 w-12 flex items-center justify-center bg-white border border-gray-200 rounded-2xl shadow-sm">
+              <button onClick={() => setShowFilters(!showFilters)} className="lg:hidden h-10 w-10 sm:h-12 sm:w-12 flex items-center justify-center bg-white border border-gray-200 rounded-2xl shadow-sm">
                   <SlidersHorizontal size={20}/>
                </button>
             </div>
@@ -236,18 +256,24 @@ export default function Products() {
           </div>
 
           {/* Grid */}
-          {!loading && filtered.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-3xl p-20 text-center flex flex-col items-center">
-               <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6"><Search className="text-gray-300" size={32}/></div>
-               <h3 className="text-xl font-black mb-2">{t('products.none')}</h3>
-               <p className="text-gray-500 max-w-xs mx-auto mb-6 text-sm">No herbs were found matching your current filter criteria.</p>
-               <button onClick={clear} className="text-sm font-black text-sageDark hover:underline">Clear all filters</button>
+          {loading ? (
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+              {Array.from({ length: 12 }).map((_, i) => <SkeletonCard key={i} />)}
+            </div>
+          ) : !loading && filtered.length === 0 ? (
+            <div className="bg-white border border-[#EAD7B7]/40 rounded-3xl p-10 sm:p-20 text-center flex flex-col items-center">
+               <div className="w-20 h-20 bg-[#F7F6F2] rounded-full flex items-center justify-center mb-6">
+                 <Search className="text-[#EAD7B7]" size={32}/>
+               </div>
+               <h3 className="text-xl font-black mb-2 text-[#2C392A]">{t('products.none')}</h3>
+               <p className="text-[#5F6D59] max-w-xs mx-auto mb-6 text-sm">No products found matching your filters.</p>
+               <button onClick={clear} className="text-sm font-black text-[#7DAA8F] hover:underline">Clear all filters</button>
             </div>
           ) : (
-            <motion.div layout className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-2 xl:grid-cols-4">
+            <motion.div layout className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
               <AnimatePresence mode="popLayout">
                 {filtered.map(p => (
-                  <motion.div key={p.id} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.2 }}>
+                  <motion.div key={p.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
                      <ProductCard product={p} />
                   </motion.div>
                 ))}
@@ -256,7 +282,7 @@ export default function Products() {
           )}
 
           {/* Info Banner */}
-          <div className="mt-12 p-8 bg-green-50 border border-green-100 rounded-3xl flex flex-col sm:flex-row items-center gap-6">
+          <div className="mt-12 p-6 sm:p-8 bg-green-50 border border-green-100 rounded-3xl flex flex-col sm:flex-row items-center gap-6">
              <div className="w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center shrink-0">
                 <CheckCircle2 size={32} className="text-green-600" />
              </div>

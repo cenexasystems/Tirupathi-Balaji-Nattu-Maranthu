@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "seed": "tsx seedProducts.ts"
+    "seed": "tsx ./bootstrap/seedProducts.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",

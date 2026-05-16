@@ -32,11 +32,17 @@ npm run build
 
 No custom Node server is required for this frontend deployment.
 
-## Seed Products
+## Supabase Migrations (Production)
 
-If the catalog shows the empty-table warning, seed the `products` table before shipping:
+Run canonical SQL migrations in this exact order from Supabase SQL Editor:
 
-1. Open Supabase SQL Editor and run `seed_products.sql`, or
-2. Set `SUPABASE_SERVICE_ROLE_KEY` in `.env` and run `npm run seed` inside `naatu-shop`.
+1. `supabase/migrations/20260426_0001_canonical_hardening.sql`
+2. `supabase/migrations/20260426_0002_order_items_atomic_order.sql`
+3. `supabase/migrations/20260427_0003_catalog_cleanup_release_prep.sql`
 
-The seed data is written to the `image` column so the storefront can render the product cards immediately.
+The third migration performs release cleanup so only the curated active catalog is exposed to storefront/POS.
+
+## Legacy Seed Files
+
+`seed_products.sql`, `COMPLETE_SETUP.sql`, `supabase_schema.sql`, and generated SQL artifacts are legacy setup files.
+Do not run them in production release-prep workflows.

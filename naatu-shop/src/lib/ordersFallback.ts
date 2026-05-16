@@ -1,8 +1,8 @@
 import type { UnitType } from './retail'
 
 export type LocalOrderItem = {
-  id?: number | null
-  product_id?: number | null
+  id?: string | null
+  product_id?: string | null
   name: string
   nameTa?: string | null
   tamil_name?: string | null

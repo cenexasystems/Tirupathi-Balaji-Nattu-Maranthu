@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase } from '../lib/supabase'
+import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import {
   calculateLineTotal,
   getDefaultQuantityForProduct,
@@ -123,16 +123,26 @@ const asRecord = (value: unknown): Record<string, unknown> => {
 
 const readString = (value: unknown, fallback = '') => (typeof value === 'string' ? value : fallback)
 
+// Admin emails — check this regardless of what the DB profile says.
+// This lets the owner log in as admin even if the DB profile row has role='customer'.
+const ADMIN_EMAILS_LOCAL = new Set([
+  'admin@srisiddha.com',
+  'eshwarbalaji07@gmail.com',
+  (import.meta.env.VITE_ADMIN_EMAIL as string || '').toLowerCase().trim(),
+].filter(Boolean))
+
 const toAuthUser = (profile: unknown, fallback?: SessionFallback): AuthUser => {
   const profileRow = asRecord(profile)
   const fallbackMeta = asRecord(fallback?.user_metadata)
+  const email = String(profileRow.email || fallback?.email || '')
+  const isAdmin = profileRow.role === 'admin' || ADMIN_EMAILS_LOCAL.has(email.toLowerCase())
 
   return {
     id: String(profileRow.id || fallback?.id || ''),
     name: String(profileRow.name || fallbackMeta.name || fallback?.email || 'Customer'),
-    email: String(profileRow.email || fallback?.email || ''),
+    email,
     mobile: String(profileRow.mobile || fallbackMeta.mobile || fallback?.phone || ''),
-    role: profileRow.role === 'admin' ? 'admin' : 'customer',
+    role: isAdmin ? 'admin' : 'customer',
   }
 }
 
@@ -220,6 +230,16 @@ export const useProductStore = create<ProductState>((set, get) => ({
   fetchProducts: async (force = false) => {
     if (!force && Date.now() - get().lastFetch < 300000 && get().products.length > 0) return
 
+    if (!isSupabaseConfigured) {
+      set({
+        products: [],
+        loading: false,
+        error: 'Supabase is not configured',
+        lastFetch: Date.now(),
+      })
+      return
+    }
+
     set({ loading: true, error: null })
     try {
       const { data, error } = await supabase
@@ -254,8 +274,14 @@ export const useCartStore = create<CartState>()(
         const lineTotal = calculateLineTotal(qty, product.unitType, product.baseQuantity, basePrice)
 
         if (existing) {
-          existing.qty += qty
-          existing.lineTotal = calculateLineTotal(existing.qty, existing.unitType, existing.baseQuantity, basePrice)
+          const mergedQty = normalizeSelectedQuantity(
+            existing.qty + qty,
+            existing.unitType,
+            existing.allowDecimalQuantity,
+            existing.unitType === 'unit' || existing.unitType === 'bundle' ? 1 : Math.max(existing.baseQuantity, 0.001),
+          )
+          existing.qty = mergedQty
+          existing.lineTotal = calculateLineTotal(mergedQty, existing.unitType, existing.baseQuantity, basePrice)
         } else {
           items.push({
             ...product,
@@ -271,11 +297,16 @@ export const useCartStore = create<CartState>()(
       updateQuantity: (id, qty) => {
         const items = get().items.map(item => {
           if (item.id === id) {
-            const newQty = Math.max(item.unitType === 'unit' ? 1 : 0.001, qty)
+            const newQty = normalizeSelectedQuantity(
+              qty,
+              item.unitType,
+              item.allowDecimalQuantity,
+              item.unitType === 'unit' || item.unitType === 'bundle' ? 1 : Math.max(item.baseQuantity, 0.001),
+            )
             return {
-               ...item,
-               qty: newQty,
-               lineTotal: calculateLineTotal(newQty, item.unitType, item.baseQuantity, item.basePrice)
+              ...item,
+              qty: newQty,
+              lineTotal: calculateLineTotal(newQty, item.unitType, item.baseQuantity, item.basePrice)
             }
           }
           return item

@@ -7,7 +7,7 @@ export type QuantityOption = {
 }
 
 export type StructuredOrderItem = {
-  product_id: number | null
+  product_id: string | null   // UUID string — Supabase products.id is UUID
   name: string
   tamil_name: string | null
   quantity: number
@@ -379,7 +379,7 @@ export const calculateStockDeduction = (input: {
 }
 
 export const buildStructuredOrderItem = (input: {
-  productId: number | null
+  productId: string | null   // UUID string
   name: string
   tamilName?: string | null
   quantity: number
@@ -434,10 +434,12 @@ export const normalizeStructuredOrderItem = (raw: Record<string, unknown>): Stru
     ? roundTo(lineTotalRaw, 2)
     : calculateLineTotal(quantity, unitType, baseQuantity, basePrice)
 
+  // products.id is UUID in Supabase — return as string, not number
   const productIdValue = raw.product_id ?? raw.productId ?? raw.id
-  const productId = Number.isFinite(Number(productIdValue))
-    ? Number(productIdValue)
-    : null
+  const productId: string | null =
+    productIdValue !== null && productIdValue !== undefined && String(productIdValue).trim()
+      ? String(productIdValue).trim()
+      : null
 
   return {
     product_id: productId,
