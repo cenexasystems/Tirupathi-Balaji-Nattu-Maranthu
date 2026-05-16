@@ -1,5 +1,5 @@
 import './index.css'
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
@@ -7,32 +7,48 @@ import FloatingCart from './components/FloatingCart'
 import Home from './pages/Home'
 import Products from './pages/Products'
 import Cart from './pages/Cart'
-import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Favorites from './pages/Favorites'
 import ProductDetails from './pages/ProductDetails'
 import Checkout from './pages/Checkout'
 import Profile from './pages/Profile'
-import Pos from './pages/Pos'
 import { useAuthStore, useProductStore } from './store/store'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { BRAND_EN } from './lib/brand'
 
+// Heavy admin pages — split into separate chunks
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Pos       = lazy(() => import('./pages/Pos'))
+
+function LoadingSpinner() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-bgMain">
+      <span className="w-10 h-10 border-4 border-sand border-t-sageDark rounded-full animate-spin" />
+    </div>
+  )
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated())
+  const user = useAuthStore((state) => state.user)
+  const loading = useAuthStore((state) => state.loading)
   const location = useLocation()
-  return isAuthenticated ? <>{children}</> : <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname)}`} replace />
+  if (loading) return <LoadingSpinner />
+  return user ? <>{children}</> : <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname)}`} replace />
 }
 
 function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated())
-  return isAuthenticated ? <Navigate to="/" replace /> : <>{children}</>
+  const user = useAuthStore((state) => state.user)
+  const loading = useAuthStore((state) => state.loading)
+  if (loading) return <LoadingSpinner />
+  return user ? <Navigate to="/" replace /> : <>{children}</>
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const isAdmin = useAuthStore((state) => state.isAdmin())
-  return isAdmin ? <>{children}</> : <Navigate to="/" replace />
+  const user = useAuthStore((state) => state.user)
+  const loading = useAuthStore((state) => state.loading)
+  if (loading) return <LoadingSpinner />
+  return user?.role === 'admin' ? <>{children}</> : <Navigate to="/" replace />
 }
 
 function AppShell() {
@@ -83,9 +99,23 @@ function AppShell() {
           <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
           <Route path="/favorites" element={<Favorites />} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="/admin" element={<ProtectedRoute><AdminRoute><Dashboard /></AdminRoute></ProtectedRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute><AdminRoute><Dashboard /></AdminRoute></ProtectedRoute>} />
-          <Route path="/pos" element={<ProtectedRoute><AdminRoute><Pos /></AdminRoute></ProtectedRoute>} />
+
+          {/* Admin-only — lazily loaded to reduce main bundle size */}
+          <Route path="/admin" element={
+            <ProtectedRoute><AdminRoute>
+              <Suspense fallback={<LoadingSpinner />}><Dashboard /></Suspense>
+            </AdminRoute></ProtectedRoute>
+          } />
+          <Route path="/dashboard" element={
+            <ProtectedRoute><AdminRoute>
+              <Suspense fallback={<LoadingSpinner />}><Dashboard /></Suspense>
+            </AdminRoute></ProtectedRoute>
+          } />
+          <Route path="/pos" element={
+            <ProtectedRoute><AdminRoute>
+              <Suspense fallback={<LoadingSpinner />}><Pos /></Suspense>
+            </AdminRoute></ProtectedRoute>
+          } />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

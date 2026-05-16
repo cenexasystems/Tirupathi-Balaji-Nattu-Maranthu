@@ -8,7 +8,7 @@ import { getLocalOrdersForUser } from '../lib/ordersFallback'
 import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, normalizeStructuredOrderItem } from '../lib/retail'
 
 interface ProfileOrderItem {
-  product_id: number | null
+  product_id: string | null   // UUID — Supabase products.id is UUID
   quantity: number
   unit: string
   unit_type: 'unit' | 'weight' | 'volume' | 'bundle'
@@ -63,6 +63,12 @@ export default function Profile() {
     if (user.role === 'admin') { setLoading(false); return }
 
     if (!isSupabaseConfigured) {
+      if (!import.meta.env.DEV) {
+        setOrders([])
+        setLoading(false)
+        return
+      }
+
       const localOrders = getLocalOrdersForUser({ userId: user.id, phone: user.mobile })
       setOrders(localOrders.map((order) => ({
         ...order,
@@ -151,7 +157,6 @@ export default function Profile() {
   if (!user) return null
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
     await logout()
     navigate('/')
   }
@@ -159,7 +164,7 @@ export default function Profile() {
   return (
     <div className="bg-bgMain min-h-screen py-10">
       <div className="max-w-5xl mx-auto px-4">
-        <h1 className="text-3xl font-bold font-headline text-textMain mb-8">My Account</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold font-headline text-textMain mb-6 sm:mb-8">My Account</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Sidebar */}
@@ -293,15 +298,16 @@ export default function Profile() {
                                 </div>
                               </div>
 
-                              <table className="w-full text-sm">
-                                <thead className="text-left text-textMuted border-b border-sand">
+                              <div className="overflow-x-auto">
+                                <table className="w-full min-w-[520px] text-sm">
+                                  <thead className="text-left text-textMuted border-b border-sand">
                                   <tr>
                                     <th className="pb-2 font-medium">Item</th>
                                     <th className="pb-2 font-medium text-center">Qty</th>
                                     <th className="pb-2 font-medium text-right">Price</th>
                                   </tr>
                                 </thead>
-                                <tbody className="divide-y divide-sand/30">
+                                  <tbody className="divide-y divide-sand/30">
                                   {(o.items || []).map((item, i: number) => {
                                       const pName = lang === 'ta' && item.tamil_name ? item.tamil_name : item.name
                                     return (
@@ -312,8 +318,9 @@ export default function Profile() {
                                       </tr>
                                     )
                                   })}
-                                </tbody>
-                              </table>
+                                  </tbody>
+                                </table>
+                              </div>
 
                               <div className="mt-3 space-y-1">
                                 {(o.items || []).map((item, i: number) => (

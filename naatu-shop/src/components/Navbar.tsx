@@ -5,25 +5,25 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useCartStore, useFavStore, useAuthStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { CartDrawer, FavoritesDrawer } from './Drawers'
-import { BRAND_EN, BRAND_SUBTITLE } from '../lib/brand'
+import { BRAND_EN, BRAND_SUBTITLE, BRAND_PHONE_DISPLAY } from '../lib/brand'
 
 export default function Navbar() {
   const [query, setQuery] = useState('')
   const [showCart, setShowCart] = useState(false)
   const [showFav, setShowFav] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const navigate = useNavigate()
   const count = useCartStore(s => s.count())
   const favCount = useFavStore(s => s.items.length)
   const user = useAuthStore((s) => s.user)
   const isAdmin = useAuthStore((s) => s.isAdmin())
   const logout = useAuthStore((s) => s.logout)
-    const handleLogout = async () => {
-      await logout()
-      navigate('/login')
-    }
-
   const { t, lang, setLang } = useLangStore()
-  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
+  }
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,34 +32,35 @@ export default function Navbar() {
 
   return (
     <>
-      <div className="flex items-center justify-center gap-3 overflow-x-auto bg-forestDark px-3 py-2 text-center text-xs font-medium tracking-wide text-sage">
-        <span className="whitespace-nowrap">🌿 {t('nav.free_shipping')} &nbsp;·&nbsp; WhatsApp: 86106 32662</span>
-        <button onClick={() => setLang(lang === 'en' ? 'ta' : 'en')} className="bg-sageDark/20 hover:bg-sageDark/40 px-2 flex items-center gap-1 py-0.5 rounded text-white font-bold transition-colors">
-          <span className={lang === 'en' ? 'opacity-100' : 'opacity-40'}>EN</span>
-          <span>|</span>
-          <span className={lang === 'ta' ? 'opacity-100' : 'opacity-40'}>தமிழ்</span>
+      <div className="flex items-center justify-center gap-3 overflow-x-auto bg-forestDark/95 px-3 py-2 text-center text-[11px] sm:text-xs font-medium tracking-wide text-sage shadow-soft">
+        <span className="whitespace-nowrap">🌿 {t('nav.free_shipping')} &nbsp;·&nbsp; WhatsApp: {BRAND_PHONE_DISPLAY}</span>
+        <button onClick={() => setLang(lang === 'en' ? 'ta' : 'en')} className="inline-flex items-center rounded-full bg-white/8 p-0.5 text-[10px] font-bold text-white transition-colors shadow-soft">
+          <span className={`px-2 py-0.5 rounded-full transition-colors ${lang === 'en' ? 'bg-white text-forestDark' : 'text-white/70'}`}>EN</span>
+          <span className={`px-2 py-0.5 rounded-full transition-colors ${lang === 'ta' ? 'bg-white text-forestDark' : 'text-white/70'}`}>தமிழ்</span>
         </button>
       </div>
 
-      <header className="sticky top-0 z-40 glass border-b border-sand/50 shadow-sm">
-        <nav className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 lg:gap-4">
+      <header className="sticky top-0 z-40 glass border-b border-sand/40 shadow-sm">
+        <nav className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-2.5 sm:px-4 sm:py-3 lg:gap-4">
           <Link to="/" className="group flex shrink-0 items-center gap-2 min-w-0">
-            <div className="w-9 h-9 bg-sage rounded-xl flex items-center justify-center group-hover:bg-sageDark transition-colors">
-              <Leaf size={18} className="text-white" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-sage rounded-xl flex items-center justify-center group-hover:bg-sageDark transition-colors">
+              <Leaf size={16} className="text-white sm:size-[18px]" />
             </div>
             <div className="flex min-w-0 flex-col leading-none">
-              <p className="truncate text-[13px] font-bold leading-tight tracking-tight text-textMain md:text-[15px] font-headline">{BRAND_EN}</p>
+              <p className="truncate text-[12px] sm:text-[13px] font-bold leading-tight tracking-tight text-textMain md:text-[15px] font-headline">{BRAND_EN}</p>
               <p className="hidden text-[9px] font-bold uppercase tracking-[0.15em] text-sageDark md:block">{BRAND_SUBTITLE}</p>
             </div>
           </Link>
 
           <form onSubmit={handleSearch} className="hidden flex-grow max-w-xl md:flex min-w-0">
-            <div className="relative w-full flex">
-              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+            <div className="relative w-full flex rounded-full bg-white/90 shadow-soft transition-shadow focus-within:shadow-hover">
+              <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
               <input value={query} onChange={e => setQuery(e.target.value)} type="text"
                 placeholder={t('nav.search_placeholder')}
-                className="w-full h-11 pl-10 pr-4 rounded-l-xl border-2 border-sand focus:border-sage outline-none text-sm bg-white text-textMain placeholder-gray-400 transition-colors" />
-              <button type="submit" className="h-11 px-5 bg-sageDark hover:bg-sageDeep text-white text-sm font-bold rounded-r-xl transition-colors">{t('nav.search')}</button>
+                className="w-full h-10 sm:h-11 pl-11 pr-4 rounded-full bg-transparent outline-none text-sm text-textMain placeholder-gray-400" />
+              <button type="submit" className="h-10 sm:h-11 px-5 bg-gradient-to-r from-sageDark to-sageDeep text-white text-sm font-bold rounded-full transition-all mr-0.5 my-0.5 shadow-md hover:scale-[1.02]">
+                {t('nav.search')}
+              </button>
             </div>
           </form>
 
@@ -84,16 +85,16 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-1">
-            <motion.button whileTap={{ scale: 0.88 }} onClick={() => setShowFav(true)} className="relative p-2 rounded-full hover:bg-sage/20 transition-colors">
-              <Heart size={20} className="text-textMuted" />
+            <motion.button whileTap={{ scale: 0.88 }} onClick={() => setShowFav(true)} className="relative rounded-full hover:bg-sage/20 transition-colors touch-target">
+              <Heart size={18} className="text-textMuted sm:size-[20px]" />
               {favCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-rose-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{favCount}</span>}
             </motion.button>
-            <motion.button whileTap={{ scale: 0.88 }} onClick={() => setShowCart(true)} className="relative p-2 rounded-full hover:bg-sage/20 transition-colors">
-              <ShoppingCart size={20} className="text-textMuted" />
+            <motion.button whileTap={{ scale: 0.88 }} onClick={() => setShowCart(true)} className="relative rounded-full hover:bg-sage/20 transition-colors touch-target">
+              <ShoppingCart size={18} className="text-textMuted sm:size-[20px]" />
               {count > 0 && <span className="absolute -top-0.5 -right-0.5 bg-sageDark text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{count}</span>}
             </motion.button>
-            <button onClick={() => setMobileOpen(!mobileOpen)} className="lg:hidden p-2 rounded-full hover:bg-sage/20 transition-colors ml-1">
-              {mobileOpen ? <X size={20} className="text-textMain" /> : <Menu size={20} className="text-textMuted" />}
+            <button onClick={() => setMobileOpen(!mobileOpen)} className="lg:hidden rounded-full hover:bg-sage/20 transition-colors ml-1 touch-target">
+              {mobileOpen ? <X size={18} className="text-textMain sm:size-[20px]" /> : <Menu size={18} className="text-textMuted sm:size-[20px]" />}
             </button>
           </div>
         </nav>
@@ -107,7 +108,7 @@ export default function Navbar() {
                   className="flex-grow h-10 px-3 rounded-l-lg border-2 border-sand focus:border-sage outline-none text-sm" />
                 <button type="submit" className="h-10 px-4 bg-sageDark text-white text-sm font-bold rounded-r-lg">{t('nav.search')}</button>
               </form>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                 {[
                   [t('nav.home'), '/'],
                   [t('nav.products'), '/products'],

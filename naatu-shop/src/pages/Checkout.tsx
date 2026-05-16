@@ -4,11 +4,11 @@ import { useCartStore, useAuthStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { ArrowLeft, MessageCircle, Printer, CheckCircle, ShoppingBag } from 'lucide-react'
 import { createOrderWithStock } from '../services/orderService'
-import { BRAND_EN, BRAND_TA, BRAND_SUBTITLE, BRAND_WHATSAPP } from '../lib/brand'
+import { BRAND_EN, BRAND_WHATSAPP_LINK } from '../lib/brand'
+import { Invoice } from '../components/Invoice'
 import {
   buildStructuredOrderItem,
   formatCurrency,
-  formatPricePerUnit,
   formatQuantityDisplay,
 } from '../lib/retail'
 
@@ -24,10 +24,10 @@ interface BookedOrderSnapshot {
   address: string
 }
 
-const WHATSAPP_RECIPIENT = '918610632662'
-const toNumericProductId = (value: string | number): number | null => {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : null
+// Returns the product UUID string as-is (Supabase products.id is UUID, not BIGINT)
+const toProductId = (value: string | number): string | null => {
+  const str = String(value ?? '').trim()
+  return str || null
 }
 
 export default function Checkout() {
@@ -57,6 +57,10 @@ export default function Checkout() {
   }, [items.length, user, navigate, booked])
 
   const handleCheckout = async () => {
+    if (!user) {
+      navigate('/login?redirect=/checkout')
+      return
+    }
     if (!form.name.trim() || !form.phone.trim() || !form.address.trim()) {
       setError('Please fill in all required fields')
       return
@@ -70,7 +74,7 @@ export default function Checkout() {
     setError('')
 
     const structuredItems = items.map((item) => buildStructuredOrderItem({
-      productId: toNumericProductId(item.id),
+      productId: toProductId(item.id),
       name: item.name,
       tamilName: item.tamilName || item.nameTa || null,
       quantity: item.qty,
@@ -107,7 +111,14 @@ export default function Checkout() {
       clear()
       setBooked(bookedSnapshot)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to place order. Please try again.')
+      // Normalize error messages from different sources (Error, Supabase error objects, strings)
+      console.error('Order creation failed', err)
+      const msg = err instanceof Error
+        ? err.message
+        : (err && typeof err === 'object' && 'message' in err)
+          ? String((err as any).message)
+          : String(err || 'Failed to place order. Please try again.')
+      setError(msg)
     } finally {
       setLoading(false)
     }
@@ -127,94 +138,66 @@ export default function Checkout() {
       }).join('\n') +
       `\n\n*Subtotal:* ${formatCurrency(booked.subtotal)}\n*Shipping:* ${booked.shipping === 0 ? 'FREE' : formatCurrency(booked.shipping)}\n*Grand Total: ${formatCurrency(booked.total)}*\n\nThank you! | இங்கு வாங்கியதற்கு நன்றி!`
     )
-    window.open(`https://wa.me/${WHATSAPP_RECIPIENT}?text=${text}`, '_blank')
+    window.open(`${BRAND_WHATSAPP_LINK}?text=${text}`, '_blank')
   }
 
   // ── Order Confirmed screen ─────────────────────────────────
   if (booked) {
+    const invoiceItems = booked.items.map(item => ({
+      id: item.id,
+      name: item.name,
+      nameTa: item.nameTa,
+      tamil_name: item.nameTa || undefined,
+      qty: item.qty,
+      quantity: item.qty,
+      unit: item.selectedUnit,
+      unit_type: item.unitType,
+      base_quantity: item.baseQuantity,
+      base_price: item.basePrice,
+      line_total: item.lineTotal,
+      price: item.price,
+      offerPrice: item.offerPrice,
+    }))
+
     return (
       <div className="bg-bgMain min-h-screen py-16 print:bg-white print:py-0">
         <div className="max-w-2xl mx-auto px-4">
-          {/* Success banner */}
-          <div className="bg-white p-10 rounded-3xl shadow-soft border border-sand/50 text-center mb-8 print:shadow-none print:border-none">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
-              <CheckCircle size={44} className="text-green-500" />
+
+          {/* Success banner — hidden on print */}
+          <div className="print:hidden bg-white p-8 rounded-3xl shadow-soft border border-sand/50 text-center mb-6">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle size={36} className="text-green-500" />
             </div>
-            <h1 className="text-3xl font-bold font-headline text-textMain mb-2">Booking Confirmed!</h1>
-            <p className="text-textMuted mb-1">Your order has been placed successfully.</p>
-            <p className="font-bold text-sageDark text-lg">{booked.invoiceNo}</p>
+            <h1 className="text-2xl font-bold font-headline text-textMain mb-1">Booking Confirmed!</h1>
+            <p className="text-textMuted text-sm mb-1">Your order has been placed successfully.</p>
+            <p className="font-bold text-sageDark">{booked.invoiceNo}</p>
           </div>
 
-          {/* Invoice */}
-          <div className="print-receipt mx-auto max-w-[430px] bg-white p-6 rounded-2xl shadow-soft border border-sand/50 mb-6 print:shadow-none print:border-none print:m-0 print:p-0">
-            <div className="text-center mb-6 pb-6 border-b border-sand">
-              <h2 className="text-2xl font-bold font-headline text-sageDeep">{BRAND_EN}</h2>
-              <p className="text-sm text-textMuted">{BRAND_TA}</p>
-              <p className="text-xs uppercase tracking-[0.18em] text-sageDark font-bold mt-1">{BRAND_SUBTITLE}</p>
-              <div className="mt-4 flex justify-between text-xs text-left">
-                <div>
-                  <p><span className="font-bold">Invoice No:</span> {booked.invoiceNo}</p>
-                  <p><span className="font-bold">Date:</span> {new Date().toLocaleDateString('en-GB')}</p>
-                  <p><span className="font-bold">Status:</span> <span className="text-amber-600 font-bold">Pending</span></p>
-                </div>
-                <div className="text-right">
-                  <p><span className="font-bold">Bill To:</span> {booked.name}</p>
-                  <p>{booked.phone}</p>
-                  <p className="max-w-[180px] text-right">{booked.address}</p>
-                </div>
-              </div>
-            </div>
-
-            <table className="w-full text-sm mb-6 pb-6 border-b border-sand">
-              <thead className="text-left text-textMuted border-b border-sand">
-                <tr>
-                  <th className="pb-2 font-medium">#</th>
-                  <th className="pb-2 font-medium">Product</th>
-                  <th className="pb-2 text-center font-medium">Qty</th>
-                  <th className="pb-2 text-right font-medium">Unit</th>
-                  <th className="pb-2 text-right font-medium">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-sand/30">
-                {booked.items.map((item, i) => {
-                  const pName = lang === 'ta' && item.nameTa ? item.nameTa : item.name
-                  return (
-                    <tr key={item.id}>
-                      <td className="py-2 text-textMuted">{i + 1}</td>
-                      <td className="py-2 font-medium">
-                        {pName}
-                        <p className="text-[11px] text-textMuted">{formatPricePerUnit(item.basePrice, item.baseQuantity, item.unitLabel, item.unitType)}</p>
-                      </td>
-                      <td className="py-2 text-center">{formatQuantityDisplay(item.qty, item.selectedUnit, item.unitType)}</td>
-                      <td className="py-2 text-right text-textMuted">{formatCurrency(item.basePrice)}</td>
-                      <td className="py-2 text-right font-bold">{formatCurrency(item.lineTotal)}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-
-            <div className="space-y-1.5 text-sm text-right">
-              <p className="text-textMuted">Subtotal: <span className="font-medium text-textMain">{formatCurrency(booked.subtotal)}</span></p>
-              <p className="text-textMuted">Shipping: <span className="font-medium text-textMain">{booked.shipping === 0 ? 'FREE 🎉' : formatCurrency(booked.shipping)}</span></p>
-              <p className="text-lg font-bold font-headline mt-3 border-t border-sand pt-3">Grand Total: {formatCurrency(booked.total)}</p>
-            </div>
-
-            <div className="mt-8 pt-5 border-t border-sand text-center text-xs text-textMuted">
-              <p className="font-bold">Thank you for shopping with us! | இங்கு வாங்கியதற்கு நன்றி!</p>
-              <p className="mt-1">Contact: WhatsApp {BRAND_WHATSAPP}</p>
-            </div>
+          {/* A4-formatted Invoice — this is what prints */}
+          <div className="mb-6 rounded-2xl overflow-hidden shadow-soft border border-sand/50 print:shadow-none print:border-none print:rounded-none">
+            <Invoice
+              invoiceNo={booked.invoiceNo}
+              date={new Date().toISOString()}
+              customerName={booked.name}
+              phone={booked.phone}
+              address={booked.address}
+              items={invoiceItems}
+              subtotal={booked.subtotal}
+              shipping={booked.shipping}
+              total={booked.total}
+              status="Pending"
+            />
           </div>
 
-          {/* Actions */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 print:hidden">
+          {/* Actions — hidden on print */}
+          <div className="print:hidden grid grid-cols-1 sm:grid-cols-3 gap-3">
             <button onClick={sendToWhatsApp}
               className="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white font-bold py-3.5 rounded-xl transition-colors">
               <MessageCircle size={18} /> WhatsApp
             </button>
             <button onClick={() => window.print()}
               className="flex items-center justify-center gap-2 border-2 border-sand hover:border-sageDark text-textMain font-bold py-3.5 rounded-xl transition-colors">
-              <Printer size={18} /> Print Bill
+              <Printer size={18} /> Print / Save PDF
             </button>
             {user ? (
               <Link to="/profile"
@@ -235,15 +218,15 @@ export default function Checkout() {
 
   // ── Checkout Form ──────────────────────────────────────────
   return (
-    <div className="bg-bgMain min-h-screen py-10">
+    <div className="bg-bgMain min-h-screen py-8 sm:py-10">
       <div className="max-w-4xl mx-auto px-4">
         <button onClick={() => navigate('/cart')} className="flex items-center gap-2 mb-6 text-sageDark font-bold">
           <ArrowLeft size={16} /> Back to Cart
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
           {/* Form */}
-          <div className="bg-white p-6 rounded-2xl shadow-soft border border-sand/50 h-fit">
+          <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-soft border border-sand/50 h-fit">
             <h2 className="text-xl font-bold text-textMain mb-5">Delivery Details</h2>
 
             {error && (
@@ -254,29 +237,35 @@ export default function Checkout() {
               <div>
                 <label className="block text-sm font-bold text-textMain mb-1.5">Full Name *</label>
                 <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-sand focus:border-sageDark rounded-xl outline-none transition-colors" required />
+                  className="w-full px-4 py-2.5 sm:py-3 border-2 border-sand focus:border-sageDark rounded-xl outline-none transition-colors" required />
               </div>
               <div>
                 <label className="block text-sm font-bold text-textMain mb-1.5">WhatsApp Number *</label>
                 <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })}
                   maxLength={10} placeholder="10-digit mobile number"
-                  className="w-full px-4 py-3 border-2 border-sand focus:border-sageDark rounded-xl outline-none transition-colors" required />
+                  className="w-full px-4 py-2.5 sm:py-3 border-2 border-sand focus:border-sageDark rounded-xl outline-none transition-colors" required />
               </div>
               <div>
                 <label className="block text-sm font-bold text-textMain mb-1.5">Delivery Address *</label>
                 <textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })}
                   rows={4} placeholder="House no., street, city, pincode"
-                  className="w-full px-4 py-3 border-2 border-sand focus:border-sageDark rounded-xl outline-none transition-colors resize-none" required />
+                  className="w-full px-4 py-2.5 sm:py-3 border-2 border-sand focus:border-sageDark rounded-xl outline-none transition-colors resize-none" required />
+              </div>
+
+              {/* Delivery charge notice — PDF requirement */}
+              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl text-sm">
+                🚚 <strong>Delivery charges</strong> will be collected during dispatch based on product weight and delivery location.
               </div>
 
               {!user && (
                 <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-xl text-sm">
-                  💡 <Link to="/login" className="font-bold underline">Sign in</Link> to track your orders in your profile.
+                  <strong>Sign in required to place an order.</strong>{' '}
+                  <Link to="/login?redirect=/checkout" className="font-bold underline">Sign in or create account →</Link>
                 </div>
               )}
 
               <button onClick={handleCheckout} disabled={loading}
-                className="w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-4 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 mt-2">
+                className="w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3.5 sm:py-4 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 mt-2">
                 {loading ? (
                   <><span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Placing Order...</>
                 ) : (
@@ -287,7 +276,7 @@ export default function Checkout() {
           </div>
 
           {/* Order summary */}
-          <div className="bg-white p-6 rounded-2xl shadow-soft border border-sand/50">
+          <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-soft border border-sand/50">
             <h2 className="text-xl font-bold text-textMain mb-5">Order Summary</h2>
             <div className="space-y-4 divide-y divide-sand/30">
               {items.map(item => {
