@@ -59,6 +59,18 @@ function AppShell() {
 
   useEffect(() => {
     void initialize()
+
+    if (!isSupabaseConfigured) return
+
+    // After Google OAuth redirect, Supabase fires SIGNED_IN — re-run initialize()
+    // so the profile is fetched and the user is set in the store.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        void initialize()
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [initialize])
 
   useEffect(() => {
