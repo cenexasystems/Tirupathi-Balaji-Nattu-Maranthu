@@ -1,0 +1,15 @@
+[
+  {
+    "name": "Shilajit (Purified)",
+    "name_ta": "தூய்மையான शिलाजीत",
+    "category": "Mineral Herb",
+    "price": 450,
+    "description": "Purified Himalayan shilajit – ancient mineral resin for vitality.",
+    "description_ta": "தூய்மைப்படுத்தப்பட்ட இமயமலை शिलाजीत - உயிர்ச்சக்திக்கான பண்டைய தாது பிசின்.",
+    "benefits": "Powerful adaptogen, boosts energy, anti-ageing, improves vitality.",
+    "benefits_ta": "ஆற்றலை அதிகரிக்கிறது, முதுமையைத் தடுக்கிறது, உயிர்ச்சக்தியை மேம்படுத்துகிறது.",
+    "image": "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=800&q=80",
+    "stock": 15,
+    "remedy": ["Immunity", "Stress"]
+  }
+]

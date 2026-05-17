@@ -7,11 +7,7 @@ import {
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { useProductStore, type Product } from '../store/store'
 import { Invoice } from '../components/Invoice'
-import {
-  BRAND_EN, BRAND_TA, BRAND_SUBTITLE,
-  BRAND_EMAIL, BRAND_PHONE_DISPLAY,
-  BRAND_LOCATION_LINK, BRAND_WHATSAPP_LINK,
-} from '../lib/brand'
+import { BRAND_EN, BRAND_TA, BRAND_WHATSAPP_LINK } from '../lib/brand'
 import { createOrderWithStock } from '../services/orderService'
 import {
   buildStructuredOrderItem,
@@ -176,7 +172,6 @@ export default function Pos() {
   }, [products, search, activeCategory])
 
   const subtotal = items.reduce((s, i) => s + i.lineTotal, 0)
-  const shipping = 0  // POS is always in-store, no shipping
   const total = subtotal
 
   const itemQtyMap = useMemo(() => {

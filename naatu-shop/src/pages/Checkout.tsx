@@ -116,7 +116,7 @@ export default function Checkout() {
       const msg = err instanceof Error
         ? err.message
         : (err && typeof err === 'object' && 'message' in err)
-          ? String((err as any).message)
+          ? String((err as Record<string, unknown>).message)
           : String(err || 'Failed to place order. Please try again.')
       setError(msg)
     } finally {
