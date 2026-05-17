@@ -202,13 +202,35 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { data: { session } } = await supabase.auth.getSession()
           if (session?.user) {
-            const { data: profile } = await supabase
+            let { data: profile } = await supabase
               .from('profiles')
               .select('*')
               .eq('id', session.user.id)
               .single()
 
+            // Auto-bootstrap profile for new OAuth / magic-link / phone users.
+            // The DB trigger handles brand-new sign-ups but the row may not
+            // exist yet if the trigger wasn't in place at sign-up time.
+            if (!profile) {
+              const email = session.user.email || ''
+              const name = String(
+                session.user.user_metadata?.full_name
+                  || session.user.user_metadata?.name
+                  || (email ? email.split('@')[0] : 'Customer')
+              )
+              const role = ADMIN_EMAILS_LOCAL.has(email.toLowerCase()) ? 'admin' : 'customer'
+              const { data: upserted } = await supabase
+                .from('profiles')
+                .upsert({ id: session.user.id, email, name, role }, { onConflict: 'id' })
+                .select()
+                .single()
+              profile = upserted
+            }
+
             set({ user: toAuthUser(profile, session.user) })
+          } else {
+            // No session — clear any stale persisted user
+            set({ user: null })
           }
         } catch (e) {
           console.error('Auth init error', e)

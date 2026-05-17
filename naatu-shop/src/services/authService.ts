@@ -289,7 +289,7 @@ export const authService = {
       const { data, error } = await supabase.auth.verifyOtp({
         email,
         token,
-        type: 'signup',
+        type: 'email',   // 'signup' was wrong — correct type for email OTP/magic-link is 'email'
       })
       if (error) return { error: error.message }
       if (!data.session) return { error: 'Verification failed' }

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
@@ -17,9 +17,10 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useProductStore } from '../store/store'
+import { useProductStore, useAuthStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import ProductCard from '../components/ProductCard'
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import {
   BRAND_TA,
   BRAND_EN,
@@ -28,7 +29,7 @@ import {
   BRAND_WHATSAPP_LINK,
 } from '../lib/brand'
 
-// ── Customer review helpers ───────────────────────────────────────────
+// ── Review type (maps to store_reviews table) ─────────────────────────
 interface CustomerReview {
   id: string
   name: string
@@ -37,13 +38,15 @@ interface CustomerReview {
   text: string
   createdAt: string
 }
-const REVIEWS_KEY = 'siddha_customer_reviews'
-function getStoredReviews(): CustomerReview[] {
-  try { return JSON.parse(localStorage.getItem(REVIEWS_KEY) || '[]') } catch { return [] }
+
+// localStorage fallback (only used when Supabase is not configured)
+const LS_KEY = 'siddha_customer_reviews'
+function lsGetReviews(): CustomerReview[] {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]') } catch { return [] }
 }
-function saveReview(r: CustomerReview) {
-  const all = getStoredReviews()
-  localStorage.setItem(REVIEWS_KEY, JSON.stringify([r, ...all].slice(0, 50)))
+function lsSaveReview(r: CustomerReview) {
+  const all = lsGetReviews()
+  localStorage.setItem(LS_KEY, JSON.stringify([r, ...all].slice(0, 50)))
 }
 
 // ── Category image map ────────────────────────────────────────────────
@@ -114,29 +117,95 @@ const TESTIMONIALS = [
 export default function Home() {
   const { t } = useLangStore()
   const { products, fetchProducts } = useProductStore()
+  const { user } = useAuthStore()
 
   // ── Review state ──────────────────────────────────────────────
-  const [customerReviews, setCustomerReviews] = useState<CustomerReview[]>(getStoredReviews)
+  const [customerReviews, setCustomerReviews] = useState<CustomerReview[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [reviewForm, setReviewForm] = useState({ name: '', location: '', rating: 5, text: '' })
   const [reviewSubmitted, setReviewSubmitted] = useState(false)
+  const [reviewError, setReviewError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const handleReviewSubmit = (e: React.FormEvent) => {
+  // ── Fetch reviews from Supabase (or localStorage fallback) ────
+  const fetchReviews = useCallback(async () => {
+    if (!isSupabaseConfigured) {
+      setCustomerReviews(lsGetReviews())
+      setReviewsLoading(false)
+      return
+    }
+    const { data, error } = await supabase
+      .from('store_reviews')
+      .select('id, name, location, rating, review_text, created_at')
+      .eq('is_approved', true)
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    if (!error && data) {
+      setCustomerReviews(data.map(r => ({
+        id: String(r.id),
+        name: String(r.name),
+        location: String(r.location || 'Tamil Nadu'),
+        rating: Number(r.rating),
+        text: String(r.review_text),
+        createdAt: String(r.created_at),
+      })))
+    }
+    setReviewsLoading(false)
+  }, [])
+
+  useEffect(() => { void fetchReviews() }, [fetchReviews]) // eslint-disable-line react-hooks/set-state-in-effect
+
+  // ── Submit review ─────────────────────────────────────────────
+  const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!reviewForm.name.trim() || !reviewForm.text.trim()) return
-    const newReview: CustomerReview = {
-      id: Date.now().toString(),
-      name: reviewForm.name.trim(),
+    const name = reviewForm.name.trim()
+    const text = reviewForm.text.trim()
+    if (!name || !text) return
+    setReviewError('')
+    setSubmitting(true)
+
+    if (!isSupabaseConfigured) {
+      // localStorage fallback
+      const r: CustomerReview = {
+        id: Date.now().toString(),
+        name,
+        location: reviewForm.location.trim() || 'Tamil Nadu',
+        rating: reviewForm.rating,
+        text,
+        createdAt: new Date().toISOString(),
+      }
+      lsSaveReview(r)
+      setCustomerReviews(lsGetReviews())
+      setReviewForm({ name: '', location: '', rating: 5, text: '' })
+      setShowForm(false)
+      setReviewSubmitted(true)
+      setSubmitting(false)
+      setTimeout(() => setReviewSubmitted(false), 4000)
+      return
+    }
+
+    const { error } = await supabase.from('store_reviews').insert({
+      user_id: user?.id || null,
+      name,
       location: reviewForm.location.trim() || 'Tamil Nadu',
       rating: reviewForm.rating,
-      text: reviewForm.text.trim(),
-      createdAt: new Date().toISOString(),
+      review_text: text,
+    })
+
+    if (error) {
+      setReviewError(error.message)
+      setSubmitting(false)
+      return
     }
-    saveReview(newReview)
-    setCustomerReviews(getStoredReviews())
-    setReviewForm({ name: '', location: '', rating: 5, text: '' })
+
+    // Reload from DB so the new review is visible immediately
+    await fetchReviews()
+    setReviewForm(f => ({ ...f, location: '', rating: 5, text: '' }))
     setShowForm(false)
     setReviewSubmitted(true)
+    setSubmitting(false)
     setTimeout(() => setReviewSubmitted(false), 4000)
   }
 
@@ -556,12 +625,19 @@ export default function Home() {
                   />
                 </div>
 
+                {reviewError && (
+                  <p className="text-red-600 text-[12px] font-bold bg-red-50 px-3 py-2 rounded-xl">{reviewError}</p>
+                )}
+
                 <div className="flex gap-3">
-                  <button type="submit"
-                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#7DAA8F] hover:bg-[#5e8c72] text-white font-bold text-[13px] transition-colors">
-                    <Send size={14} /> Post Review
+                  <button type="submit" disabled={submitting}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#7DAA8F] hover:bg-[#5e8c72] text-white font-bold text-[13px] transition-colors disabled:opacity-60">
+                    {submitting
+                      ? <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Posting…</>
+                      : <><Send size={14} /> Post Review</>
+                    }
                   </button>
-                  <button type="button" onClick={() => setShowForm(false)}
+                  <button type="button" onClick={() => { setShowForm(false); setReviewError('') }}
                     className="px-5 py-2.5 rounded-xl border-2 border-[#EAD7B7] text-[#5F6D59] font-bold text-[13px] hover:bg-[#F7F6F2] transition-colors">
                     Cancel
                   </button>
@@ -570,7 +646,22 @@ export default function Home() {
             )}
           </AnimatePresence>
 
+          {/* Reviews loading skeleton */}
+          {reviewsLoading && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-5">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="bg-[#F7F6F2] rounded-2xl p-5 border border-[#EAD7B7]/30 animate-pulse">
+                  <div className="h-3 bg-[#EAD7B7] rounded w-24 mb-4" />
+                  <div className="h-2.5 bg-[#EAD7B7] rounded w-full mb-2" />
+                  <div className="h-2.5 bg-[#EAD7B7] rounded w-4/5 mb-2" />
+                  <div className="h-2.5 bg-[#EAD7B7] rounded w-3/5" />
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Hardcoded + customer reviews grid */}
+          {!reviewsLoading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {TESTIMONIALS.map((review, idx) => (
               <motion.div
@@ -600,8 +691,8 @@ export default function Home() {
               </motion.div>
             ))}
 
-            {/* Customer-submitted reviews */}
-            {customerReviews.slice(0, 4).map((review) => {
+            {/* Customer-submitted reviews from Supabase */}
+            {customerReviews.slice(0, 8).map((review) => {
               const colors = ['#7DAA8F', '#C4845C', '#8B7355', '#5e8c72']
               const color = colors[review.name.charCodeAt(0) % colors.length]
               return (
@@ -634,6 +725,7 @@ export default function Home() {
               )
             })}
           </div>
+          )} {/* end !reviewsLoading */}
         </div>
       </section>
 
