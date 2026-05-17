@@ -58,17 +58,25 @@ function AppShell() {
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register'
 
   useEffect(() => {
-    void initialize()
+    if (!isSupabaseConfigured) {
+      void initialize()
+      return
+    }
 
-    if (!isSupabaseConfigured) return
-
-    // After Google OAuth redirect, Supabase fires SIGNED_IN — re-run initialize()
-    // so the profile is fetched and the user is set in the store.
+    // Register listener BEFORE initialize() so we never miss the SIGNED_IN
+    // event that Supabase fires after processing the Google OAuth URL fragment.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') {
+      // SIGNED_IN  → fires after Google OAuth redirect lands back on the app
+      // INITIAL_SESSION → fires on first load when a session already exists
+      //                   (e.g., the user refreshes the page while logged in)
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         void initialize()
       }
     })
+
+    // Also call initialize directly so a pre-existing localStorage session
+    // is picked up even if onAuthStateChange somehow already fired.
+    void initialize()
 
     return () => subscription.unsubscribe()
   }, [initialize])

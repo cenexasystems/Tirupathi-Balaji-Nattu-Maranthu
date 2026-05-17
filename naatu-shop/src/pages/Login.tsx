@@ -4,12 +4,16 @@ import { Leaf } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { BRAND_EN, BRAND_TA } from '../lib/brand'
 
+// Use the canonical production URL from Vercel env var.
+// Falls back to current origin for local dev (http://localhost:5173).
+const SITE_URL = (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/$/, '')
+  || window.location.origin
+
 export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const location = useLocation()
-
-  const redirectPath = new URLSearchParams(location.search).get('redirect') || '/'
+  const redirectPath = new URLSearchParams(location.search).get('redirect') || ''
 
   const handleGoogleSignIn = async () => {
     if (!isSupabaseConfigured) {
@@ -19,12 +23,15 @@ export default function Login() {
     setLoading(true)
     setError('')
 
+    // redirectTo must be whitelisted in Supabase → Authentication → URL Configuration → Redirect URLs
     const { error: authError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // After Supabase processes the Google callback, redirect to app root.
-        // Cart is persisted in localStorage, so in-progress checkout is preserved.
-        redirectTo: window.location.origin,
+        redirectTo: SITE_URL,
+        queryParams: {
+          // Always prompt account picker so users can choose which Google account
+          prompt: 'select_account',
+        },
       },
     })
 
@@ -46,7 +53,7 @@ export default function Login() {
           </div>
           <h1 className="text-xl sm:text-2xl font-bold font-headline text-textMain text-center">{BRAND_EN}</h1>
           <p className="text-sm text-textMuted mt-1 text-center">{BRAND_TA}</p>
-          {redirectPath !== '/' && (
+          {redirectPath && (
             <p className="mt-3 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full text-center">
               Sign in to continue
             </p>
@@ -59,6 +66,7 @@ export default function Login() {
           </div>
         )}
 
+        {/* Google Sign In / Sign Up */}
         <button
           onClick={handleGoogleSignIn}
           disabled={loading}
@@ -78,8 +86,15 @@ export default function Login() {
         </button>
 
         <div className="mt-6 pt-5 border-t border-sand/50 text-center space-y-1.5">
-          <p className="text-xs text-gray-400">New users get an account automatically.</p>
-          <p className="text-xs text-gray-400">Admin access is granted to authorised emails.</p>
+          <p className="text-xs text-gray-400">
+            First time? An account is created automatically.
+          </p>
+          <p className="text-xs text-gray-400">
+            Returning? You'll be signed in to your existing account.
+          </p>
+          <p className="text-xs text-gray-400">
+            Admin access is granted to authorised emails.
+          </p>
         </div>
       </div>
     </div>
