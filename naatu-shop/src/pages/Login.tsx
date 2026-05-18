@@ -1,75 +1,42 @@
 /**
- * Login.tsx — Full authentication page
- *
- * Supports three methods:
- *   1. Google OAuth    — signInWithOAuth (redirect flow)
- *   2. Email           — signInWithOtp sends a Magic Link (one-click sign-in)
- *                        If Supabase email template is changed to {{ .Token }},
- *                        the same UI handles OTP code entry via verifyOtp.
- *   3. Phone OTP       — signInWithOtp({ phone }) → verifyOtp({ phone, type:'sms' })
- *                        Requires Twilio/MessageBird configured in Supabase Auth.
- *                        Fails gracefully with a clear message if not enabled.
+ * Login — Sign in / Sign up
+ * Two methods: Google OAuth  |  Email Magic Link
+ * Phone OTP removed (not required).
  */
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Leaf, Mail, Phone, ArrowLeft, CheckCircle } from 'lucide-react'
+import { Leaf, Mail, ArrowLeft, CheckCircle } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { useAuthStore } from '../store/store'
 import { BRAND_EN, BRAND_TA } from '../lib/brand'
 
-// Canonical production URL — set VITE_SITE_URL in Vercel env vars.
-// Falls back to current origin for local dev.
-const SITE_URL = (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/$/, '')
-  || window.location.origin
+const SITE_URL =
+  (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/$/, '') ||
+  window.location.origin
 
-type Method = 'google' | 'email' | 'phone'
+type Method = 'google' | 'email'
 type EmailStep = 'input' | 'sent'
-type PhoneStep = 'input' | 'otp'
-
-// Normalise Indian phone number to E.164 (+91...)
-function toE164(raw: string): string {
-  const digits = raw.replace(/\D/g, '')
-  if (digits.startsWith('91') && digits.length === 12) return `+${digits}`
-  if (digits.length === 10) return `+91${digits}`
-  return `+${digits}`
-}
 
 export default function Login() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const redirectPath = new URLSearchParams(location.search).get('redirect') || '/'
+  const navigate   = useNavigate()
+  const location   = useLocation()
   const initialize = useAuthStore((s) => s.initialize)
+  const redirectPath = new URLSearchParams(location.search).get('redirect') || '/'
 
-  // ── shared state ────────────────────────────────────────────
-  const [method, setMethod]   = useState<Method>('google')
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState('')
-
-  // ── email state ─────────────────────────────────────────────
-  const [email, setEmail]       = useState('')
-  const [name,  setName]        = useState('')
+  const [method,    setMethod]    = useState<Method>('google')
+  const [loading,   setLoading]   = useState(false)
+  const [error,     setError]     = useState('')
+  const [email,     setEmail]     = useState('')
+  const [name,      setName]      = useState('')
   const [emailStep, setEmailStep] = useState<EmailStep>('input')
-  const [otp,   setOtp]         = useState('')   // only used if template sends {{ .Token }}
+  const [otp,       setOtp]       = useState('')
 
-  // ── phone state ─────────────────────────────────────────────
-  const [phone,      setPhone]      = useState('')
-  const [phoneStep,  setPhoneStep]  = useState<PhoneStep>('input')
-  const [phoneOtp,   setPhoneOtp]   = useState('')
-
-  const reset = (m: Method) => {
-    setMethod(m)
-    setError('')
-    setLoading(false)
-    setEmail('')
-    setName('')
-    setEmailStep('input')
-    setOtp('')
-    setPhone('')
-    setPhoneStep('input')
-    setPhoneOtp('')
+  const switchMethod = (m: Method) => {
+    setMethod(m); setError(''); setLoading(false)
+    setEmail(''); setName(''); setEmailStep('input'); setOtp('')
   }
 
-  // ── Google ───────────────────────────────────────────────────
+  /* ── Google ──────────────────────────────────────────────────── */
   const handleGoogle = async () => {
     if (!isSupabaseConfigured) { setError('Auth not configured.'); return }
     setLoading(true); setError('')
@@ -81,14 +48,14 @@ export default function Login() {
       },
     })
     if (e) { setError(e.message); setLoading(false) }
-    // Success → browser redirects to Google; no code after this point.
+    // On success the browser navigates away — no code after this.
   }
 
-  // ── Email magic link ─────────────────────────────────────────
-  const handleSendEmailLink = async (e: React.FormEvent) => {
+  /* ── Email magic link ─────────────────────────────────────────── */
+  const handleSendLink = async (e: React.FormEvent) => {
     e.preventDefault()
     const cleanEmail = email.trim().toLowerCase()
-    if (!cleanEmail.includes('@')) { setError('Enter a valid email address'); return }
+    if (!cleanEmail.includes('@')) { setError('Enter a valid email address.'); return }
     if (!isSupabaseConfigured) { setError('Auth not configured.'); return }
     setLoading(true); setError('')
 
@@ -106,10 +73,10 @@ export default function Login() {
     setEmailStep('sent')
   }
 
-  // Verify email OTP code (only shown if Supabase template sends {{ .Token }})
-  const handleVerifyEmailOtp = async (e: React.FormEvent) => {
+  /* ── Email OTP code (only if Supabase template uses {{ .Token }}) */
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (otp.trim().length < 6) { setError('Enter the 6-digit code from your email'); return }
+    if (otp.trim().length < 6) { setError('Enter the 6-digit code.'); return }
     setLoading(true); setError('')
 
     const { error: e2 } = await supabase.auth.verifyOtp({
@@ -119,58 +86,12 @@ export default function Login() {
     })
 
     if (e2) { setLoading(false); setError(e2.message); return }
-
     await initialize()
     setLoading(false)
     navigate(redirectPath, { replace: true })
   }
 
-  // ── Phone OTP ─────────────────────────────────────────────────
-  const handleSendPhoneOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const e164 = toE164(phone)
-    if (e164.length < 10) { setError('Enter a valid phone number'); return }
-    if (!isSupabaseConfigured) { setError('Auth not configured.'); return }
-    setLoading(true); setError('')
-
-    const { error: e2 } = await supabase.auth.signInWithOtp({
-      phone: e164,
-      options: { shouldCreateUser: true },
-    })
-
-    setLoading(false)
-    if (e2) {
-      // Surface helpful message for misconfigured phone provider
-      const msg = e2.message.toLowerCase()
-      if (msg.includes('phone') || msg.includes('provider') || msg.includes('sms')) {
-        setError('Phone login is not enabled yet. Please use Google or email sign-in.')
-      } else {
-        setError(e2.message)
-      }
-      return
-    }
-    setPhoneStep('otp')
-  }
-
-  const handleVerifyPhoneOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (phoneOtp.trim().length < 6) { setError('Enter the 6-digit SMS code'); return }
-    setLoading(true); setError('')
-
-    const { error: e2 } = await supabase.auth.verifyOtp({
-      phone: toE164(phone),
-      token: phoneOtp.trim(),
-      type: 'sms',
-    })
-
-    if (e2) { setLoading(false); setError(e2.message); return }
-
-    await initialize()
-    setLoading(false)
-    navigate(redirectPath, { replace: true })
-  }
-
-  // ──────────────────────────────────────────────────────────────
+  /* ── Render ───────────────────────────────────────────────────── */
   return (
     <div className="bg-gradient-to-br from-[#eaf2e5] to-[#f7f6f2] min-h-screen flex items-center justify-center p-4">
       <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-xl border border-sand/40 w-full max-w-md">
@@ -189,11 +110,12 @@ export default function Login() {
           )}
         </div>
 
-        {/* Method tabs */}
+        {/* Tabs */}
         <div className="flex gap-1.5 bg-[#F7F6F2] rounded-xl p-1 mb-5">
-          <TabBtn m="google" label="Google" icon={<GoogleIcon />} active={method === 'google'} onClick={reset} />
-          <TabBtn m="email"  label="Email"  icon={<Mail size={13} />} active={method === 'email'} onClick={reset} />
-          <TabBtn m="phone"  label="Phone"  icon={<Phone size={13} />} active={method === 'phone'} onClick={reset} />
+          <TabBtn active={method === 'google'} onClick={() => switchMethod('google')}
+            icon={<GoogleIcon />} label="Google" />
+          <TabBtn active={method === 'email'} onClick={() => switchMethod('email')}
+            icon={<Mail size={13} />} label="Email" />
         </div>
 
         {/* Error */}
@@ -206,199 +128,112 @@ export default function Login() {
         {/* ═══ GOOGLE ════════════════════════════════════════════ */}
         {method === 'google' && (
           <div className="space-y-4">
-            <button
-              onClick={handleGoogle}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-3 bg-white border-2 border-[#EAD7B7] hover:border-sageDark text-textMain font-bold py-4 rounded-xl transition-all disabled:opacity-60 shadow-sm hover:shadow-md active:scale-[0.98]"
-            >
+            <button onClick={handleGoogle} disabled={loading}
+              className="w-full flex items-center justify-center gap-3 bg-white border-2 border-[#EAD7B7] hover:border-sageDark text-textMain font-bold py-4 rounded-xl transition-all disabled:opacity-60 shadow-sm hover:shadow-md active:scale-[0.98]">
               {loading ? <Spinner /> : <GoogleIcon size={20} />}
               {loading ? 'Redirecting…' : 'Continue with Google'}
             </button>
-            <p className="text-center text-[11px] text-gray-400 leading-relaxed">
-              New users get an account automatically.<br />
-              Returning users are signed in to their existing account.
-            </p>
+
+            <div className="relative flex items-center gap-3 py-1">
+              <div className="flex-1 h-px bg-sand/60" />
+              <span className="text-[11px] text-textMuted font-medium shrink-0">What happens</span>
+              <div className="flex-1 h-px bg-sand/60" />
+            </div>
+
+            <div className="space-y-2.5 text-[12px] text-textMuted">
+              <div className="flex items-start gap-2.5">
+                <span className="w-5 h-5 rounded-full bg-[#7DAA8F]/15 text-sageDark flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">1</span>
+                <p><strong className="text-textMain">New user?</strong> A free account is created automatically using your Google profile.</p>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <span className="w-5 h-5 rounded-full bg-[#7DAA8F]/15 text-sageDark flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">2</span>
+                <p><strong className="text-textMain">Returning user?</strong> You're signed straight in — no password needed.</p>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <span className="w-5 h-5 rounded-full bg-[#7DAA8F]/15 text-sageDark flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">3</span>
+                <p>Your orders, cart and favourites are linked to your account.</p>
+              </div>
+            </div>
           </div>
         )}
 
         {/* ═══ EMAIL ═════════════════════════════════════════════ */}
-        {method === 'email' && (
-          <>
-            {emailStep === 'input' && (
-              <form onSubmit={handleSendEmailLink} className="space-y-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-textMuted uppercase tracking-wide mb-1.5">
-                    Your Name <span className="font-normal">(optional — for new accounts)</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Full name"
-                    className="w-full px-4 py-3 rounded-xl border-2 border-sand focus:border-sageDark outline-none transition-colors text-[13px]"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-textMuted uppercase tracking-wide mb-1.5">
-                    Email Address *
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    className="w-full px-4 py-3 rounded-xl border-2 border-sand focus:border-sageDark outline-none transition-colors text-[13px]"
-                    value={email}
-                    onChange={e => { setEmail(e.target.value); setError('') }}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
-                >
-                  {loading ? <><Spinner /> Sending…</> : <><Mail size={15} /> Send Magic Link</>}
-                </button>
-                <p className="text-center text-[11px] text-gray-400 leading-relaxed">
-                  We'll email you a one-click sign-in link.<br />
-                  No password required.
-                </p>
-              </form>
-            )}
+        {method === 'email' && emailStep === 'input' && (
+          <form onSubmit={handleSendLink} className="space-y-4">
+            <div>
+              <label className="block text-[11px] font-bold text-textMuted uppercase tracking-wide mb-1.5">
+                Your Name <span className="font-normal normal-case">(for new accounts)</span>
+              </label>
+              <input type="text" placeholder="Full name"
+                className="w-full px-4 py-3 rounded-xl border-2 border-sand focus:border-sageDark outline-none text-[13px]"
+                value={name} onChange={e => setName(e.target.value)} />
+            </div>
 
-            {emailStep === 'sent' && (
-              <div className="text-center space-y-5">
-                <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto">
-                  <CheckCircle size={32} className="text-green-500" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-textMain text-[15px] mb-1">Check your inbox!</h3>
-                  <p className="text-[13px] text-textMuted leading-relaxed">
-                    A magic sign-in link was sent to<br />
-                    <strong className="text-sageDark">{email}</strong>
-                  </p>
-                </div>
-                <p className="text-[11px] text-gray-400 leading-relaxed">
-                  Click the link in the email to sign in.<br />
-                  Link expires in 60 minutes. Check spam if not received.
-                </p>
+            <div>
+              <label className="block text-[11px] font-bold text-textMuted uppercase tracking-wide mb-1.5">
+                Email Address *
+              </label>
+              <input type="email" required autoComplete="email" placeholder="you@example.com"
+                className="w-full px-4 py-3 rounded-xl border-2 border-sand focus:border-sageDark outline-none text-[13px]"
+                value={email} onChange={e => { setEmail(e.target.value); setError('') }} />
+            </div>
 
-                {/* OTP code entry — shown only when Supabase email template
-                    is changed to send {{ .Token }} instead of {{ .ConfirmationURL }} */}
-                <details className="text-left">
-                  <summary className="text-[11px] text-sageDark font-bold cursor-pointer select-none">
-                    Have a 6-digit code instead?
-                  </summary>
-                  <form onSubmit={handleVerifyEmailOtp} className="mt-3 space-y-3">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={6}
-                      placeholder="000000"
-                      className="w-full text-center text-2xl font-bold tracking-[0.4em] py-3 bg-gray-50 border-2 border-sand focus:border-sageDark rounded-xl outline-none"
-                      value={otp}
-                      onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); setError('') }}
-                    />
-                    <button
-                      type="submit"
-                      disabled={loading || otp.length < 6}
-                      className="w-full bg-sageDark text-white font-bold py-3 rounded-xl disabled:opacity-60 flex items-center justify-center gap-2"
-                    >
-                      {loading ? <><Spinner /> Verifying…</> : 'Verify Code & Sign In'}
-                    </button>
-                  </form>
-                </details>
+            <button type="submit" disabled={loading}
+              className="w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+              {loading ? <><Spinner /> Sending…</> : <><Mail size={15} /> Send Magic Link</>}
+            </button>
 
-                <button
-                  type="button"
-                  onClick={() => { setEmailStep('input'); setError(''); setOtp('') }}
-                  className="flex items-center justify-center gap-1.5 text-[12px] text-textMuted hover:text-textMain mx-auto"
-                >
-                  <ArrowLeft size={13} /> Use a different email
-                </button>
-              </div>
-            )}
-          </>
+            <p className="text-center text-[11px] text-gray-400 leading-relaxed">
+              We'll send a one-click sign-in link to your inbox.<br />
+              No password required. Works for sign-up and sign-in.
+            </p>
+          </form>
         )}
 
-        {/* ═══ PHONE ═════════════════════════════════════════════ */}
-        {method === 'phone' && (
-          <>
-            {phoneStep === 'input' && (
-              <form onSubmit={handleSendPhoneOtp} className="space-y-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-textMuted uppercase tracking-wide mb-1.5">
-                    Mobile Number *
-                  </label>
-                  <div className="flex gap-2">
-                    <span className="flex items-center px-3.5 py-3 bg-[#F7F6F2] border-2 border-sand rounded-xl text-[13px] font-bold text-textMuted shrink-0">
-                      🇮🇳 +91
-                    </span>
-                    <input
-                      type="tel"
-                      required
-                      maxLength={10}
-                      placeholder="9876543210"
-                      className="flex-1 px-4 py-3 rounded-xl border-2 border-sand focus:border-sageDark outline-none transition-colors text-[13px]"
-                      value={phone}
-                      onChange={e => { setPhone(e.target.value.replace(/\D/g, '')); setError('') }}
-                    />
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
-                >
-                  {loading ? <><Spinner /> Sending OTP…</> : <><Phone size={15} /> Send OTP</>}
-                </button>
-                <p className="text-center text-[11px] text-gray-400 leading-relaxed">
-                  We'll send a 6-digit code to your mobile.<br />
-                  Standard SMS rates apply.
-                </p>
-              </form>
-            )}
+        {method === 'email' && emailStep === 'sent' && (
+          <div className="text-center space-y-5">
+            <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle size={32} className="text-green-500" />
+            </div>
+            <div>
+              <h3 className="font-bold text-textMain text-[15px] mb-1">Check your inbox!</h3>
+              <p className="text-[13px] text-textMuted leading-relaxed">
+                A magic sign-in link was sent to<br />
+                <strong className="text-sageDark">{email}</strong>
+              </p>
+            </div>
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              Click the link to sign in instantly.<br />
+              Valid for 60 minutes · Check spam if not received.
+            </p>
 
-            {phoneStep === 'otp' && (
-              <form onSubmit={handleVerifyPhoneOtp} className="space-y-5">
-                <div className="text-center">
-                  <p className="text-[13px] text-textMuted">
-                    Code sent to <strong className="text-sageDark">+91 {phone}</strong>
-                  </p>
-                </div>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  autoFocus
-                  placeholder="0  0  0  0  0  0"
-                  className="w-full text-center text-3xl font-bold tracking-[0.6em] py-4 bg-gray-50 border-2 border-sand focus:border-sageDark rounded-xl outline-none placeholder:text-gray-200 placeholder:tracking-[0.4em]"
-                  value={phoneOtp}
-                  onChange={e => { setPhoneOtp(e.target.value.replace(/\D/g, '')); setError('') }}
-                />
-                <button
-                  type="submit"
-                  disabled={loading || phoneOtp.length < 6}
-                  className="w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3.5 rounded-xl disabled:opacity-60 flex items-center justify-center gap-2"
-                >
-                  {loading ? <><Spinner /> Verifying…</> : 'Verify & Sign In →'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setPhoneStep('input'); setPhoneOtp(''); setError('') }}
-                  className="flex items-center justify-center gap-1.5 text-[12px] text-textMuted hover:text-textMain w-full"
-                >
-                  <ArrowLeft size={13} /> Use a different number
+            {/* OTP entry — shown only when Supabase template sends {{ .Token }} */}
+            <details className="text-left border border-sand/60 rounded-xl p-4">
+              <summary className="text-[11px] text-sageDark font-bold cursor-pointer select-none list-none flex items-center gap-1.5">
+                <span className="text-sageDark">›</span> Received a 6-digit code instead?
+              </summary>
+              <form onSubmit={handleVerifyOtp} className="mt-3 space-y-3">
+                <input type="text" inputMode="numeric" maxLength={6} placeholder="000000"
+                  className="w-full text-center text-2xl font-bold tracking-[0.4em] py-3 bg-gray-50 border-2 border-sand focus:border-sageDark rounded-xl outline-none"
+                  value={otp} onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); setError('') }} />
+                <button type="submit" disabled={loading || otp.length < 6}
+                  className="w-full bg-sageDark text-white font-bold py-3 rounded-xl disabled:opacity-60 flex items-center justify-center gap-2">
+                  {loading ? <><Spinner /> Verifying…</> : 'Verify & Sign In'}
                 </button>
               </form>
-            )}
-          </>
+            </details>
+
+            <button type="button" onClick={() => { setEmailStep('input'); setError(''); setOtp('') }}
+              className="flex items-center justify-center gap-1.5 text-[12px] text-textMuted hover:text-textMain mx-auto">
+              <ArrowLeft size={13} /> Use a different email
+            </button>
+          </div>
         )}
 
         {/* Footer */}
         <div className="mt-6 pt-5 border-t border-sand/50 text-center">
           <p className="text-[11px] text-gray-400">
-            New users get an account automatically on first sign-in.
+            New users get a free account on first sign-in. No credit card needed.
           </p>
         </div>
       </div>
@@ -406,23 +241,20 @@ export default function Login() {
   )
 }
 
+/* ── Module-level helpers (not inside component) ──────────────────── */
+
 function Spinner() {
   return <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
 }
 
-function TabBtn({
-  m, label, icon, active, onClick,
-}: {
-  m: Method; label: string; icon: React.ReactNode; active: boolean; onClick: (m: Method) => void
+function TabBtn({ active, onClick, icon, label }: {
+  active: boolean; onClick: () => void; icon: React.ReactNode; label: string
 }) {
   return (
-    <button
-      type="button"
-      onClick={() => onClick(m)}
+    <button type="button" onClick={onClick}
       className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-bold rounded-xl transition-all ${
         active ? 'bg-[#2C392A] text-white shadow-sm' : 'text-[#5F6D59] hover:bg-[#F7F6F2]'
-      }`}
-    >
+      }`}>
       {icon}{label}
     </button>
   )
