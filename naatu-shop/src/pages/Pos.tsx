@@ -528,11 +528,11 @@ export default function Pos() {
 
                       {/* Info */}
                       <div className="p-1.5 flex-1 flex flex-col justify-between">
-                        <p className="text-[10px] sm:text-[11px] font-bold text-[#2C392A] line-clamp-2 leading-tight">
+                        <p className="text-[10px] sm:text-[11px] font-bold text-[#2C392A] line-clamp-2 leading-snug">
                           {product.name}
                         </p>
                         {(product.nameTa || product.tamilName) && (
-                          <p className="text-[9px] text-[#7DAA8F] line-clamp-1 mt-0.5 leading-tight">
+                          <p className="text-[10px] text-[#7DAA8F] line-clamp-1 mt-0.5 leading-relaxed ta-text">
                             {product.nameTa || product.tamilName}
                           </p>
                         )}

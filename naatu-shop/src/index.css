@@ -8,12 +8,33 @@
   body {
     background-color: #F7F6F2;
     color: #2C392A;
-    font-family: 'Inter', 'Noto Sans Tamil', sans-serif;
+    /* Noto Sans Tamil listed second so Latin text uses Inter but Tamil falls
+       back to the correct Tamil-capable font without reordering glyphs. */
+    font-family: 'Inter', 'Noto Sans Tamil', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
   }
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Poppins', 'Noto Sans Tamil', sans-serif;
+    /* Poppins for Latin headings; Noto Sans Tamil for any Tamil heading text */
+    font-family: 'Poppins', 'Noto Sans Tamil', system-ui, sans-serif;
+  }
+
+  /* ── Tamil script typography fixes ────────────────────────────
+     Tamil characters extend above and below the baseline more than
+     Latin glyphs. Without a generous line-height they clip.
+     The .ta-text utility class is applied to Tamil text nodes. */
+  .ta-text {
+    font-family: 'Noto Sans Tamil', system-ui, sans-serif;
+    line-height: 1.75;
+    /* Prevent over-tight tracking from crushing Tamil conjuncts */
+    letter-spacing: 0;
+  }
+  /* Generic fallback: any element containing Tamil Unicode block text
+     will inherit relaxed line-height through the cascade. */
+  [lang="ta"], :lang(ta) {
+    font-family: 'Noto Sans Tamil', system-ui, sans-serif;
+    line-height: 1.75;
+    letter-spacing: 0;
   }
 }
 

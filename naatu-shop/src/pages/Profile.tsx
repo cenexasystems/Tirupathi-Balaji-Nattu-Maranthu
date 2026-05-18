@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
-import { Package, User, LogOut, ChevronDown, ChevronUp, ShoppingBag, Settings } from 'lucide-react'
+import { Package, User, LogOut, ChevronDown, ChevronUp, ShoppingBag, Settings, Edit2, Check, X } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { getLocalOrdersForUser } from '../lib/ordersFallback'
 import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, normalizeStructuredOrderItem } from '../lib/retail'
+
+const PHONE_RE = /^[6-9]\d{9}$/
 
 interface ProfileOrderItem {
   product_id: string | null   // UUID — Supabase products.id is UUID
@@ -42,13 +44,48 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }>
 }
 
 export default function Profile() {
-  const { user, logout } = useAuthStore()
+  const { user, logout, setAuth } = useAuthStore()
   const { lang } = useLangStore()
   const navigate = useNavigate()
   const [orders, setOrders] = useState<ProfileOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'orders' | 'info'>('orders')
+
+  // ── Inline profile edit ───────────────────────────────────────
+  const [editing, setEditing]     = useState(false)
+  const [editName, setEditName]   = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [saveErr, setSaveErr]     = useState('')
+  const [saving, setSaving]       = useState(false)
+
+  const startEdit = () => {
+    setEditName(user?.name || '')
+    setEditPhone(user?.mobile || '')
+    setSaveErr(''); setEditing(true)
+  }
+
+  const cancelEdit = () => { setEditing(false); setSaveErr('') }
+
+  const handleSaveProfile = async () => {
+    const trimName  = editName.trim()
+    const trimPhone = editPhone.replace(/\D/g, '')
+    if (!trimName || trimName.length < 2) { setSaveErr('Name must be at least 2 characters.'); return }
+    if (trimPhone && !PHONE_RE.test(trimPhone)) { setSaveErr('Enter a valid 10-digit Indian mobile number.'); return }
+    if (!user) return
+
+    setSaving(true); setSaveErr('')
+    const { error } = await supabase
+      .from('profiles')
+      .update({ name: trimName, mobile: trimPhone })
+      .eq('id', user.id)
+
+    if (error) { setSaveErr(error.message); setSaving(false); return }
+
+    // Update local store so Navbar / other components reflect new values immediately
+    setAuth({ ...user, name: trimName, mobile: trimPhone })
+    setSaving(false); setEditing(false)
+  }
 
   const parseOrderItems = (value: unknown): ProfileOrderItem[] => {
     if (!Array.isArray(value)) return []
@@ -210,28 +247,103 @@ export default function Profile() {
             {/* Account Info */}
             {activeTab === 'info' && (
               <div className="bg-white p-6 rounded-2xl shadow-soft border border-sand/50">
-                <h2 className="text-xl font-bold text-textMain mb-6 flex items-center gap-2">
-                  <User size={20} className="text-sageDark" /> Account Information
-                </h2>
-                <div className="space-y-4">
-                  {[
-                    { label: 'Full Name', value: user.name },
-                    { label: 'Email', value: user.email || '—' },
-                    { label: 'Mobile', value: user.mobile || '—' },
-                    { label: 'Account Type', value: user.role === 'admin' ? 'Administrator' : 'Customer' },
-                  ].map(item => (
-                    <div key={item.label} className="flex items-start gap-4 p-4 bg-bgMain rounded-xl">
-                      <div>
-                        <p className="text-xs font-bold text-textMuted uppercase tracking-wide">{item.label}</p>
-                        <p className="font-bold text-textMain mt-1">{item.value}</p>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-textMain flex items-center gap-2">
+                    <User size={20} className="text-sageDark" /> Account Information
+                  </h2>
+                  {isSupabaseConfigured && !editing && (
+                    <button onClick={startEdit}
+                      className="flex items-center gap-1.5 text-[12px] font-bold text-sageDark hover:text-sageDeep transition-colors">
+                      <Edit2 size={13} /> Edit
+                    </button>
+                  )}
+                </div>
+
+                {/* View mode */}
+                {!editing && (
+                  <div className="space-y-3">
+                    {[
+                      { label: 'Full Name',     value: user.name           },
+                      { label: 'Email',         value: user.email || '—'   },
+                      { label: 'Mobile',        value: user.mobile || '—'  },
+                      { label: 'Account Type',  value: user.role === 'admin' ? 'Administrator' : 'Customer' },
+                    ].map(item => (
+                      <div key={item.label} className="flex items-start gap-4 p-4 bg-bgMain rounded-xl">
+                        <div>
+                          <p className="text-[10px] font-bold text-textMuted uppercase tracking-wide">{item.label}</p>
+                          <p className="font-bold text-textMain mt-0.5">{item.value}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {!user.mobile && (
+                      <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 px-4 py-3 rounded-xl">
+                        📱 Add your mobile number so we can reach you about orders.
+                        <button onClick={startEdit} className="ml-1.5 font-bold underline">Add now →</button>
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Edit mode */}
+                {editing && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-[11px] font-bold text-textMuted uppercase tracking-wide mb-1.5">
+                        Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        autoFocus
+                        className="w-full px-4 py-3 rounded-xl border-2 border-sand focus:border-sageDark outline-none text-[13px]"
+                        value={editName}
+                        onChange={e => { setEditName(e.target.value); setSaveErr('') }}
+                        placeholder="Your full name"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-textMuted uppercase tracking-wide mb-1.5">
+                        Mobile Number
+                        <span className="ml-1 font-normal normal-case text-[10px] text-gray-400">10-digit Indian mobile</span>
+                      </label>
+                      <div className="flex gap-2">
+                        <span className="flex items-center px-3 py-3 bg-[#F7F6F2] border-2 border-sand rounded-xl text-[13px] font-bold text-textMuted shrink-0 select-none">
+                          🇮🇳 +91
+                        </span>
+                        <input
+                          type="tel"
+                          maxLength={10}
+                          className="flex-1 px-4 py-3 rounded-xl border-2 border-sand focus:border-sageDark outline-none text-[13px]"
+                          value={editPhone}
+                          onChange={e => { setEditPhone(e.target.value.replace(/\D/g, '')); setSaveErr('') }}
+                          placeholder="9876543210"
+                        />
                       </div>
                     </div>
-                  ))}
-                </div>
-                {isSupabaseConfigured && (
-                  <p className="text-xs text-textMuted mt-6 bg-blue-50 px-4 py-3 rounded-xl">
-                    ✉️ Your account is linked to your email. To update your profile, contact support.
-                  </p>
+
+                    <div className="p-3 bg-[#F7F6F2] rounded-xl text-[12px] text-textMuted">
+                      <strong>Email:</strong> {user.email || '—'}
+                      <span className="ml-2 text-[11px] text-gray-400">(cannot be changed here)</span>
+                    </div>
+
+                    {saveErr && (
+                      <p className="text-[12px] text-red-500 font-medium">⚠ {saveErr}</p>
+                    )}
+
+                    <div className="flex gap-3 pt-1">
+                      <button onClick={handleSaveProfile} disabled={saving}
+                        className="flex items-center gap-1.5 px-5 py-2.5 bg-sageDark hover:bg-sageDeep text-white font-bold rounded-xl text-[13px] disabled:opacity-60 transition-colors">
+                        {saving
+                          ? <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
+                          : <><Check size={14} /> Save Changes</>
+                        }
+                      </button>
+                      <button onClick={cancelEdit} disabled={saving}
+                        className="flex items-center gap-1.5 px-5 py-2.5 border-2 border-sand text-textMuted font-bold rounded-xl text-[13px] hover:bg-bgMain transition-colors">
+                        <X size={14} /> Cancel
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             )}

@@ -193,9 +193,9 @@ export default function ProductCard({ product }: { product: Product }) {
           {product.category}
         </span>
 
-        {/* Name */}
+        {/* Name — min-h accommodates 2 Tamil lines at 1.65 line-height */}
         <Link to={`/product/${product.id}`}>
-          <h3 className="line-clamp-2 min-h-[2.25rem] text-[12px] sm:text-[13px] font-bold leading-[1.35] text-[#2C392A] hover:text-[#7DAA8F] transition-colors">
+          <h3 className="line-clamp-2 min-h-[2.75rem] text-[12px] sm:text-[13px] font-bold leading-[1.65] text-[#2C392A] hover:text-[#7DAA8F] transition-colors ta-text">
             {displayName}
           </h3>
         </Link>

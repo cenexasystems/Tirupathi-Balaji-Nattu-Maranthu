@@ -1,13 +1,15 @@
 /**
- * Login — Sign in / Sign up
- * Two methods: Google OAuth  |  Email Magic Link
- * Phone OTP removed (not required).
+ * Login / Sign-up — Google OAuth + Email Magic Link
+ *
+ * Email flow collects: Full Name · Mobile · Email
+ * All three are validated inline before sending the magic link.
+ * Name and mobile are stored in user_metadata so the DB trigger
+ * (handle_new_user) and initialize() can persist them to profiles.
  */
 import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { Leaf, Mail, ArrowLeft, CheckCircle } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
+import { Leaf, Mail, ArrowLeft, CheckCircle, User, Phone as PhoneIcon } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { useAuthStore } from '../store/store'
 import { BRAND_EN, BRAND_TA } from '../lib/brand'
 
 const SITE_URL =
@@ -17,28 +19,50 @@ const SITE_URL =
 type Method = 'google' | 'email'
 type EmailStep = 'input' | 'sent'
 
+// Indian mobile: 10 digits, must start with 6-9
+const PHONE_RE = /^[6-9]\d{9}$/
+
+interface FieldError {
+  name?: string
+  phone?: string
+  email?: string
+}
+
+function validate(name: string, phone: string, email: string): FieldError {
+  const errs: FieldError = {}
+  if (!name.trim() || name.trim().length < 2)
+    errs.name = 'Please enter your full name (at least 2 characters).'
+  const digits = phone.replace(/\D/g, '')
+  if (!digits || !PHONE_RE.test(digits))
+    errs.phone = 'Enter a valid 10-digit Indian mobile number (starts with 6–9).'
+  if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+    errs.email = 'Enter a valid email address.'
+  return errs
+}
+
 export default function Login() {
-  const navigate   = useNavigate()
   const location   = useLocation()
-  const initialize = useAuthStore((s) => s.initialize)
   const redirectPath = new URLSearchParams(location.search).get('redirect') || '/'
 
   const [method,    setMethod]    = useState<Method>('google')
   const [loading,   setLoading]   = useState(false)
-  const [error,     setError]     = useState('')
+  const [error,     setError]     = useState('')           // general / server error
+  const [fieldErrs, setFieldErrs] = useState<FieldError>({})
   const [email,     setEmail]     = useState('')
   const [name,      setName]      = useState('')
+  const [phone,     setPhone]     = useState('')
   const [emailStep, setEmailStep] = useState<EmailStep>('input')
   const [otp,       setOtp]       = useState('')
 
   const switchMethod = (m: Method) => {
-    setMethod(m); setError(''); setLoading(false)
-    setEmail(''); setName(''); setEmailStep('input'); setOtp('')
+    setMethod(m); setError(''); setFieldErrs({})
+    setEmail(''); setName(''); setPhone(''); setEmailStep('input'); setOtp('')
+    setLoading(false)
   }
 
   /* ── Google ──────────────────────────────────────────────────── */
   const handleGoogle = async () => {
-    if (!isSupabaseConfigured) { setError('Auth not configured.'); return }
+    if (!isSupabaseConfigured) { setError('Authentication not configured.'); return }
     setLoading(true); setError('')
     const { error: e } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -48,23 +72,31 @@ export default function Login() {
       },
     })
     if (e) { setError(e.message); setLoading(false) }
-    // On success the browser navigates away — no code after this.
   }
 
-  /* ── Email magic link ─────────────────────────────────────────── */
+  /* ── Email: send magic link ──────────────────────────────────── */
   const handleSendLink = async (e: React.FormEvent) => {
     e.preventDefault()
-    const cleanEmail = email.trim().toLowerCase()
-    if (!cleanEmail.includes('@')) { setError('Enter a valid email address.'); return }
-    if (!isSupabaseConfigured) { setError('Auth not configured.'); return }
-    setLoading(true); setError('')
 
+    const errs = validate(name, phone, email)
+    if (Object.keys(errs).length > 0) { setFieldErrs(errs); return }
+
+    if (!isSupabaseConfigured) { setError('Authentication not configured.'); return }
+    setLoading(true); setError(''); setFieldErrs({})
+
+    const cleanPhone = phone.replace(/\D/g, '')
     const { error: e2 } = await supabase.auth.signInWithOtp({
-      email: cleanEmail,
+      email: email.trim().toLowerCase(),
       options: {
         shouldCreateUser: true,
         emailRedirectTo: SITE_URL,
-        data: name.trim() ? { name: name.trim(), full_name: name.trim() } : undefined,
+        // Stored in raw_user_meta_data; handle_new_user trigger + initialize()
+        // will persist these to profiles.name / profiles.mobile
+        data: {
+          name:       name.trim(),
+          full_name:  name.trim(),
+          mobile:     cleanPhone,
+        },
       },
     })
 
@@ -73,10 +105,10 @@ export default function Login() {
     setEmailStep('sent')
   }
 
-  /* ── Email OTP code (only if Supabase template uses {{ .Token }}) */
+  /* ── Email: verify OTP code (only if template sends {{ .Token }}) */
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (otp.trim().length < 6) { setError('Enter the 6-digit code.'); return }
+    if (otp.trim().length < 6) { setError('Enter the 6-digit code from your email.'); return }
     setLoading(true); setError('')
 
     const { error: e2 } = await supabase.auth.verifyOtp({
@@ -86,9 +118,8 @@ export default function Login() {
     })
 
     if (e2) { setLoading(false); setError(e2.message); return }
-    await initialize()
+    // onAuthStateChange SIGNED_IN in App.tsx will call initialize() and redirect
     setLoading(false)
-    navigate(redirectPath, { replace: true })
   }
 
   /* ── Render ───────────────────────────────────────────────────── */
@@ -110,15 +141,15 @@ export default function Login() {
           )}
         </div>
 
-        {/* Tabs */}
+        {/* Method tabs */}
         <div className="flex gap-1.5 bg-[#F7F6F2] rounded-xl p-1 mb-5">
-          <TabBtn active={method === 'google'} onClick={() => switchMethod('google')}
-            icon={<GoogleIcon />} label="Google" />
-          <TabBtn active={method === 'email'} onClick={() => switchMethod('email')}
-            icon={<Mail size={13} />} label="Email" />
+          <TabBtn active={method === 'google'} label="Google"
+            icon={<GoogleIcon />} onClick={() => switchMethod('google')} />
+          <TabBtn active={method === 'email'} label="Email"
+            icon={<Mail size={13} />} onClick={() => switchMethod('email')} />
         </div>
 
-        {/* Error */}
+        {/* Server-level error */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-[12px] mb-4">
             {error}
@@ -131,65 +162,115 @@ export default function Login() {
             <button onClick={handleGoogle} disabled={loading}
               className="w-full flex items-center justify-center gap-3 bg-white border-2 border-[#EAD7B7] hover:border-sageDark text-textMain font-bold py-4 rounded-xl transition-all disabled:opacity-60 shadow-sm hover:shadow-md active:scale-[0.98]">
               {loading ? <Spinner /> : <GoogleIcon size={20} />}
-              {loading ? 'Redirecting…' : 'Continue with Google'}
+              {loading ? 'Redirecting to Google…' : 'Continue with Google'}
             </button>
 
             <div className="relative flex items-center gap-3 py-1">
               <div className="flex-1 h-px bg-sand/60" />
-              <span className="text-[11px] text-textMuted font-medium shrink-0">What happens</span>
+              <span className="text-[11px] text-textMuted font-medium shrink-0">How it works</span>
               <div className="flex-1 h-px bg-sand/60" />
             </div>
 
             <div className="space-y-2.5 text-[12px] text-textMuted">
-              <div className="flex items-start gap-2.5">
-                <span className="w-5 h-5 rounded-full bg-[#7DAA8F]/15 text-sageDark flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">1</span>
-                <p><strong className="text-textMain">New user?</strong> A free account is created automatically using your Google profile.</p>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <span className="w-5 h-5 rounded-full bg-[#7DAA8F]/15 text-sageDark flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">2</span>
-                <p><strong className="text-textMain">Returning user?</strong> You're signed straight in — no password needed.</p>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <span className="w-5 h-5 rounded-full bg-[#7DAA8F]/15 text-sageDark flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">3</span>
-                <p>Your orders, cart and favourites are linked to your account.</p>
-              </div>
+              {[
+                ['New user?', 'A free account is created automatically using your Google profile.'],
+                ['Returning user?', 'You\'re signed straight in — no password needed.'],
+                ['Your data:', 'Orders, cart and favourites are linked to your account.'],
+              ].map(([bold, text], i) => (
+                <div key={i} className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-[#7DAA8F]/15 text-sageDark flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">
+                    {i + 1}
+                  </span>
+                  <p><strong className="text-textMain">{bold}</strong> {text}</p>
+                </div>
+              ))}
             </div>
+
+            <p className="text-center text-[11px] text-gray-400 leading-relaxed pt-1">
+              After signing in with Google, you can add your phone number<br />
+              from your Profile page.
+            </p>
           </div>
         )}
 
-        {/* ═══ EMAIL ═════════════════════════════════════════════ */}
+        {/* ═══ EMAIL — step 1: form ══════════════════════════════ */}
         {method === 'email' && emailStep === 'input' && (
-          <form onSubmit={handleSendLink} className="space-y-4">
-            <div>
-              <label className="block text-[11px] font-bold text-textMuted uppercase tracking-wide mb-1.5">
-                Your Name <span className="font-normal normal-case">(for new accounts)</span>
-              </label>
-              <input type="text" placeholder="Full name"
-                className="w-full px-4 py-3 rounded-xl border-2 border-sand focus:border-sageDark outline-none text-[13px]"
-                value={name} onChange={e => setName(e.target.value)} />
-            </div>
+          <form onSubmit={handleSendLink} noValidate className="space-y-4">
 
-            <div>
-              <label className="block text-[11px] font-bold text-textMuted uppercase tracking-wide mb-1.5">
-                Email Address *
-              </label>
-              <input type="email" required autoComplete="email" placeholder="you@example.com"
-                className="w-full px-4 py-3 rounded-xl border-2 border-sand focus:border-sageDark outline-none text-[13px]"
-                value={email} onChange={e => { setEmail(e.target.value); setError('') }} />
-            </div>
+            {/* Full Name */}
+            <FieldGroup
+              label="Full Name"
+              icon={<User size={14} />}
+              required
+              error={fieldErrs.name}
+            >
+              <input
+                type="text"
+                autoComplete="name"
+                placeholder="e.g. Priya Krishnamurthy"
+                className={inputCls(!!fieldErrs.name)}
+                value={name}
+                onChange={e => { setName(e.target.value); setFieldErrs(f => ({ ...f, name: '' })) }}
+              />
+            </FieldGroup>
+
+            {/* Mobile Number */}
+            <FieldGroup
+              label="Mobile Number"
+              icon={<PhoneIcon size={14} />}
+              required
+              error={fieldErrs.phone}
+              hint="10-digit Indian mobile"
+            >
+              <div className="flex gap-2">
+                <span className="flex items-center px-3 py-3 bg-[#F7F6F2] border-2 border-sand rounded-xl text-[13px] font-bold text-textMuted shrink-0 select-none">
+                  🇮🇳 +91
+                </span>
+                <input
+                  type="tel"
+                  autoComplete="tel-national"
+                  maxLength={10}
+                  placeholder="9876543210"
+                  className={`flex-1 ${inputCls(!!fieldErrs.phone)}`}
+                  value={phone}
+                  onChange={e => { setPhone(e.target.value.replace(/\D/g, '')); setFieldErrs(f => ({ ...f, phone: '' })) }}
+                />
+              </div>
+            </FieldGroup>
+
+            {/* Email */}
+            <FieldGroup
+              label="Email Address"
+              icon={<Mail size={14} />}
+              required
+              error={fieldErrs.email}
+            >
+              <input
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                className={inputCls(!!fieldErrs.email)}
+                value={email}
+                onChange={e => { setEmail(e.target.value); setFieldErrs(f => ({ ...f, email: '' })) }}
+              />
+            </FieldGroup>
 
             <button type="submit" disabled={loading}
-              className="w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
-              {loading ? <><Spinner /> Sending…</> : <><Mail size={15} /> Send Magic Link</>}
+              className="w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 mt-2">
+              {loading
+                ? <><Spinner /> Sending link…</>
+                : <><Mail size={15} /> Send Magic Link</>
+              }
             </button>
 
             <p className="text-center text-[11px] text-gray-400 leading-relaxed">
               We'll send a one-click sign-in link to your inbox.<br />
-              No password required. Works for sign-up and sign-in.
+              No password required. Works for both sign-up and sign-in.
             </p>
           </form>
         )}
 
+        {/* ═══ EMAIL — step 2: link sent ════════════════════════ */}
         {method === 'email' && emailStep === 'sent' && (
           <div className="text-center space-y-5">
             <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto">
@@ -204,13 +285,13 @@ export default function Login() {
             </div>
             <p className="text-[11px] text-gray-400 leading-relaxed">
               Click the link to sign in instantly.<br />
-              Valid for 60 minutes · Check spam if not received.
+              Valid for 60 minutes. Check spam if not received.
             </p>
 
-            {/* OTP entry — shown only when Supabase template sends {{ .Token }} */}
+            {/* OTP code entry — only if Supabase template uses {{ .Token }} */}
             <details className="text-left border border-sand/60 rounded-xl p-4">
               <summary className="text-[11px] text-sageDark font-bold cursor-pointer select-none list-none flex items-center gap-1.5">
-                <span className="text-sageDark">›</span> Received a 6-digit code instead?
+                <span>›</span> Received a 6-digit code instead?
               </summary>
               <form onSubmit={handleVerifyOtp} className="mt-3 space-y-3">
                 <input type="text" inputMode="numeric" maxLength={6} placeholder="000000"
@@ -223,7 +304,8 @@ export default function Login() {
               </form>
             </details>
 
-            <button type="button" onClick={() => { setEmailStep('input'); setError(''); setOtp('') }}
+            <button type="button"
+              onClick={() => { setEmailStep('input'); setError(''); setOtp('') }}
               className="flex items-center justify-center gap-1.5 text-[12px] text-textMuted hover:text-textMain mx-auto">
               <ArrowLeft size={13} /> Use a different email
             </button>
@@ -233,7 +315,7 @@ export default function Login() {
         {/* Footer */}
         <div className="mt-6 pt-5 border-t border-sand/50 text-center">
           <p className="text-[11px] text-gray-400">
-            New users get a free account on first sign-in. No credit card needed.
+            First time here? Your account is created automatically on sign-in.
           </p>
         </div>
       </div>
@@ -241,7 +323,42 @@ export default function Login() {
   )
 }
 
-/* ── Module-level helpers (not inside component) ──────────────────── */
+/* ── Module-level helpers ─────────────────────────────────────────── */
+
+const inputCls = (hasError: boolean) =>
+  `w-full px-4 py-3 rounded-xl border-2 outline-none text-[13px] transition-colors ${
+    hasError
+      ? 'border-red-400 focus:border-red-500 bg-red-50/30'
+      : 'border-sand focus:border-sageDark'
+  }`
+
+function FieldGroup({
+  label, icon, required, error, hint, children,
+}: {
+  label: string
+  icon: React.ReactNode
+  required?: boolean
+  error?: string
+  hint?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <label className="flex items-center gap-1.5 text-[11px] font-bold text-textMuted uppercase tracking-wide mb-1.5">
+        {icon}
+        {label}
+        {required && <span className="text-red-500 font-black">*</span>}
+        {hint && <span className="ml-auto font-normal normal-case text-[10px] text-gray-400">{hint}</span>}
+      </label>
+      {children}
+      {error && (
+        <p className="mt-1.5 text-[11px] text-red-500 font-medium flex items-center gap-1">
+          <span className="shrink-0">⚠</span> {error}
+        </p>
+      )}
+    </div>
+  )
+}
 
 function Spinner() {
   return <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
@@ -255,7 +372,7 @@ function TabBtn({ active, onClick, icon, label }: {
       className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-bold rounded-xl transition-all ${
         active ? 'bg-[#2C392A] text-white shadow-sm' : 'text-[#5F6D59] hover:bg-[#F7F6F2]'
       }`}>
-      {icon}{label}
+      {icon} {label}
     </button>
   )
 }

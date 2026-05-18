@@ -208,28 +208,47 @@ export const useAuthStore = create<AuthState>()(
               .eq('id', session.user.id)
               .single()
 
-            // Auto-bootstrap profile for new OAuth / magic-link / phone users.
-            // The DB trigger handles brand-new sign-ups but the row may not
-            // exist yet if the trigger wasn't in place at sign-up time.
+            const meta = session.user.user_metadata || {}
+            const email = session.user.email || ''
+            const metaName  = String(meta.full_name || meta.name || (email ? email.split('@')[0] : 'Customer'))
+            const metaMobile = String(meta.mobile || meta.phone || '')
+
             if (!profile) {
-              const email = session.user.email || ''
-              const name = String(
-                session.user.user_metadata?.full_name
-                  || session.user.user_metadata?.name
-                  || (email ? email.split('@')[0] : 'Customer')
-              )
+              // Bootstrap profile for users signed up before the DB trigger existed
               const role = ADMIN_EMAILS_LOCAL.has(email.toLowerCase()) ? 'admin' : 'customer'
               const { data: upserted } = await supabase
                 .from('profiles')
-                .upsert({ id: session.user.id, email, name, role }, { onConflict: 'id' })
+                .upsert({
+                  id: session.user.id,
+                  email,
+                  name: metaName,
+                  mobile: metaMobile,
+                  role,
+                }, { onConflict: 'id' })
                 .select()
                 .single()
               profile = upserted
+            } else {
+              // Profile exists — backfill missing fields from user_metadata
+              // (handles users who signed up before phone field was added to the form)
+              const needsUpdate: Record<string, string> = {}
+              if (!profile.mobile && metaMobile) needsUpdate.mobile = metaMobile
+              if (!profile.name   && metaName)   needsUpdate.name   = metaName
+              if (!profile.email  && email)       needsUpdate.email  = email
+
+              if (Object.keys(needsUpdate).length > 0) {
+                const { data: updated } = await supabase
+                  .from('profiles')
+                  .update(needsUpdate)
+                  .eq('id', session.user.id)
+                  .select()
+                  .single()
+                if (updated) profile = updated
+              }
             }
 
             set({ user: toAuthUser(profile, session.user) })
           } else {
-            // No session — clear any stale persisted user
             set({ user: null })
           }
         } catch (e) {
