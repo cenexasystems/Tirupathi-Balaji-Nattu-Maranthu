@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState, useMemo, type FormEvent } from
 import {
   BarChart2, Trash2, Edit2, List, ShoppingCart, LayoutDashboard,
   Box, AlertCircle, ArrowUp, ArrowDown, Power, Download, TrendingUp,
-  Package, IndianRupee, Search, RefreshCw,
+  Package, IndianRupee, Search, RefreshCw, Users, ShieldCheck, ShieldOff,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
@@ -16,7 +16,8 @@ type DashboardOrder = {
   created_at: string; total: number; status: string; user_id: string | null; items: unknown
 }
 type DashboardOrderItem = { order_id: string; product_name: string; quantity: number; line_total: number }
-type TabKey = 'overview' | 'billing' | 'products' | 'categories'
+type TabKey = 'overview' | 'billing' | 'products' | 'categories' | 'users'
+type ProfileUser = { id: string; email: string; name: string; mobile: string; role: string; created_at: string }
 
 const normalizeStatus = (v: unknown) => String(v || '').trim().toLowerCase()
 const parseOrderItems = (items: unknown): Record<string, unknown>[] => {
@@ -83,6 +84,13 @@ export default function Dashboard() {
   const [search, setSearch] = useState({ invoiceNo: '', phone: '', email: '', userId: '', dateFrom: '', dateTo: '' })
   const [searchResults, setSearchResults] = useState<DashboardOrder[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
+
+  // Users tab
+  const [allUsers, setAllUsers] = useState<ProfileUser[]>([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [usersError, setUsersError] = useState('')
+  const [userSearch, setUserSearch] = useState('')
+  const [roleUpdating, setRoleUpdating] = useState<string | null>(null)
 
   const isAdmin = user?.role === 'admin'
 
@@ -173,6 +181,28 @@ export default function Dashboard() {
     finally { setLoading(false) }
   }, [fetchProducts])
 
+  const loadUsers = useCallback(async () => {
+    if (!isSupabaseConfigured) return
+    setUsersLoading(true); setUsersError('')
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email, name, mobile, role, created_at')
+      .order('created_at', { ascending: false })
+    if (error) { setUsersError(error.message) }
+    else { setAllUsers((data || []) as ProfileUser[]) }
+    setUsersLoading(false)
+  }, [])
+
+  const toggleUserRole = async (u: ProfileUser) => {
+    const newRole = u.role === 'admin' ? 'customer' : 'admin'
+    setRoleUpdating(u.id)
+    const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', u.id)
+    if (!error) {
+      setAllUsers(prev => prev.map(p => p.id === u.id ? { ...p, role: newRole } : p))
+    }
+    setRoleUpdating(null)
+  }
+
   useEffect(() => {
     if (!isAdmin) return
     void loadData()
@@ -184,6 +214,10 @@ export default function Dashboard() {
       .subscribe()
     return () => { void supabase.removeChannel(ch) }
   }, [isAdmin, loadData])
+
+  useEffect(() => {
+    if (tab === 'users') void loadUsers()
+  }, [tab, loadUsers])
 
   // ── Order search ───────────────────────────────────────────
   const runSearch = async (e?: FormEvent) => {
@@ -341,6 +375,7 @@ export default function Dashboard() {
     { id: 'billing',     icon: <ShoppingCart size={17} />,   label: 'POS Terminal' },
     { id: 'products',    icon: <Box size={17} />,            label: 'Inventory' },
     { id: 'categories',  icon: <List size={17} />,           label: 'Categories' },
+    { id: 'users',       icon: <Users size={17} />,          label: 'Users' },
   ]
 
   return (
@@ -844,6 +879,109 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ── USERS TAB ── */}
+        {tab === 'users' && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-black text-[#2C392A]">User Management</h2>
+              <button onClick={() => void loadUsers()}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-[#EAD7B7]/60 rounded-xl text-[13px] font-bold text-[#5F6D59] hover:bg-[#F7F6F2] transition-colors">
+                <RefreshCw size={14} /> Refresh
+              </button>
+            </div>
+
+            {/* Search */}
+            <div className="relative max-w-sm">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BAB9A]" />
+              <input
+                className="w-full pl-9 pr-4 py-2.5 bg-white border border-[#EAD7B7]/60 rounded-xl text-[13px] font-bold text-[#2C392A] placeholder-[#9BAB9A] focus:outline-none focus:ring-2 focus:ring-[#7DAA8F]/40"
+                placeholder="Search by name or email…"
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+              />
+            </div>
+
+            {usersError && (
+              <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-[13px] text-red-700 font-bold">
+                <AlertCircle size={15} /> {usersError}
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 shadow-sm overflow-hidden">
+              {usersLoading ? (
+                <div className="p-8 text-center text-[13px] font-bold text-[#5F6D59]">Loading users…</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[13px]">
+                    <thead>
+                      <tr className="bg-[#F7F6F2] border-b border-[#EAD7B7]/40">
+                        <th className="text-left px-4 py-3 font-black text-[#2C392A]">Name</th>
+                        <th className="text-left px-4 py-3 font-black text-[#2C392A]">Email</th>
+                        <th className="text-left px-4 py-3 font-black text-[#2C392A]">Mobile</th>
+                        <th className="text-left px-4 py-3 font-black text-[#2C392A]">Joined</th>
+                        <th className="text-center px-4 py-3 font-black text-[#2C392A]">Role</th>
+                        <th className="text-center px-4 py-3 font-black text-[#2C392A]">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#EAD7B7]/30">
+                      {allUsers
+                        .filter(u => {
+                          if (!userSearch.trim()) return true
+                          const q = userSearch.toLowerCase()
+                          return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+                        })
+                        .map(u => (
+                          <tr key={u.id} className="hover:bg-[#F7F6F2]/60 transition-colors">
+                            <td className="px-4 py-3 font-bold text-[#2C392A]">{u.name || '—'}</td>
+                            <td className="px-4 py-3 text-[#5F6D59]">{u.email || '—'}</td>
+                            <td className="px-4 py-3 text-[#5F6D59]">{u.mobile || '—'}</td>
+                            <td className="px-4 py-3 text-[#9BAB9A] text-[11px]">
+                              {u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN') : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black ${
+                                u.role === 'admin'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-[#F7F6F2] text-[#5F6D59]'
+                              }`}>
+                                {u.role === 'admin' ? <ShieldCheck size={10} /> : <ShieldOff size={10} />}
+                                {u.role === 'admin' ? 'Admin' : 'Customer'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {u.id === user?.id ? (
+                                <span className="text-[11px] text-[#9BAB9A] font-bold">You</span>
+                              ) : (
+                                <button
+                                  onClick={() => void toggleUserRole(u)}
+                                  disabled={roleUpdating === u.id}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-colors disabled:opacity-50 ${
+                                    u.role === 'admin'
+                                      ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+                                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                                  }`}
+                                >
+                                  {u.role === 'admin' ? <><ShieldOff size={11} /> Remove Admin</> : <><ShieldCheck size={11} /> Make Admin</>}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                  {allUsers.length === 0 && !usersLoading && (
+                    <p className="p-8 text-center text-[13px] font-bold text-[#9BAB9A]">No users found.</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <p className="text-[11px] text-[#9BAB9A] font-bold">
+              ⚡ Role changes take effect on the user's next login. Admins get Dashboard + POS Billing access.
+            </p>
           </div>
         )}
 

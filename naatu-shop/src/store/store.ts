@@ -124,12 +124,14 @@ const asRecord = (value: unknown): Record<string, unknown> => {
 const readString = (value: unknown, fallback = '') => (typeof value === 'string' ? value : fallback)
 
 // Admin emails — check this regardless of what the DB profile says.
-// This lets the owner log in as admin even if the DB profile row has role='customer'.
+// Set VITE_ADMIN_EMAILS in Vercel as comma-separated: email1@x.com,email2@y.com
+const _adminEnvEmails = (import.meta.env.VITE_ADMIN_EMAILS as string || import.meta.env.VITE_ADMIN_EMAIL as string || '')
+  .split(',').map((e: string) => e.toLowerCase().trim()).filter(Boolean)
 const ADMIN_EMAILS_LOCAL = new Set([
   'admin@srisiddha.com',
   'eshwarbalaji07@gmail.com',
-  (import.meta.env.VITE_ADMIN_EMAIL as string || '').toLowerCase().trim(),
-].filter(Boolean))
+  ..._adminEnvEmails,
+])
 
 const toAuthUser = (profile: unknown, fallback?: SessionFallback): AuthUser => {
   const profileRow = asRecord(profile)
