@@ -4,6 +4,7 @@ import { useCartStore, useProductStore, type Product } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { ShoppingCart } from 'lucide-react'
 import { formatPricePerUnit } from '../lib/retail'
+import { getProductImage, onImgError } from '../lib/productImages'
 
 export default function ProductDetails() {
   const { id } = useParams()
@@ -59,8 +60,8 @@ export default function ProductDetails() {
     <div className="bg-bgMain min-h-screen py-8 sm:py-10">
       <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-10">
         <div className="rounded-3xl overflow-hidden border border-sand/50 bg-white shadow-soft" style={{ aspectRatio: '1' }}>
-          <img src={product.image} alt={product.name} loading="lazy"
-            onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=800&q=80' }}
+          <img src={getProductImage(product.name, product.category, product.imageUrl, 'detail')}
+            alt={product.name} loading="lazy" decoding="async" onError={onImgError}
             className="w-full h-full object-cover transition-transform hover:scale-105 duration-500" />
         </div>
         

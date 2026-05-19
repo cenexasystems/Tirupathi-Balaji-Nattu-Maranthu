@@ -18,6 +18,7 @@ import {
   getDefaultQuantityForProduct,
   normalizeSelectedQuantity,
 } from '../lib/retail'
+import { getProductImage, onImgError } from '../lib/productImages'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type PosItem = Product & {
@@ -70,57 +71,6 @@ const recalc = (item: PosItem, nextQty: number): PosItem => {
   return { ...item, qty: q, lineTotal: calculateLineTotal(q, item.unitType, item.baseQuantity, item.basePrice) }
 }
 
-// Keyword-based image for product tile
-const KW_IMG: Array<{ kw: string[]; url: string }> = [
-  { kw: ['turmeric', 'manjal', 'haldi'], url: 'https://images.unsplash.com/photo-1615485291234-9d694218aeb5?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['neem', 'veppalai', 'vepp'], url: 'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['honey', 'then'], url: 'https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['camphor', 'karpooram'], url: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['tulsi', 'thulasi', 'basil'], url: 'https://images.unsplash.com/photo-1587411768638-ec71f8e33b78?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['pepper', 'milagu'], url: 'https://images.unsplash.com/photo-1599909533731-f5f6c1fbd5ff?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['cardamom', 'elakkai', 'elaichi'], url: 'https://images.unsplash.com/photo-1514191893769-d44de1f4ac22?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['cinnamon', 'pattai'], url: 'https://images.unsplash.com/photo-1502741338009-cac2772e18bc?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['clove', 'lavangam', 'kirambu'], url: 'https://images.unsplash.com/photo-1600628421060-9a851ea69c5c?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['oil', 'ennai'], url: 'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['rice', 'pacharisi'], url: 'https://images.unsplash.com/photo-1536304929831-ee1ca9d44906?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['dal', 'paruppu', 'lentil', 'ulundhu'], url: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['moringa', 'murungai', 'drumstick'], url: 'https://images.unsplash.com/photo-1620706857370-e1b9770e8bb1?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['ginger', 'sukku', 'inji'], url: 'https://images.unsplash.com/photo-1588543385566-60f2039da2e2?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['lotus', 'thamarai'], url: 'https://images.unsplash.com/photo-1559181567-c3190ca9d713?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['incense', 'agarbatti', 'agarbathi'], url: 'https://images.unsplash.com/photo-1603204077167-2fa0397f5264?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['ghee', 'nei'], url: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['coconut', 'thengai'], url: 'https://images.unsplash.com/photo-1526947425960-945c6e72858f?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['kungumam', 'kumkum', 'vermilion'], url: 'https://images.unsplash.com/photo-1568214379698-8aeb8c6c6ac8?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['vibhoothi', 'vibhuti', 'thiruneer', 'thiru neeru'], url: 'https://images.unsplash.com/photo-1591189863430-ab87e120f312?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['sandalwood', 'sandhanam', 'sandal'], url: 'https://images.unsplash.com/photo-1611080626919-7cf5a9dbab12?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['vilakku', 'deepam', 'lamp', 'diya', 'thiri'], url: 'https://images.unsplash.com/photo-1567335743949-70f2b6b6e36d?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['poo', 'varisai', 'arugu', 'flower'], url: 'https://images.unsplash.com/photo-1490750967868-88df5691cc6b?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['navagraha', 'padam', 'swami'], url: 'https://images.unsplash.com/photo-1567335743949-70f2b6b6e36d?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['amla', 'nellikkai', 'gooseberry'], url: 'https://images.unsplash.com/photo-1612871689552-be7ef6f50d0e?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['fenugreek', 'vendhayam', 'methi'], url: 'https://images.unsplash.com/photo-1532944138793-3a7bab2b5c1c?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['fennel', 'sombu'], url: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['sesame', 'ellu', 'til'], url: 'https://images.unsplash.com/photo-1595591996854-3b82ac8b6f65?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['rose', 'panneer', 'rosewater'], url: 'https://images.unsplash.com/photo-1585386959984-a4155224a1ad?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['sugar', 'kalkandu', 'candy'], url: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['brahmi', 'ashwagandha', 'shatavari', 'sathavari'], url: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['castor', 'vilakk'], url: 'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['cumin', 'seeragam', 'jeeragam', 'jeera'], url: 'https://images.unsplash.com/photo-1532944138793-3a7bab2b5c1c?auto=format&fit=crop&w=120&q=70' },
-  { kw: ['triphala', 'trikatu'], url: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=120&q=70' },
-]
-const CAT_FB: Record<string, string> = {
-  'Pooja Items': 'https://images.unsplash.com/photo-1567335743949-70f2b6b6e36d?auto=format&fit=crop&w=120&q=70',
-  'Herbal Powder': 'https://images.unsplash.com/photo-1615485291234-9d694218aeb5?auto=format&fit=crop&w=120&q=70',
-  'Herbal Oil': 'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=120&q=70',
-  'Spices & Condiments': 'https://images.unsplash.com/photo-1532944138793-3a7bab2b5c1c?auto=format&fit=crop&w=120&q=70',
-  'Grains & Pulses': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=120&q=70',
-  'Honey & Liquids': 'https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?auto=format&fit=crop&w=120&q=70',
-  'Bundle Packages': 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=120&q=70',
-}
-function tileImage(p: Product) {
-  const hay = p.name.toLowerCase()
-  for (const { kw, url } of KW_IMG) if (kw.some(k => hay.includes(k))) return url
-  return CAT_FB[p.category] || 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=120&q=70'
-}
 
 // ── Category colours ───────────────────────────────────────────────────────
 const CAT_COLOR: Record<string, string> = {
@@ -517,11 +467,13 @@ export default function Pos() {
                       <div className="h-1 w-full shrink-0" style={{ backgroundColor: CAT_COLOR[product.category] || '#7DAA8F' }} />
 
                       {/* Image */}
-                      <div className="w-full aspect-square overflow-hidden bg-[#F7F6F2] shrink-0">
+                      <div className="w-full aspect-square overflow-hidden bg-[#E8EDE4] shrink-0">
                         <img
-                          src={tileImage(product)}
+                          src={getProductImage(product.name, product.category, product.imageUrl, 'tile')}
                           alt={product.name}
                           loading="lazy"
+                          decoding="async"
+                          onError={onImgError}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       </div>
