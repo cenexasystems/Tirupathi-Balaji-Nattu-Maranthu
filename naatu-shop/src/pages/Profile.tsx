@@ -230,10 +230,18 @@ export default function Profile() {
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-colors ${activeTab === 'info' ? 'bg-sageDark/10 text-sageDark' : 'text-textMuted hover:bg-bgMain'}`}>
                   <User size={16} /> Account Info
                 </button>
-                <button onClick={() => navigate('/dashboard')}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm text-textMuted hover:bg-bgMain transition-colors">
-                  <Settings size={16} /> Dashboard & Billing
-                </button>
+                {user.role === 'admin' && (
+                  <>
+                    <button onClick={() => navigate('/dashboard')}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm text-textMuted hover:bg-bgMain transition-colors">
+                      <Settings size={16} /> Dashboard
+                    </button>
+                    <button onClick={() => navigate('/pos')}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm text-textMuted hover:bg-bgMain transition-colors">
+                      <ShoppingBag size={16} /> POS Billing
+                    </button>
+                  </>
+                )}
                 <button onClick={handleLogout}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm text-red-500 hover:bg-red-50 transition-colors">
                   <LogOut size={16} /> Logout
