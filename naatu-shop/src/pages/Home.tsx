@@ -115,7 +115,7 @@ const TESTIMONIALS = [
 ]
 
 export default function Home() {
-  const { t } = useLangStore()
+  const { t, lang } = useLangStore()
   const { products, fetchProducts } = useProductStore()
   const { user } = useAuthStore()
 
@@ -267,16 +267,22 @@ export default function Home() {
               </span>
             </div>
 
-            {/* Headline — primary visual anchor */}
-            <h1 className="font-headline font-black leading-[1.0] tracking-[-0.02em] mb-5
-              text-[40px] sm:text-[54px] lg:text-[66px]">
+            {/* Headline — responsive to locale:
+                Tamil characters are ~3× wider at the same px size as Latin,
+                so we scale down and relax line-height for Tamil mode. */}
+            <h1 className={`font-black mb-5 break-words ${
+              lang === 'ta'
+                ? 'font-sans text-[28px] sm:text-[36px] lg:text-[44px] leading-[1.45] tracking-[0] ta-text'
+                : 'font-headline text-[40px] sm:text-[54px] lg:text-[66px] leading-[1.0] tracking-[-0.02em]'
+            }`}>
               <span className="block text-[#2C392A]">{t('hero.title1')}</span>
               <span className="block text-[#7DAA8F]">{t('hero.title2')}</span>
             </h1>
 
-            {/* English subtitle */}
-            <p className="text-[15px] sm:text-[16px] text-[#5F6D59] leading-[1.7] font-medium
-              mb-2.5 max-w-[420px]">
+            {/* Subtitle */}
+            <p className={`text-[15px] sm:text-[16px] text-[#5F6D59] leading-[1.7] font-medium mb-2.5 ${
+              lang === 'ta' ? 'max-w-full ta-text' : 'max-w-[420px]'
+            }`}>
               {t('hero.subtitle')}
             </p>
 
@@ -404,8 +410,8 @@ export default function Home() {
                 {item.icon}
               </div>
               <div className="min-w-0">
-                <h4 className="font-bold text-[12px] sm:text-[13px] text-[#2C392A] leading-tight">{item.title}</h4>
-                <p className="text-[10px] text-[#5F6D59] font-medium mt-0.5 leading-snug">{item.sub}</p>
+                <h4 className="font-bold text-[12px] sm:text-[13px] text-[#2C392A] leading-normal ta-text">{item.title}</h4>
+                <p className="text-[10px] text-[#5F6D59] font-medium mt-0.5 leading-normal ta-text">{item.sub}</p>
               </div>
             </div>
           ))}
@@ -417,7 +423,7 @@ export default function Home() {
         <div className="flex justify-between items-end mb-10">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7DAA8F] mb-2">Browse Collection</p>
-            <h2 className="text-3xl sm:text-[38px] font-black tracking-tight text-[#2C392A]">{t('cat.title')}</h2>
+            <h2 className={`font-black text-[#2C392A] break-words ${lang === 'ta' ? 'text-2xl sm:text-[30px] leading-[1.4] tracking-[0] ta-text' : 'text-3xl sm:text-[38px] tracking-tight'}`}>{t('cat.title')}</h2>
           </div>
           <Link to="/products"
             className="text-[13px] font-bold text-[#7DAA8F] flex items-center gap-1 group hover:text-[#5e8c72] transition-colors">
@@ -479,8 +485,8 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
           <div className="mb-12">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7DAA8F]">{t('remedy.badge')}</p>
-            <h2 className="text-3xl sm:text-[38px] font-black mt-3 mb-3 tracking-tight text-[#2C392A]">{t('remedy.title')}</h2>
-            <p className="text-[15px] text-[#5F6D59] max-w-xl mx-auto font-medium leading-relaxed">{t('remedy.sub')}</p>
+            <h2 className={`font-black mt-3 mb-3 text-[#2C392A] break-words ${lang === 'ta' ? 'text-2xl sm:text-[30px] leading-[1.4] tracking-[0] ta-text' : 'text-3xl sm:text-[38px] tracking-tight'}`}>{t('remedy.title')}</h2>
+            <p className={`text-[15px] text-[#5F6D59] mx-auto font-medium leading-relaxed ${lang === 'ta' ? 'max-w-full ta-text' : 'max-w-xl'}`}>{t('remedy.sub')}</p>
           </div>
           <div className="flex flex-wrap justify-center gap-3">
             {derivedRemedies.map((r, idx) => (
@@ -510,7 +516,7 @@ export default function Home() {
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7DAA8F]">Customer Favourites</p>
-              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[#2C392A]">{t('top.title')}</h2>
+              <h2 className={`font-black text-[#2C392A] break-words ${lang === 'ta' ? 'text-xl sm:text-2xl leading-[1.4] tracking-[0] ta-text' : 'text-2xl sm:text-3xl tracking-tight'}`}>{t('top.title')}</h2>
             </div>
           </div>
           <Link to="/products"
@@ -751,10 +757,16 @@ export default function Home() {
                 {t('banner.badge')}
               </span>
             </div>
-            <h2 className="text-[36px] sm:text-5xl lg:text-[58px] font-black mb-5 leading-[1.05] tracking-tight">
+            <h2 className={`font-black mb-5 break-words ${
+              lang === 'ta'
+                ? 'text-[26px] sm:text-[34px] lg:text-[42px] leading-[1.45] tracking-[0] ta-text'
+                : 'text-[36px] sm:text-5xl lg:text-[58px] leading-[1.05] tracking-tight'
+            }`}>
               {t('banner.title')}
             </h2>
-            <p className="text-[14px] sm:text-[16px] text-white/65 mb-10 max-w-sm font-medium leading-relaxed">
+            <p className={`text-[14px] sm:text-[16px] text-white/65 mb-10 font-medium leading-relaxed ${
+              lang === 'ta' ? 'max-w-full ta-text' : 'max-w-sm'
+            }`}>
               {t('banner.sub')}
             </p>
             <Link
@@ -873,7 +885,7 @@ export default function Home() {
 
       {/* ═══ MORE PRODUCTS ═══ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24 text-center">
-        <h2 className="text-2xl sm:text-3xl font-black mb-8 text-[#2C392A] tracking-tight">
+        <h2 className={`font-black mb-8 text-[#2C392A] break-words ${lang === 'ta' ? 'text-xl sm:text-2xl leading-[1.4] tracking-[0] ta-text' : 'text-2xl sm:text-3xl tracking-tight'}`}>
           {t('more.title')}
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-5 mb-10">
