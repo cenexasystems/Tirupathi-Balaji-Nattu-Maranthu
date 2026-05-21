@@ -27,14 +27,61 @@ const U = (id: string, w = 400, q = 80) =>
 const isStorageImage = (url: string | null | undefined): url is string =>
   !!url && url.includes('/storage/v1/object/') && url.startsWith('https://')
 
+/** Returns true for local static assets served from the public folder. */
+const isLocalAsset = (url: string | null | undefined): url is string =>
+  !!url && url.startsWith('/assets/')
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PRODUCT_OVERRIDES — Exact product name → known image URL
 // Add entries here when you have real product photos.
 // Keys are lowercase; substring matching is used (partial name works).
 // ─────────────────────────────────────────────────────────────────────────────
 export const PRODUCT_OVERRIDES: Record<string, string> = {
-  // Add real product photos here as you get them, e.g.:
-  // 'panchagavyam': 'https://your-cdn.com/panchagavyam.jpg',
+  // ── Pooja Items ───────────────────────────────────────────────────────────
+  'kungumam':          '/assets/images/Kungumam.png',
+  'karpooram':         '/assets/images/Karpooram.png',
+  'agarbatti':         '/assets/images/Agarbatti.png',
+  'sandhanam':         '/assets/images/Sandhanam.png',
+  'thiru neeru':       '/assets/images/Thiru Neer.png',
+  'poo varisai':       '/assets/images/Poo varisai.png',
+  'panchagavyam':      '/assets/images/Panchagavyam.png',
+  'navagraha bit':     '/assets/images/Navagraha Bit.png',
+  'kuthu vilakku':     '/assets/images/kutthu vilakku.png',
+  'swami padam':       '/assets/images/swami padam.png',
+  'thamarai':          '/assets/images/thamarai.png',
+  'deepam thiri':      '/assets/images/Deepam Thiri.png',
+  'kolamavu':          '/assets/images/kolamaavu.png',
+  // ── Herbal Powders ────────────────────────────────────────────────────────
+  'manjal podi':       '/assets/images/Manjal Podi.png',
+  'thulasi podi':      '/assets/images/Thulasi podi.png',
+  'veppalai podi':     '/assets/images/Veppalai Podi.png',
+  'vendhayam podi':    '/assets/images/Vendhayam Podi.png',
+  'omam podi':         '/assets/images/Omam Podi.png',
+  'seeragam podi':     '/assets/images/Seeragam Podi.png',
+  'milagu podi':       '/assets/images/Milagu Podi.png',
+  'ashwagandha podi':  '/assets/images/Ashwagandha Podi.png',
+  'amla podi':         '/assets/images/Amala Podi.png',
+  'triphala podi':     '/assets/images/Triphala Podi.png',
+  'brahmi podi':       '/assets/images/Brahmi Podi.png',
+  'murungai podi':     '/assets/images/Murungai Podi.png',
+  'sathavari podi':    '/assets/images/Sathavari Podi.png',
+  'kandankathiri podi':'/assets/images/Kandankathari Podi.png',
+  'nithyakalyani podi':'/assets/images/Nithyakalyani Podi.png',
+  // ── Herbal Oils ───────────────────────────────────────────────────────────
+  'veppa ennai':       '/assets/images/Veppa Ennai.png',
+  'nalla ennai':       '/assets/images/Nalla Ennai.png',
+  'vilakkennai':       '/assets/images/Vilakkennai.png',
+  'thengai ennai':     '/assets/images/Thengai Ennai.png',
+  'omam ennai':        '/assets/images/Omam ennai.png',
+  'brahmi ennai':      '/assets/images/Brahmi Ennai.png',
+  'milagu ennai':      '/assets/images/Milagu Ennai.png',
+  'pungam ennai':      '/assets/images/Pungam Ennai.png',
+  // ── Spices & Condiments ───────────────────────────────────────────────────
+  'kalkandu':          '/assets/images/Kalkandu.png',
+  'elakkai':           '/assets/images/Elakkai.png',
+  'pattai':            '/assets/images/Pattai.png',
+  'kothamalli':        '/assets/images/Kothamalli.png',
+  'ellu':              '/assets/images/Ellu.png',
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -373,6 +420,9 @@ export function getProductImage(
   if (isStorageImage(dbUrl)) {
     return dbUrl.includes('?') ? dbUrl : `${dbUrl}?w=${w}&q=${q}`
   }
+
+  // 0b. Local static asset stored in public/assets — use directly
+  if (isLocalAsset(dbUrl)) return dbUrl
 
   const hay = name.toLowerCase().trim()
 
