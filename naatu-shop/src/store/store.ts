@@ -123,21 +123,11 @@ const asRecord = (value: unknown): Record<string, unknown> => {
 
 const readString = (value: unknown, fallback = '') => (typeof value === 'string' ? value : fallback)
 
-// Admin emails — check this regardless of what the DB profile says.
-// Set VITE_ADMIN_EMAILS in Vercel as comma-separated: email1@x.com,email2@y.com
-const _adminEnvEmails = (import.meta.env.VITE_ADMIN_EMAILS as string || import.meta.env.VITE_ADMIN_EMAIL as string || '')
-  .split(',').map((e: string) => e.toLowerCase().trim()).filter(Boolean)
-const ADMIN_EMAILS_LOCAL = new Set([
-  'admin@srisiddha.com',
-  'eshwarbalaji07@gmail.com',
-  ..._adminEnvEmails,
-])
-
 const toAuthUser = (profile: unknown, fallback?: SessionFallback): AuthUser => {
   const profileRow = asRecord(profile)
   const fallbackMeta = asRecord(fallback?.user_metadata)
   const email = String(profileRow.email || fallback?.email || '')
-  const isAdmin = profileRow.role === 'admin' || ADMIN_EMAILS_LOCAL.has(email.toLowerCase())
+  const isAdmin = profileRow.role === 'admin'
 
   return {
     id: String(profileRow.id || fallback?.id || ''),
@@ -217,7 +207,7 @@ export const useAuthStore = create<AuthState>()(
 
             if (!profile) {
               // Bootstrap profile for users signed up before the DB trigger existed
-              const role = ADMIN_EMAILS_LOCAL.has(email.toLowerCase()) ? 'admin' : 'customer'
+              const role = 'customer'
               const { data: upserted } = await supabase
                 .from('profiles')
                 .upsert({

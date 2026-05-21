@@ -13,17 +13,6 @@ export interface AuthUser {
   role: 'admin' | 'customer'
 }
 
-// Admin email: use env variable if set, otherwise fall back to known admin emails.
-// Set VITE_ADMIN_EMAIL in .env to override.
-const ADMIN_EMAIL_PRIMARY = (import.meta.env.VITE_ADMIN_EMAIL as string || '').toLowerCase().trim()
-const ADMIN_EMAIL_FALLBACKS = ['admin@srisiddha.com', 'eshwarbalaji07@gmail.com']
-
-const isAdminEmail = (email: string) => {
-  const normalized = (email || '').toLowerCase().trim()
-  if (ADMIN_EMAIL_PRIMARY && normalized === ADMIN_EMAIL_PRIMARY) return true
-  return ADMIN_EMAIL_FALLBACKS.includes(normalized)
-}
-
 const USE_LOCAL_AUTH_FALLBACK = import.meta.env.DEV && !isSupabaseConfigured
 
 type LocalUser = {
@@ -117,7 +106,7 @@ export const authService = {
           name: profile?.name || data.user.user_metadata?.name || params.name,
           mobile: profile?.mobile || data.user.user_metadata?.mobile || params.mobile,
           email: data.user.email || params.email,
-          role: profile?.role === 'admin' || isAdminEmail(data.user.email || params.email) ? 'admin' : 'customer',
+          role: profile?.role === 'admin' ? 'admin' : 'customer',
         },
         error: null,
       }
@@ -168,7 +157,7 @@ export const authService = {
           name: profile?.name || data.user.user_metadata?.name || data.user.email || '',
           mobile: profile?.mobile || data.user.user_metadata?.mobile || '',
           email: data.user.email || '',
-          role: profile?.role === 'admin' || isAdminEmail(data.user.email || '') ? 'admin' : 'customer',
+          role: profile?.role === 'admin' ? 'admin' : 'customer',
         },
         error: null,
       }
@@ -213,7 +202,7 @@ export const authService = {
         name: profile?.name || user.user_metadata?.name || user.email || '',
         mobile: profile?.mobile || user.user_metadata?.mobile || '',
         email: user.email || '',
-        role: profile?.role === 'admin' || isAdminEmail(user.email || '') ? 'admin' : 'customer',
+        role: profile?.role === 'admin' ? 'admin' : 'customer',
       }
     }
 
@@ -267,7 +256,7 @@ export const authService = {
             name: profile?.name || session.user.user_metadata?.name || session.user.email || '',
             mobile: profile?.mobile || session.user.user_metadata?.mobile || '',
             email: session.user.email || '',
-            role: profile?.role === 'admin' || isAdminEmail(session.user.email || '') ? 'admin' : 'customer',
+            role: profile?.role === 'admin' ? 'admin' : 'customer',
           })
         } else {
           callback(null)
