@@ -13,7 +13,7 @@ import { formatCurrency, normalizeUnitType, toNumber, type UnitType } from '../l
 type Category = { id: string | number; name_en: string; name_ta: string; is_active?: boolean; sort_order?: number }
 type DashboardOrder = {
   id: string; invoice_no: string; customer_name: string; phone: string
-  created_at: string; total: number; status: string; user_id: string | null; items: unknown
+  created_at: string; total: number; status: string; order_mode: string; user_id: string | null; items: unknown
 }
 type DashboardOrderItem = { order_id: string; product_name: string; quantity: number; line_total: number }
 type TabKey = 'overview' | 'billing' | 'products' | 'categories' | 'users'
@@ -102,7 +102,9 @@ export default function Dashboard() {
     id: String(row.id || ''), invoice_no: String(row.invoice_no || ''),
     customer_name: String(row.customer_name || ''), phone: String(row.phone || ''),
     created_at: String(row.created_at || ''), total: toNumber(row.total, 0),
-    status: String(row.status || 'pending'), user_id: typeof row.user_id === 'string' ? row.user_id : null,
+    status: String(row.status || 'pending'),
+    order_mode: String(row.order_mode || 'online'),
+    user_id: typeof row.user_id === 'string' ? row.user_id : null,
     items: row.items,
   })
 
@@ -110,8 +112,17 @@ export default function Dashboard() {
   const analytics = useMemo(() => {
     const active   = orders.filter(o => normalizeStatus(o.status) !== 'cancelled')
     const revenue  = active.reduce((s, o) => s + toNumber(o.total, 0), 0)
+    const pending   = active.filter(o => normalizeStatus(o.status) === 'pending').length
     const completed = active.filter(o => ['completed', 'paid'].includes(normalizeStatus(o.status))).length
     const lowStock  = products.filter(p => toNumber(p.stockQuantity ?? p.stock, 0) < 10).length
+
+    // Online vs Offline revenue
+    const onlineRevenue  = active.filter(o => o.order_mode !== 'offline').reduce((s, o) => s + toNumber(o.total, 0), 0)
+    const offlineRevenue = active.filter(o => o.order_mode === 'offline').reduce((s, o) => s + toNumber(o.total, 0), 0)
+
+    // Today's revenue
+    const today = new Date().toISOString().slice(0, 10)
+    const todayRevenue = active.filter(o => o.created_at.startsWith(today)).reduce((s, o) => s + toNumber(o.total, 0), 0)
 
     const pMap = new Map<string, { name: string; qty: number; revenue: number }>()
     const activeIds = new Set(active.map(o => o.id))
@@ -130,7 +141,7 @@ export default function Dashboard() {
       pMap.set(product_name, cur)
     })
     const topProducts = Array.from(pMap.values()).sort((a, b) => b.qty - a.qty).slice(0, 8)
-    return { revenue, totalOrders: orders.length, completedOrders: completed, lowStockCount: lowStock, topProducts }
+    return { revenue, totalOrders: orders.length, pendingOrders: pending, completedOrders: completed, lowStockCount: lowStock, topProducts, onlineRevenue, offlineRevenue, todayRevenue }
   }, [orders, orderItems, products])
 
   // ── Date-wise revenue ──────────────────────────────────────
@@ -201,6 +212,12 @@ export default function Dashboard() {
       setAllUsers(prev => prev.map(p => p.id === u.id ? { ...p, role: newRole } : p))
     }
     setRoleUpdating(null)
+  }
+
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    await supabase.from('orders').update({ status: newStatus }).eq('id', orderId)
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
+    setSearchResults(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
   }
 
   useEffect(() => {
@@ -427,13 +444,13 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* KPI Cards */}
+            {/* KPI Cards — row 1 */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {[
                 { label: 'Total Revenue', value: formatCurrency(analytics.revenue), icon: <IndianRupee size={18} />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                { label: 'Total Orders', value: analytics.totalOrders, icon: <Package size={18} />, color: 'text-blue-600', bg: 'bg-blue-50' },
-                { label: 'Completed', value: analytics.completedOrders, icon: <TrendingUp size={18} />, color: 'text-purple-600', bg: 'bg-purple-50' },
-                { label: 'Low Stock', value: analytics.lowStockCount, icon: <AlertCircle size={18} />, color: 'text-amber-600', bg: 'bg-amber-50' },
+                { label: 'Today Revenue', value: formatCurrency(analytics.todayRevenue), icon: <TrendingUp size={18} />, color: 'text-blue-600', bg: 'bg-blue-50' },
+                { label: 'Pending Orders', value: analytics.pendingOrders, icon: <Package size={18} />, color: 'text-amber-600', bg: 'bg-amber-50' },
+                { label: 'Completed Orders', value: analytics.completedOrders, icon: <TrendingUp size={18} />, color: 'text-purple-600', bg: 'bg-purple-50' },
               ].map((k, i) => (
                 <div key={i} className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-4 sm:p-5 shadow-sm">
                   <div className="flex items-start justify-between mb-3">
@@ -441,6 +458,23 @@ export default function Dashboard() {
                     <div className={`w-8 h-8 rounded-xl ${k.bg} flex items-center justify-center ${k.color}`}>{k.icon}</div>
                   </div>
                   <p className="text-2xl font-black text-[#2C392A]">{k.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* KPI Cards — row 2: Online vs Offline */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {[
+                { label: 'Online Revenue', value: formatCurrency(analytics.onlineRevenue), icon: '🌐', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
+                { label: 'Offline Revenue', value: formatCurrency(analytics.offlineRevenue), icon: '🏪', color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200' },
+                { label: 'Low Stock Items', value: analytics.lowStockCount, icon: '⚠️', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
+              ].map((k, i) => (
+                <div key={i} className={`bg-white rounded-2xl border ${k.border} p-4 sm:p-5 shadow-sm`}>
+                  <div className="flex items-start justify-between mb-3">
+                    <p className="text-[10px] uppercase font-black text-[#5F6D59] tracking-wider">{k.label}</p>
+                    <span className="text-xl">{k.icon}</span>
+                  </div>
+                  <p className={`text-2xl font-black ${k.color}`}>{k.value}</p>
                 </div>
               ))}
             </div>
@@ -583,7 +617,7 @@ export default function Dashboard() {
                 <table className="w-full min-w-[600px] text-left text-[13px]">
                   <thead className="bg-[#F7F6F2] text-[10px] uppercase tracking-wider text-[#5F6D59]">
                     <tr>
-                      {['Invoice','Customer','Phone','Date','Total','Status'].map(h => (
+                      {['Invoice','Customer','Phone','Date','Total','Mode','Status'].map(h => (
                         <th key={h} className="px-4 py-3 font-black">{h}</th>
                       ))}
                     </tr>
@@ -591,24 +625,34 @@ export default function Dashboard() {
                   <tbody className="divide-y divide-[#EAD7B7]/20">
                     {searchResults.slice(0, 50).map(o => (
                       <tr key={o.id} className="hover:bg-[#F7F6F2]/50">
-                        <td className="px-4 py-3 font-bold text-[#7DAA8F]">{o.invoice_no}</td>
-                        <td className="px-4 py-3 font-semibold">{o.customer_name}</td>
-                        <td className="px-4 py-3">{o.phone}</td>
-                        <td className="px-4 py-3">{new Date(o.created_at).toLocaleDateString('en-IN')}</td>
-                        <td className="px-4 py-3 font-bold">{formatCurrency(toNumber(o.total, 0))}</td>
+                        <td className="px-4 py-3 font-bold text-[#7DAA8F] text-[12px]">{o.invoice_no}</td>
+                        <td className="px-4 py-3 font-semibold text-[13px]">{o.customer_name}</td>
+                        <td className="px-4 py-3 text-[13px]">{o.phone}</td>
+                        <td className="px-4 py-3 text-[12px]">{new Date(o.created_at).toLocaleDateString('en-IN')}</td>
+                        <td className="px-4 py-3 font-bold text-[13px]">{formatCurrency(toNumber(o.total, 0))}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                            normalizeStatus(o.status) === 'completed' || normalizeStatus(o.status) === 'paid'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : normalizeStatus(o.status) === 'cancelled'
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-amber-100 text-amber-700'
-                          }`}>{o.status}</span>
+                            o.order_mode === 'offline' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                          }`}>{o.order_mode === 'offline' ? '🏪 Offline' : '🌐 Online'}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={normalizeStatus(o.status)}
+                            onChange={e => void updateOrderStatus(o.id, e.target.value)}
+                            className={`text-[11px] font-black px-2 py-1 rounded-lg border cursor-pointer outline-none ${
+                              normalizeStatus(o.status) === 'completed'
+                                ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                : 'bg-amber-100 text-amber-700 border-amber-200'
+                            }`}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="completed">Completed</option>
+                          </select>
                         </td>
                       </tr>
                     ))}
                     {searchResults.length === 0 && (
-                      <tr><td colSpan={6} className="px-4 py-8 text-center text-[#5F6D59]">No matching orders</td></tr>
+                      <tr><td colSpan={7} className="px-4 py-8 text-center text-[#5F6D59]">No matching orders</td></tr>
                     )}
                   </tbody>
                 </table>

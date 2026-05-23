@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
-import { Package, User, LogOut, ChevronDown, ChevronUp, ShoppingBag, Settings, Edit2, Check, X } from 'lucide-react'
+import { Package, User, LogOut, ChevronDown, ChevronUp, ShoppingBag, Settings, Edit2, Check, X, Camera } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { getLocalOrdersForUser } from '../lib/ordersFallback'
 import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, normalizeStructuredOrderItem } from '../lib/retail'
@@ -59,6 +59,11 @@ export default function Profile() {
   const [saveErr, setSaveErr]     = useState('')
   const [saving, setSaving]       = useState(false)
 
+  // ── Avatar upload ─────────────────────────────────────────────
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatarUrl || null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+
   const startEdit = () => {
     setEditName(user?.name || '')
     setEditPhone(user?.mobile || '')
@@ -66,6 +71,30 @@ export default function Profile() {
   }
 
   const cancelEdit = () => { setEditing(false); setSaveErr('') }
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!user || !isSupabaseConfigured) return
+    setAvatarUploading(true)
+    try {
+      const ext = file.name.split('.').pop() || 'jpg'
+      const path = `${user.id}/avatar.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { upsert: true, contentType: file.type })
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
+      const publicUrl = urlData.publicUrl + `?t=${Date.now()}`
+
+      await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id)
+      setAvatarUrl(publicUrl)
+      setAuth({ ...user, avatarUrl: publicUrl })
+    } catch (err) {
+      console.error('Avatar upload failed', err)
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
 
   const handleSaveProfile = async () => {
     const trimName  = editName.trim()
@@ -209,8 +238,34 @@ export default function Profile() {
             <div className="bg-white p-6 rounded-2xl shadow-soft border border-sand/50">
               {/* Avatar */}
               <div className="flex flex-col items-center text-center mb-6 pb-6 border-b border-sand">
-                <div className="w-20 h-20 bg-gradient-to-br from-sage to-sageDark rounded-full flex items-center justify-center mb-3">
-                  <span className="text-white text-3xl font-bold">{user.name.charAt(0).toUpperCase()}</span>
+                <div className="relative mb-3">
+                  <div className="w-20 h-20 rounded-full overflow-hidden bg-gradient-to-br from-sage to-sageDark flex items-center justify-center">
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-white text-3xl font-bold">{user.name.charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
+                  {isSupabaseConfigured && (
+                    <button
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={avatarUploading}
+                      className="absolute bottom-0 right-0 w-7 h-7 bg-sageDark hover:bg-sageDeep text-white rounded-full flex items-center justify-center shadow-md transition-colors disabled:opacity-60"
+                      title="Change profile photo"
+                    >
+                      {avatarUploading
+                        ? <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        : <Camera size={13} />
+                      }
+                    </button>
+                  )}
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) void handleAvatarUpload(f) }}
+                  />
                 </div>
                 <h2 className="text-lg font-bold text-textMain">{user.name}</h2>
                 <p className="text-sm text-textMuted">{user.email}</p>

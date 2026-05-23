@@ -10,9 +10,8 @@ import { PLACEHOLDER as PRODUCT_PLACEHOLDER } from '../lib/productImages'
 export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { items, remove, updateQty, total, count, clear } = useCartStore()
   const { t, lang } = useLangStore()
-  const sub = total()
-  const shipping = sub === 0 ? 0 : 50
-  const grand = sub + shipping
+  const orderTotal = total()
+
   const getStep = (item: (typeof items)[number]) => {
     if (item.unitType === 'unit' || item.unitType === 'bundle') return 1
     return getDefaultQuantityForProduct({
@@ -21,13 +20,14 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
       predefinedOptions: item.predefinedOptions,
     })
   }
+
   const waText = encodeURIComponent(
-    `🌿 *${BRAND_EN}* — Cart Order\n\n` +
+    `🌿 *${BRAND_EN}* — Cart Enquiry\n\n` +
     items.map(i => {
       const dbName = lang === 'ta' && i.nameTa ? i.nameTa : i.name;
       return `• ${dbName} (${formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)}) — ${formatCurrency(i.lineTotal)}`
     }).join('\n') +
-    `\n\nDelivery: ${formatCurrency(shipping)}\n*Total: ${formatCurrency(grand)}*`
+    `\n\n*Order Total: ${formatCurrency(orderTotal)}*\n_Delivery charges will be confirmed before dispatch._`
   )
 
   return (
@@ -58,7 +58,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                 <AnimatePresence>
                   {items.map(item => (
                     <motion.div key={item.id} layout initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex gap-3 p-3 bg-bgMain rounded-xl border border-sand/40">
-                      <img src={item.image} alt={item.name} onError={(e) => { (e.target as HTMLImageElement).src = PRODUCT_PLACEHOLDER }} className="w-16 h-16 object-cover rounded-lg shrink-0 bg-gray-100" />
+                      <img src={item.image} alt={item.name} onError={(e) => { (e.target as HTMLImageElement).src = PRODUCT_PLACEHOLDER }} className="w-16 h-16 object-cover rounded-lg shrink-0 bg-gray-100" loading="lazy" />
                       <div className="flex-grow min-w-0">
                         <h4 className="font-bold text-sm text-textMain truncate">
                           {lang === 'ta' && item.nameTa ? item.nameTa : item.name}
@@ -83,14 +83,10 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
 
             {items.length > 0 && (
               <div className="px-4 py-4 border-t border-gray-100 space-y-3">
-                <div className="flex justify-between text-sm"><span className="text-gray-500">{t('drawer.subtotal')}</span><span className="font-bold text-textMain">{formatCurrency(sub)}</span></div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">{t('drawer.shipping')}</span>
-                  <span className={shipping === 0 ? 'text-sageDark font-bold' : 'font-bold text-textMain'}>{shipping === 0 ? t('cart.free') : formatCurrency(shipping)}</span>
+                <div className="flex justify-between font-bold text-textMain text-base">
+                  <span>Order Total</span><span>{formatCurrency(orderTotal)}</span>
                 </div>
-                <div className="flex justify-between font-bold text-textMain text-base border-t pt-3">
-                  <span>{t('drawer.total')}</span><span>{formatCurrency(grand)}</span>
-                </div>
+                <p className="text-xs text-textMuted">🚚 Delivery charges confirmed via WhatsApp</p>
                 <a href={`${BRAND_WHATSAPP_LINK}?text=${waText}`} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl transition-colors">
                   <MessageCircle size={16} /> {t('drawer.send_wa')}
                 </a>
@@ -134,7 +130,7 @@ export function FavoritesDrawer({ open, onClose }: { open: boolean; onClose: () 
                 <AnimatePresence>
                   {items.map(item => (
                     <motion.div key={item.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, x: -20 }} className="flex gap-3 p-3 bg-[#FFF8E7] rounded-xl border border-[#EAD7B7]/50">
-                      <img src={item.image} alt={item.name} onError={(e) => { (e.target as HTMLImageElement).src = PRODUCT_PLACEHOLDER }} className="w-14 h-14 object-cover rounded-lg shrink-0" />
+                      <img src={item.image} alt={item.name} onError={(e) => { (e.target as HTMLImageElement).src = PRODUCT_PLACEHOLDER }} className="w-14 h-14 object-cover rounded-lg shrink-0" loading="lazy" />
                       <div className="flex-grow min-w-0">
                         <h4 className="font-bold text-sm text-textMain truncate">
                           {lang === 'ta' && item.nameTa ? item.nameTa : item.name}

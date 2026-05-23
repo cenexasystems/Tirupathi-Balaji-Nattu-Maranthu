@@ -60,6 +60,7 @@ interface AuthUser {
   email: string
   mobile?: string
   role: 'admin' | 'customer'
+  avatarUrl?: string
 }
 
 interface AuthState {
@@ -142,6 +143,7 @@ const toAuthUser = (profile: unknown, fallback?: SessionFallback): AuthUser => {
     email,
     mobile: String(profileRow.mobile || fallbackMeta.mobile || fallback?.phone || ''),
     role: isAdmin ? 'admin' : 'customer',
+    avatarUrl: readString(profileRow.avatar_url) || undefined,
   }
 }
 

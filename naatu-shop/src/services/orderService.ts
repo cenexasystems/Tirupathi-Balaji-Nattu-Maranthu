@@ -9,6 +9,7 @@ type CreateOrderInput = {
   items: StructuredOrderItem[]
   shipping: number
   status?: string
+  orderMode?: 'online' | 'offline'
 }
 
 type CreatedOrder = {
@@ -23,6 +24,7 @@ export const createOrderWithStock = async (input: CreateOrderInput): Promise<Cre
   const address = input.address.trim()
   const shipping = Number(input.shipping || 0)
   const status = input.status || 'pending'
+  const orderMode = input.orderMode || 'online'
 
   if (!isSupabaseConfigured) {
     if (!import.meta.env.DEV) {
@@ -67,27 +69,62 @@ export const createOrderWithStock = async (input: CreateOrderInput): Promise<Cre
     }
   }
 
-  const { data, error } = await supabase.rpc('create_order_with_stock', {
+  // Try new RPC signature (with p_order_mode) — fall back to old signature gracefully
+  let data: unknown = null
+  let error: unknown = null
+
+  const newRpcResult = await supabase.rpc('create_order_with_stock', {
     p_customer_name: customerName,
     p_phone: phone,
     p_address: address,
     p_items: input.items,
     p_shipping: shipping,
     p_status: status,
+    p_order_mode: orderMode,
   })
+  data = newRpcResult.data
+  error = newRpcResult.error
+
+  // If new signature failed (migration not run yet), try old signature
+  if (error && typeof error === 'object' && 'message' in error) {
+    const msg = String((error as { message: string }).message)
+    if (msg.includes('p_order_mode') || msg.includes('argument')) {
+      const fallbackResult = await supabase.rpc('create_order_with_stock', {
+        p_customer_name: customerName,
+        p_phone: phone,
+        p_address: address,
+        p_items: input.items,
+        p_shipping: shipping,
+        p_status: status,
+      })
+      data = fallbackResult.data
+      error = fallbackResult.error
+
+      // Best-effort: set order_mode on the created order via direct update
+      if (!error && data) {
+        const row = Array.isArray(data) ? data[0] : data
+        if (row?.order_id) {
+          await supabase
+            .from('orders')
+            .update({ order_mode: orderMode })
+            .eq('id', row.order_id)
+        }
+      }
+    }
+  }
 
   if (error) {
     throw error
   }
 
-  const row = Array.isArray(data) ? data[0] : data
-  if (!row?.order_id || !row?.invoice_no) {
+  const row = Array.isArray(data) ? (data as unknown[])[0] : data
+  if (!row || typeof row !== 'object' || !('order_id' in row) || !('invoice_no' in row)) {
     throw new Error('Order RPC returned an invalid payload')
   }
 
   return {
-    orderId: String(row.order_id),
-    invoiceNo: String(row.invoice_no),
+    orderId: String((row as Record<string, unknown>).order_id),
+    invoiceNo: String((row as Record<string, unknown>).invoice_no),
     createdAt: new Date().toISOString(),
   }
 }

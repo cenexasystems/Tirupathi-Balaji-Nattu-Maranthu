@@ -3,16 +3,13 @@ import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft } from 'lucide-react'
 import { useCartStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { Link } from 'react-router-dom'
-import { BRAND_EN, BRAND_TA, BRAND_SUBTITLE, BRAND_WHATSAPP, BRAND_WHATSAPP_LINK } from '../lib/brand'
 import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, getQuantityStepForProduct } from '../lib/retail'
 import { PLACEHOLDER as PRODUCT_PLACEHOLDER } from '../lib/productImages'
 
 export default function Cart() {
   const { items, remove, updateQty, total, count, clear } = useCartStore()
   const { t, lang } = useLangStore()
-  const sub = total()
-  const shipping = sub === 0 ? 0 : 50
-  const grand = sub + shipping
+  const orderTotal = total()
 
   const getStep = (item: (typeof items)[number]) => getQuantityStepForProduct({
     unitType: item.unitType,
@@ -57,7 +54,7 @@ export default function Cart() {
                     <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden shrink-0 bg-gray-50 border border-sand/40">
                       <img src={item.image} alt={item.name}
                         onError={(e) => { (e.target as HTMLImageElement).src = PRODUCT_PLACEHOLDER }}
-                        className="w-full h-full object-cover" />
+                        className="w-full h-full object-cover" loading="lazy" />
                     </div>
                     <div className="flex-grow flex flex-col items-start gap-0.5 sm:gap-1">
                       <h3 className="font-bold text-sm sm:text-base text-textMain">
@@ -68,9 +65,9 @@ export default function Cart() {
                     </div>
                     <div className="flex items-center gap-4 flex-wrap">
                       <div className="flex items-center gap-0 border-2 border-sand rounded-lg overflow-hidden bg-white">
-                        <button onClick={() => updateQty(item.id, item.qty - getStep(item))} className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-textMuted hover:bg-bgMain hover:text-textMain transition-colors touch-target"><Minus size={14} /></button>
+                        <button onClick={() => updateQty(item.id, item.qty - getStep(item))} className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-textMuted hover:bg-bgMain hover:text-textMain transition-colors"><Minus size={14} /></button>
                         <span className="min-w-12 sm:min-w-14 px-1 sm:px-2 text-center font-bold text-sm text-textMain">{formatQuantityDisplay(item.qty, item.selectedUnit, item.unitType)}</span>
-                        <button onClick={() => updateQty(item.id, item.qty + getStep(item))} className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-textMuted hover:bg-bgMain hover:text-textMain transition-colors touch-target"><Plus size={14} /></button>
+                        <button onClick={() => updateQty(item.id, item.qty + getStep(item))} className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-textMuted hover:bg-bgMain hover:text-textMain transition-colors"><Plus size={14} /></button>
                       </div>
                       <span className="text-lg font-bold text-textMain font-headline w-24 text-right whitespace-nowrap">{formatCurrency(item.lineTotal)}</span>
                       <button onClick={() => remove(item.id)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={15} /></button>
@@ -85,46 +82,37 @@ export default function Cart() {
           </Link>
         </div>
 
-        {/* Invoice + actions */}
+        {/* Bill summary */}
         <div className="w-full lg:w-[38%]">
           <div className="bg-white rounded-2xl border border-sand/50 shadow-soft p-6 sticky top-24 sm:top-[110px]">
             <h2 className="font-bold text-xl font-headline text-textMain mb-5 pb-4 border-b border-sand/40">{t('cart.bill_summary')}</h2>
 
-            {/* Invoice printable area */}
-            <div id="invoice-area" className="print-receipt bg-bgMain rounded-xl p-4 mb-5 text-sm">
-              <div className="text-center mb-3 pb-3 border-b border-dashed border-sand">
-                <p className="font-extrabold text-base font-headline text-textMain">{BRAND_EN}</p>
-                <p className="text-[11px] font-semibold text-textMuted">{BRAND_TA}</p>
-                <p className="text-[10px] uppercase tracking-[0.18em] text-sageDark font-bold">{BRAND_SUBTITLE}</p>
-                <p className="text-xs text-textMuted mt-1">Contact: WhatsApp {BRAND_WHATSAPP}</p>
-                <p className="text-[10px] text-textMuted mt-1">{BRAND_WHATSAPP_LINK}</p>
+            {/* Item list */}
+            {items.length === 0 ? (
+              <p className="text-center text-gray-400 text-sm py-4">{t('cart.empty')}</p>
+            ) : (
+              <div className="space-y-2 mb-5">
+                {items.map(i => {
+                  const dbName = lang === 'ta' && i.nameTa ? i.nameTa : i.name;
+                  return (
+                    <div key={i.id} className="flex justify-between text-sm gap-2">
+                      <span className="text-textMuted truncate">{dbName} <span className="text-xs">({formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)})</span></span>
+                      <span className="font-bold text-textMain shrink-0">{formatCurrency(i.lineTotal)}</span>
+                    </div>
+                  )
+                })}
               </div>
-              {items.length === 0 ? (
-                <p className="text-center text-gray-400 text-xs py-3">{t('cart.empty')}</p>
-              ) : (
-                <>
-                  {items.map(i => {
-                    const dbName = lang === 'ta' && i.nameTa ? i.nameTa : i.name;
-                    return (
-                      <div key={i.id} className="flex justify-between mb-1.5 gap-2">
-                        <span className="text-textMain truncate text-xs">{dbName} ({formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)})</span>
-                        <span className="font-bold text-textMain text-xs shrink-0">{formatCurrency(i.lineTotal)}</span>
-                      </div>
-                    )
-                  })}
-                  <div className="border-t border-dashed border-sand pt-2 mt-2 space-y-1">
-                    <div className="flex justify-between text-xs text-textMuted"><span>{t('cart.subtotal')}</span><span>{formatCurrency(sub)}</span></div>
-                    <div className="flex justify-between text-xs"><span className="text-textMuted">{t('cart.shipping')}</span>
-                      <span className={shipping === 0 && sub > 0 ? 'text-sageDark font-bold' : 'text-textMuted'}>
-                        {sub === 0 ? '–' : shipping === 0 ? t('cart.free') : formatCurrency(shipping)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between font-bold text-textMain text-base border-t pt-2">
-                      <span>{t('cart.grand_total')}</span><span>{formatCurrency(grand)}</span>
-                    </div>
-                  </div>
-                </>
-              )}
+            )}
+
+            {/* Totals */}
+            <div className="border-t border-sand pt-4 space-y-2 text-sm mb-5">
+              <div className="flex justify-between font-bold text-textMain text-base">
+                <span>Order Total</span>
+                <span>{formatCurrency(orderTotal)}</span>
+              </div>
+              <p className="text-xs text-textMuted bg-bgMain px-3 py-2 rounded-lg">
+                🚚 Delivery charges confirmed via WhatsApp before dispatch
+              </p>
             </div>
 
             <div className="flex flex-col gap-3">
@@ -135,12 +123,6 @@ export default function Cart() {
                 Proceed to Checkout
               </Link>
             </div>
-
-            {sub > 0 && (
-              <p className="text-xs text-center text-amber-600 bg-amber-50 px-3 py-2 rounded-lg mt-3 font-medium">
-                {t('cart.add_more')}
-              </p>
-            )}
           </div>
         </div>
       </div>

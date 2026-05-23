@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   Search, Trash2, Plus, Minus, Receipt, Printer,
   RefreshCw, ChevronLeft, ShoppingBag, MessageCircle,
+  Wifi, WifiOff,
 } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { useProductStore, type Product } from '../store/store'
@@ -92,6 +93,7 @@ export default function Pos() {
   const [invoice, setInvoice] = useState<InvoiceSnap | null>(null)
   const [cashReceived, setCashReceived] = useState<string>('')
   const [mobilePanelView, setMobilePanelView] = useState<'catalogue' | 'bill'>('catalogue')
+  const [orderMode, setOrderMode] = useState<'online' | 'offline'>('offline')
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -190,6 +192,7 @@ export default function Pos() {
         })),
         shipping: 0,
         status: 'completed',
+        orderMode,
       })
       setInvoice({
         id: created.orderId,
@@ -363,6 +366,21 @@ export default function Pos() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Online / Offline sale mode toggle */}
+          <div className="flex items-center gap-0 bg-white/10 rounded-lg overflow-hidden border border-white/20">
+            <button
+              onClick={() => setOrderMode('offline')}
+              className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-black transition-colors ${orderMode === 'offline' ? 'bg-white text-[#2C392A]' : 'text-white/70 hover:text-white'}`}
+            >
+              <WifiOff size={10} /> OFFLINE
+            </button>
+            <button
+              onClick={() => setOrderMode('online')}
+              className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-black transition-colors ${orderMode === 'online' ? 'bg-white text-[#2C392A]' : 'text-white/70 hover:text-white'}`}
+            >
+              <Wifi size={10} /> ONLINE
+            </button>
+          </div>
           <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${isSupabaseConfigured ? 'bg-green-500/20 text-green-300' : 'bg-amber-500/20 text-amber-300'}`}>
             {isSupabaseConfigured ? '● Live' : '● Local'}
           </span>
@@ -625,6 +643,11 @@ export default function Pos() {
               </div>
             </div>
 
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-[#5F6D59] mb-1">
+              <span className={`px-2 py-0.5 rounded-full ${orderMode === 'offline' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                {orderMode === 'offline' ? '⬇ Offline Sale' : '⬆ Online Order'}
+              </span>
+            </div>
             <button
               onClick={generateBill}
               disabled={saving || items.length === 0}

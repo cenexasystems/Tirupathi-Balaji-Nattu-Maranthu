@@ -1,10 +1,5 @@
 /**
- * Login / Sign-up — Google OAuth + Email Magic Link
- *
- * Email flow collects: Full Name · Mobile · Email
- * All three are validated inline before sending the magic link.
- * Name and mobile are stored in user_metadata so the DB trigger
- * (handle_new_user) and initialize() can persist them to profiles.
+ * Login / Sign-up — Email Magic Link primary, Google OAuth below
  */
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -16,10 +11,8 @@ const SITE_URL =
   (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/$/, '') ||
   window.location.origin
 
-type Method = 'google' | 'email'
 type EmailStep = 'input' | 'sent'
 
-// Indian mobile: 10 digits, must start with 6-9
 const PHONE_RE = /^[6-9]\d{9}$/
 
 interface FieldError {
@@ -44,9 +37,9 @@ export default function Login() {
   const location   = useLocation()
   const redirectPath = new URLSearchParams(location.search).get('redirect') || '/'
 
-  const [method,    setMethod]    = useState<Method>('google')
   const [loading,   setLoading]   = useState(false)
-  const [error,     setError]     = useState('')           // general / server error
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const [error,     setError]     = useState('')
   const [fieldErrs, setFieldErrs] = useState<FieldError>({})
   const [email,     setEmail]     = useState('')
   const [name,      setName]      = useState('')
@@ -54,16 +47,10 @@ export default function Login() {
   const [emailStep, setEmailStep] = useState<EmailStep>('input')
   const [otp,       setOtp]       = useState('')
 
-  const switchMethod = (m: Method) => {
-    setMethod(m); setError(''); setFieldErrs({})
-    setEmail(''); setName(''); setPhone(''); setEmailStep('input'); setOtp('')
-    setLoading(false)
-  }
-
   /* ── Google ──────────────────────────────────────────────────── */
   const handleGoogle = async () => {
     if (!isSupabaseConfigured) { setError('Authentication not configured.'); return }
-    setLoading(true); setError('')
+    setGoogleLoading(true); setError('')
     const { error: e } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -71,54 +58,42 @@ export default function Login() {
         queryParams: { prompt: 'select_account' },
       },
     })
-    if (e) { setError(e.message); setLoading(false) }
+    if (e) { setError(e.message); setGoogleLoading(false) }
   }
 
   /* ── Email: send magic link ──────────────────────────────────── */
   const handleSendLink = async (e: React.FormEvent) => {
     e.preventDefault()
-
     const errs = validate(name, phone, email)
     if (Object.keys(errs).length > 0) { setFieldErrs(errs); return }
-
     if (!isSupabaseConfigured) { setError('Authentication not configured.'); return }
-    setLoading(true); setError(''); setFieldErrs({})
 
+    setLoading(true); setError(''); setFieldErrs({})
     const cleanPhone = phone.replace(/\D/g, '')
     const { error: e2 } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
       options: {
         shouldCreateUser: true,
         emailRedirectTo: SITE_URL,
-        // Stored in raw_user_meta_data; handle_new_user trigger + initialize()
-        // will persist these to profiles.name / profiles.mobile
-        data: {
-          name:       name.trim(),
-          full_name:  name.trim(),
-          mobile:     cleanPhone,
-        },
+        data: { name: name.trim(), full_name: name.trim(), mobile: cleanPhone },
       },
     })
-
     setLoading(false)
     if (e2) { setError(e2.message); return }
     setEmailStep('sent')
   }
 
-  /* ── Email: verify OTP code (only if template sends {{ .Token }}) */
+  /* ── Email: verify OTP code ──────────────────────────────────── */
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault()
     if (otp.trim().length < 6) { setError('Enter the 6-digit code from your email.'); return }
     setLoading(true); setError('')
-
     const { error: e2 } = await supabase.auth.verifyOtp({
       email: email.trim().toLowerCase(),
       token: otp.trim(),
       type: 'email',
     })
-
     if (e2) { setLoading(false); setError(e2.message); return }
-    // onAuthStateChange SIGNED_IN in App.tsx will call initialize() and redirect
     setLoading(false)
   }
 
@@ -141,14 +116,6 @@ export default function Login() {
           )}
         </div>
 
-        {/* Method tabs */}
-        <div className="flex gap-1.5 bg-[#F7F6F2] rounded-xl p-1 mb-5">
-          <TabBtn active={method === 'google'} label="Google"
-            icon={<GoogleIcon />} onClick={() => switchMethod('google')} />
-          <TabBtn active={method === 'email'} label="Email"
-            icon={<Mail size={13} />} onClick={() => switchMethod('email')} />
-        </div>
-
         {/* Server-level error */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-[12px] mb-4">
@@ -156,57 +123,15 @@ export default function Login() {
           </div>
         )}
 
-        {/* ═══ GOOGLE ════════════════════════════════════════════ */}
-        {method === 'google' && (
-          <div className="space-y-4">
-            <button onClick={handleGoogle} disabled={loading}
-              className="w-full flex items-center justify-center gap-3 bg-white border-2 border-[#EAD7B7] hover:border-sageDark text-textMain font-bold py-4 rounded-xl transition-all disabled:opacity-60 shadow-sm hover:shadow-md active:scale-[0.98]">
-              {loading ? <Spinner /> : <GoogleIcon size={20} />}
-              {loading ? 'Redirecting to Google…' : 'Continue with Google'}
-            </button>
-
-            <div className="relative flex items-center gap-3 py-1">
-              <div className="flex-1 h-px bg-sand/60" />
-              <span className="text-[11px] text-textMuted font-medium shrink-0">How it works</span>
-              <div className="flex-1 h-px bg-sand/60" />
-            </div>
-
-            <div className="space-y-2.5 text-[12px] text-textMuted">
-              {[
-                ['New user?', 'A free account is created automatically using your Google profile.'],
-                ['Returning user?', 'You\'re signed straight in — no password needed.'],
-                ['Your data:', 'Orders, cart and favourites are linked to your account.'],
-              ].map(([bold, text], i) => (
-                <div key={i} className="flex items-start gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-[#7DAA8F]/15 text-sageDark flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">
-                    {i + 1}
-                  </span>
-                  <p><strong className="text-textMain">{bold}</strong> {text}</p>
-                </div>
-              ))}
-            </div>
-
-            <p className="text-center text-[11px] text-gray-400 leading-relaxed pt-1">
-              After signing in with Google, you can add your phone number<br />
-              from your Profile page.
-            </p>
-          </div>
-        )}
-
         {/* ═══ EMAIL — step 1: form ══════════════════════════════ */}
-        {method === 'email' && emailStep === 'input' && (
+        {emailStep === 'input' && (
           <form onSubmit={handleSendLink} noValidate className="space-y-4">
+            <p className="text-[13px] font-bold text-textMain">Sign in with Email</p>
 
             {/* Full Name */}
-            <FieldGroup
-              label="Full Name"
-              icon={<User size={14} />}
-              required
-              error={fieldErrs.name}
-            >
+            <FieldGroup label="Full Name" icon={<User size={14} />} required error={fieldErrs.name}>
               <input
-                type="text"
-                autoComplete="name"
+                type="text" autoComplete="name"
                 placeholder="e.g. Priya Krishnamurthy"
                 className={inputCls(!!fieldErrs.name)}
                 value={name}
@@ -215,21 +140,13 @@ export default function Login() {
             </FieldGroup>
 
             {/* Mobile Number */}
-            <FieldGroup
-              label="Mobile Number"
-              icon={<PhoneIcon size={14} />}
-              required
-              error={fieldErrs.phone}
-              hint="10-digit Indian mobile"
-            >
+            <FieldGroup label="Mobile Number" icon={<PhoneIcon size={14} />} required error={fieldErrs.phone} hint="10-digit Indian mobile">
               <div className="flex gap-2">
                 <span className="flex items-center px-3 py-3 bg-[#F7F6F2] border-2 border-sand rounded-xl text-[13px] font-bold text-textMuted shrink-0 select-none">
                   🇮🇳 +91
                 </span>
                 <input
-                  type="tel"
-                  autoComplete="tel-national"
-                  maxLength={10}
+                  type="tel" autoComplete="tel-national" maxLength={10}
                   placeholder="9876543210"
                   className={`flex-1 ${inputCls(!!fieldErrs.phone)}`}
                   value={phone}
@@ -239,15 +156,9 @@ export default function Login() {
             </FieldGroup>
 
             {/* Email */}
-            <FieldGroup
-              label="Email Address"
-              icon={<Mail size={14} />}
-              required
-              error={fieldErrs.email}
-            >
+            <FieldGroup label="Email Address" icon={<Mail size={14} />} required error={fieldErrs.email}>
               <input
-                type="email"
-                autoComplete="email"
+                type="email" autoComplete="email"
                 placeholder="you@example.com"
                 className={inputCls(!!fieldErrs.email)}
                 value={email}
@@ -256,7 +167,7 @@ export default function Login() {
             </FieldGroup>
 
             <button type="submit" disabled={loading}
-              className="w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 mt-2">
+              className="w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
               {loading
                 ? <><Spinner /> Sending link…</>
                 : <><Mail size={15} /> Send Magic Link</>
@@ -265,13 +176,36 @@ export default function Login() {
 
             <p className="text-center text-[11px] text-gray-400 leading-relaxed">
               We'll send a one-click sign-in link to your inbox.<br />
-              No password required. Works for both sign-up and sign-in.
+              No password needed. Works for sign-up and sign-in.
+            </p>
+
+            {/* Divider */}
+            <div className="relative flex items-center gap-3 py-1">
+              <div className="flex-1 h-px bg-sand/60" />
+              <span className="text-[11px] text-textMuted font-medium shrink-0">or</span>
+              <div className="flex-1 h-px bg-sand/60" />
+            </div>
+
+            {/* Google — positioned below email fields */}
+            <button
+              type="button"
+              onClick={handleGoogle}
+              disabled={googleLoading}
+              className="w-full flex items-center justify-center gap-3 bg-white border-2 border-[#EAD7B7] hover:border-sageDark text-textMain font-bold py-3.5 rounded-xl transition-all disabled:opacity-60 shadow-sm hover:shadow-md active:scale-[0.98]"
+            >
+              {googleLoading ? <Spinner /> : <GoogleIcon size={20} />}
+              {googleLoading ? 'Redirecting to Google…' : 'Continue with Google'}
+            </button>
+
+            <p className="text-center text-[11px] text-gray-400 leading-relaxed">
+              Google sign-in creates an account automatically.<br />
+              Add your phone number from Profile after signing in.
             </p>
           </form>
         )}
 
         {/* ═══ EMAIL — step 2: link sent ════════════════════════ */}
-        {method === 'email' && emailStep === 'sent' && (
+        {emailStep === 'sent' && (
           <div className="text-center space-y-5">
             <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto">
               <CheckCircle size={32} className="text-green-500" />
@@ -288,7 +222,6 @@ export default function Login() {
               Valid for 60 minutes. Check spam if not received.
             </p>
 
-            {/* OTP code entry — only if Supabase template uses {{ .Token }} */}
             <details className="text-left border border-sand/60 rounded-xl p-4">
               <summary className="text-[11px] text-sageDark font-bold cursor-pointer select-none list-none flex items-center gap-1.5">
                 <span>›</span> Received a 6-digit code instead?
@@ -362,19 +295,6 @@ function FieldGroup({
 
 function Spinner() {
   return <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
-}
-
-function TabBtn({ active, onClick, icon, label }: {
-  active: boolean; onClick: () => void; icon: React.ReactNode; label: string
-}) {
-  return (
-    <button type="button" onClick={onClick}
-      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-bold rounded-xl transition-all ${
-        active ? 'bg-[#2C392A] text-white shadow-sm' : 'text-[#5F6D59] hover:bg-[#F7F6F2]'
-      }`}>
-      {icon} {label}
-    </button>
-  )
 }
 
 function GoogleIcon({ size = 18 }: { size?: number }) {

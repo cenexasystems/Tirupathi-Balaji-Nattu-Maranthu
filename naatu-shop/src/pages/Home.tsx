@@ -68,16 +68,20 @@ const CAT_IMAGES: Record<string, string> = {
 const CAT_DEFAULT = PRODUCT_PLACEHOLDER
 
 const REMEDY_MAP: Record<string, { emoji: string; bg: string; border: string }> = {
-  'Immunity':      { emoji: '🛡️', bg: '#FFF7ED', border: '#FDBA74' },
-  'Digestion':     { emoji: '🌿', bg: '#F0FDF4', border: '#86EFAC' },
-  'Hair Growth':   { emoji: '💆', bg: '#FFFBEB', border: '#FCD34D' },
-  'Skin Care':     { emoji: '✨', bg: '#FFF1F2', border: '#FDA4AF' },
-  'Joint Pain':    { emoji: '🦵', bg: '#F5F3FF', border: '#DDD6FE' },
-  'Cold & Cough':  { emoji: '🤧', bg: '#EFF6FF', border: '#93C5FD' },
-  'Diabetes':      { emoji: '🩸', bg: '#F1F5F9', border: '#94A3B8' },
-  'Stress':        { emoji: '🧘', bg: '#FAF5FF', border: '#C4B5FD' },
-  'Fever':         { emoji: '🤒', bg: '#FEF2F2', border: '#FECACA' },
-  'Ritual Purity': { emoji: '🪔', bg: '#FFFBF0', border: '#FDE68A' },
+  'Cold & Cough':       { emoji: '🤧', bg: '#EFF6FF', border: '#93C5FD' },
+  'Digestion':          { emoji: '🌿', bg: '#F0FDF4', border: '#86EFAC' },
+  'Hair Growth':        { emoji: '💆', bg: '#FFFBEB', border: '#FCD34D' },
+  'Skin Care':          { emoji: '✨', bg: '#FFF1F2', border: '#FDA4AF' },
+  'Immunity':           { emoji: '🛡️', bg: '#FFF7ED', border: '#FDBA74' },
+  'Stress Relief':      { emoji: '🧘', bg: '#FAF5FF', border: '#C4B5FD' },
+  'Temple Essentials':  { emoji: '🪔', bg: '#FFFBF0', border: '#FDE68A' },
+  'Siddha Remedies':    { emoji: '🌱', bg: '#F0FDF4', border: '#4ADE80' },
+  'Joint Pain':         { emoji: '🦵', bg: '#F5F3FF', border: '#DDD6FE' },
+  'Diabetes':           { emoji: '🩸', bg: '#F1F5F9', border: '#94A3B8' },
+  'Fever':              { emoji: '🤒', bg: '#FEF2F2', border: '#FECACA' },
+  'Ritual Purity':      { emoji: '🔔', bg: '#FFFBF0', border: '#FDE68A' },
+  // Legacy aliases so existing product remedy tags still resolve
+  'Stress':             { emoji: '🧘', bg: '#FAF5FF', border: '#C4B5FD' },
 }
 
 const TESTIMONIALS = [
