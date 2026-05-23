@@ -104,6 +104,13 @@ interface FavState {
   clear: () => void
 }
 
+interface ProductModalState {
+  product: Product | null
+  open: boolean
+  openProduct: (product: Product) => void
+  closeProduct: () => void
+}
+
 type SessionFallback = {
   id?: string
   email?: string | null
@@ -391,3 +398,10 @@ export const useFavStore = create<FavState>()(
     { name: 'sri-siddha-favorites' },
   ),
 )
+
+export const useProductModalStore = create<ProductModalState>()((set) => ({
+  product: null,
+  open: false,
+  openProduct: (product) => set({ product, open: true }),
+  closeProduct: () => set({ open: false, product: null }),
+}))

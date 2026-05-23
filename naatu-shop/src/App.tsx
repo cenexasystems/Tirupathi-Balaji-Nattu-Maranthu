@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import FloatingCart from './components/FloatingCart'
+import ProductDetailModal from './components/ProductDetailModal'
 import Home from './pages/Home'
 import Products from './pages/Products'
 import Cart from './pages/Cart'
@@ -13,7 +14,7 @@ import Favorites from './pages/Favorites'
 import ProductDetails from './pages/ProductDetails'
 import Checkout from './pages/Checkout'
 import Profile from './pages/Profile'
-import { useAuthStore, useProductStore } from './store/store'
+import { useAuthStore, useProductModalStore, useProductStore } from './store/store'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { BRAND_EN } from './lib/brand'
 
@@ -55,6 +56,11 @@ function AppShell() {
   const location = useLocation()
   const initialize = useAuthStore((state) => state.initialize)
   const fetchProducts = useProductStore((state) => state.fetchProducts)
+  const products = useProductStore((state) => state.products)
+  const modalProduct = useProductModalStore((state) => state.product)
+  const modalOpen = useProductModalStore((state) => state.open)
+  const openProduct = useProductModalStore((state) => state.openProduct)
+  const closeProduct = useProductModalStore((state) => state.closeProduct)
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register'
 
   useEffect(() => {
@@ -104,6 +110,10 @@ function AppShell() {
     }
   }, [fetchProducts])
 
+  const relatedProducts = products.length > 0 && modalProduct
+    ? products.filter((item) => item.isActive && item.category === modalProduct.category && item.id !== modalProduct.id).slice(0, 10)
+    : []
+
   return (
     <div className="flex flex-col min-h-screen print:block print:min-h-0">
       {!isAuthPage && <div className="print-hidden"><Navbar /></div>}
@@ -140,6 +150,13 @@ function AppShell() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      <ProductDetailModal
+        product={modalProduct}
+        open={modalOpen}
+        onClose={closeProduct}
+        onSelectProduct={openProduct}
+        relatedProducts={relatedProducts}
+      />
       <FloatingCart />
       {!isAuthPage && <div className="print-hidden"><Footer /></div>}
     </div>

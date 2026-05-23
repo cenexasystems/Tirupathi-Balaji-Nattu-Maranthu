@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   ArrowRight,
   ShieldCheck,
-  Truck,
+  PackageCheck,
   Leaf,
   Award,
   Sparkles,
@@ -21,6 +21,7 @@ import { useProductStore, useAuthStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import ProductCard from '../components/ProductCard'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { PLACEHOLDER as PRODUCT_PLACEHOLDER } from '../lib/productImages'
 import {
   BRAND_TA,
   BRAND_EN,
@@ -51,20 +52,20 @@ function lsSaveReview(r: CustomerReview) {
 
 // ── Category image map ────────────────────────────────────────────────
 const CAT_IMAGES: Record<string, string> = {
-  'Pooja Items':         'https://images.unsplash.com/photo-1567335743949-70f2b6b6e36d?auto=format&fit=crop&w=400&q=80',
-  'Herbal Powder':       'https://images.unsplash.com/photo-1615485291234-9d694218aeb5?auto=format&fit=crop&w=400&q=80',
-  'Herbal Oil':          'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=400&q=80',
-  'Spices & Condiments': 'https://images.unsplash.com/photo-1532944138793-3a7bab2b5c1c?auto=format&fit=crop&w=400&q=80',
-  'Grains & Pulses':     'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=400&q=80',
-  'Honey & Liquids':     'https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?auto=format&fit=crop&w=400&q=80',
-  'Bundle Packages':     'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=400&q=80',
+  'Pooja Items':         PRODUCT_PLACEHOLDER,
+  'Herbal Powder':       PRODUCT_PLACEHOLDER,
+  'Herbal Oil':          PRODUCT_PLACEHOLDER,
+  'Spices & Condiments': PRODUCT_PLACEHOLDER,
+  'Grains & Pulses':     PRODUCT_PLACEHOLDER,
+  'Honey & Liquids':     PRODUCT_PLACEHOLDER,
+  'Bundle Packages':     PRODUCT_PLACEHOLDER,
   // Legacy
-  'Herbal Root':    'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=400&q=80',
-  'Herbal Leaf':    'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?auto=format&fit=crop&w=400&q=80',
-  'Herbal Spice':   'https://images.unsplash.com/photo-1532944138793-3a7bab2b5c1c?auto=format&fit=crop&w=400&q=80',
-  'Herbal Product': 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=400&q=80',
+  'Herbal Root':    PRODUCT_PLACEHOLDER,
+  'Herbal Leaf':    PRODUCT_PLACEHOLDER,
+  'Herbal Spice':   PRODUCT_PLACEHOLDER,
+  'Herbal Product': PRODUCT_PLACEHOLDER,
 }
-const CAT_DEFAULT = 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=400&q=80'
+const CAT_DEFAULT = PRODUCT_PLACEHOLDER
 
 const REMEDY_MAP: Record<string, { emoji: string; bg: string; border: string }> = {
   'Immunity':      { emoji: '🛡️', bg: '#FFF7ED', border: '#FDBA74' },
@@ -382,7 +383,7 @@ export default function Home() {
                   ))}
                 </div>
                 <p className="text-[13px] font-black text-[#2C392A] leading-tight">4.9 / 5.0</p>
-                <p className="text-[10px] text-[#5F6D59] font-medium mt-0.5">500+ Happy Customers</p>
+                <p className="text-[10px] text-[#5F6D59] font-medium mt-0.5">Happy Customers</p>
               </div>
             </motion.div>
 
@@ -395,9 +396,9 @@ export default function Home() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           {[
             { icon: <ShieldCheck size={17} />, title: t('trust.organic'),  sub: t('trust.organic_sub')  },
-            { icon: <Truck size={17} />,        title: t('trust.shipping'), sub: t('trust.shipping_sub') },
-            { icon: <Leaf size={17} />,          title: t('trust.pure'),    sub: t('trust.pure_sub')     },
-            { icon: <Award size={17} />,         title: t('trust.gmp'),     sub: t('trust.gmp_sub')      },
+            { icon: <PackageCheck size={17} />, title: t('trust.shipping'), sub: t('trust.shipping_sub') },
+            { icon: <Leaf size={17} />,         title: t('trust.pure'),     sub: t('trust.pure_sub')     },
+            { icon: <Award size={17} />,        title: t('trust.gmp'),      sub: t('trust.gmp_sub')      },
           ].map((item, idx) => (
             <div key={idx}
               className="flex items-center gap-3.5 p-4 sm:p-5
@@ -742,7 +743,7 @@ export default function Home() {
           shadow-[0_24px_80px_rgba(44,57,42,0.28)]">
           <div className="absolute inset-0 opacity-[0.09] pointer-events-none">
             <img
-              src="https://images.unsplash.com/photo-1512103522279-9e54d799db91?auto=format&fit=crop&q=80&w=1400"
+              src={PRODUCT_PLACEHOLDER}
               alt=""
               className="w-full h-full object-cover"
             />

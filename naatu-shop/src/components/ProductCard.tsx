@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Heart, ShoppingCart, Star, Plus, Minus } from 'lucide-react'
-import { Link } from 'react-router-dom'
-import { useCartStore, useFavStore, type Product } from '../store/store'
+import { useCartStore, useFavStore, useProductModalStore, type Product } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { formatCurrency, calculateLineTotal, type QuantityOption } from '../lib/retail'
 import { getProductImage, onImgError } from '../lib/productImages'
@@ -13,9 +12,14 @@ function formatBaseQty(qty: number, unit: string): string {
   return `${qty}${unit}`
 }
 
-export default function ProductCard({ product }: { product: Product }) {
+export default function ProductCard({
+  product,
+}: {
+  product: Product
+}) {
   const { addItem, add } = useCartStore()
   const { toggle, isFav } = useFavStore()
+  const openProduct = useProductModalStore((state) => state.openProduct)
   const { lang } = useLangStore()
   const fav = isFav(product.id)
 
@@ -57,16 +61,20 @@ export default function ProductCard({ product }: { product: Product }) {
     }
   }
 
+  const handleOpen = () => {
+    openProduct(product)
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       className="group relative flex flex-col overflow-hidden rounded-2xl border border-[#EAD7B7]/50 bg-white shadow-sm hover:shadow-md transition-shadow"
     >
       {/* Wishlist */}
       <motion.button
-        whileTap={{ scale: 0.88 }}
+        whileTap={{ scale: 0.95 }}
         onClick={() => void toggle(product)}
         className={`absolute right-2.5 top-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border transition-colors ${
           fav ? 'border-rose-200 bg-rose-50' : 'border-[#EAD7B7] bg-white/90'
@@ -85,16 +93,20 @@ export default function ProductCard({ product }: { product: Product }) {
       )}
 
       {/* Image — stable aspect-ratio container prevents layout shift */}
-      <Link to={`/product/${product.id}`} className="block aspect-square w-full overflow-hidden bg-[#E8EDE4]">
+      <button
+        type="button"
+        onClick={handleOpen}
+        className="block aspect-square w-full overflow-hidden bg-[#E8EDE4] text-left"
+      >
         <img
           src={getProductImage(product.name, product.category, product.imageUrl, 'card')}
           alt={product.name}
           loading="lazy"
           decoding="async"
           onError={onImgError}
-          className="h-full w-full object-cover transition-transform duration-400 group-hover:scale-105"
+          className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
         />
-      </Link>
+      </button>
 
       {/* Content */}
       <div className="flex flex-1 flex-col gap-1.5 p-3 sm:p-3.5">
@@ -104,11 +116,11 @@ export default function ProductCard({ product }: { product: Product }) {
         </span>
 
         {/* Name — min-h accommodates 2 Tamil lines at 1.65 line-height */}
-        <Link to={`/product/${product.id}`}>
+        <button type="button" onClick={handleOpen} className="text-left">
           <h3 className="line-clamp-2 min-h-[2.75rem] text-[12px] sm:text-[13px] font-bold leading-[1.65] text-[#2C392A] hover:text-[#7DAA8F] transition-colors ta-text">
             {displayName}
           </h3>
-        </Link>
+        </button>
 
         {/* Rating */}
         <div className="flex items-center gap-1 text-[10px] text-slate-500">
@@ -181,7 +193,7 @@ export default function ProductCard({ product }: { product: Product }) {
           </div>
 
           <motion.button
-            whileTap={{ scale: 0.92 }}
+            whileTap={{ scale: 0.96 }}
             onClick={handleAddToCart}
             type="button"
             className="shrink-0 flex items-center gap-1 rounded-xl bg-[#7DAA8F] hover:bg-[#5e8c72] text-white px-2.5 sm:px-3 py-2 text-[11px] font-bold transition-colors touch-target"

@@ -5,12 +5,13 @@ import { useLangStore } from '../store/langStore'
 import { Link } from 'react-router-dom'
 import { BRAND_EN, BRAND_WHATSAPP_LINK } from '../lib/brand'
 import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, getDefaultQuantityForProduct } from '../lib/retail'
+import { PLACEHOLDER as PRODUCT_PLACEHOLDER } from '../lib/productImages'
 
 export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { items, remove, updateQty, total, count, clear } = useCartStore()
   const { t, lang } = useLangStore()
   const sub = total()
-  const shipping = sub >= 500 ? 0 : (sub === 0 ? 0 : 50)
+  const shipping = sub === 0 ? 0 : 50
   const grand = sub + shipping
   const getStep = (item: (typeof items)[number]) => {
     if (item.unitType === 'unit' || item.unitType === 'bundle') return 1
@@ -26,7 +27,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
       const dbName = lang === 'ta' && i.nameTa ? i.nameTa : i.name;
       return `• ${dbName} (${formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)}) — ${formatCurrency(i.lineTotal)}`
     }).join('\n') +
-    `\n\nShipping: ${shipping === 0 && sub > 0 ? 'FREE' : formatCurrency(shipping)}\n*Total: ${formatCurrency(grand)}*`
+    `\n\nDelivery: ${formatCurrency(shipping)}\n*Total: ${formatCurrency(grand)}*`
   )
 
   return (
@@ -57,7 +58,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                 <AnimatePresence>
                   {items.map(item => (
                     <motion.div key={item.id} layout initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex gap-3 p-3 bg-bgMain rounded-xl border border-sand/40">
-                      <img src={item.image} alt={item.name} onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=200&q=80' }} className="w-16 h-16 object-cover rounded-lg shrink-0 bg-gray-100" />
+                      <img src={item.image} alt={item.name} onError={(e) => { (e.target as HTMLImageElement).src = PRODUCT_PLACEHOLDER }} className="w-16 h-16 object-cover rounded-lg shrink-0 bg-gray-100" />
                       <div className="flex-grow min-w-0">
                         <h4 className="font-bold text-sm text-textMain truncate">
                           {lang === 'ta' && item.nameTa ? item.nameTa : item.name}
@@ -133,7 +134,7 @@ export function FavoritesDrawer({ open, onClose }: { open: boolean; onClose: () 
                 <AnimatePresence>
                   {items.map(item => (
                     <motion.div key={item.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, x: -20 }} className="flex gap-3 p-3 bg-[#FFF8E7] rounded-xl border border-[#EAD7B7]/50">
-                      <img src={item.image} alt={item.name} onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=200&q=80' }} className="w-14 h-14 object-cover rounded-lg shrink-0" />
+                      <img src={item.image} alt={item.name} onError={(e) => { (e.target as HTMLImageElement).src = PRODUCT_PLACEHOLDER }} className="w-14 h-14 object-cover rounded-lg shrink-0" />
                       <div className="flex-grow min-w-0">
                         <h4 className="font-bold text-sm text-textMain truncate">
                           {lang === 'ta' && item.nameTa ? item.nameTa : item.name}

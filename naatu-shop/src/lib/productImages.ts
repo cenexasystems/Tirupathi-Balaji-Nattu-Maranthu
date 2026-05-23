@@ -19,8 +19,8 @@
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const U = (id: string, w = 400, q = 80) =>
-  `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=${q}`
+const LOCAL_FALLBACK_IMAGE = '/assets/images/Kungumam.png'
+const U = (_id: string, _w = 400, _q = 80) => LOCAL_FALLBACK_IMAGE
 
 /** Returns true only for admin-uploaded images stored in Supabase Storage.
  *  These deserve the highest trust — the admin explicitly chose this image. */

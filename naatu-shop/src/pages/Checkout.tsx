@@ -6,6 +6,7 @@ import { ArrowLeft, MessageCircle, Printer, CheckCircle, ShoppingBag } from 'luc
 import { createOrderWithStock } from '../services/orderService'
 import { BRAND_EN, BRAND_WHATSAPP_LINK } from '../lib/brand'
 import { Invoice } from '../components/Invoice'
+import { PLACEHOLDER as PRODUCT_PLACEHOLDER } from '../lib/productImages'
 import {
   buildStructuredOrderItem,
   formatCurrency,
@@ -37,7 +38,7 @@ export default function Checkout() {
   const navigate = useNavigate()
 
   const sub = total()
-  const shipping = sub === 0 ? 0 : sub >= 500 ? 0 : 50
+  const shipping = sub === 0 ? 0 : 50
   const grand = sub + shipping
 
   const [form, setForm] = useState({ name: '', phone: '', address: '' })
@@ -285,7 +286,7 @@ export default function Checkout() {
                   <div key={item.id} className="flex items-center gap-3 pt-4 first:pt-0">
                     <div className="w-14 h-14 rounded-xl overflow-hidden bg-sand/20 shrink-0">
                       <img src={item.image} alt={item.name} loading="lazy"
-                        onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=200&q=80' }}
+                        onError={e => { (e.target as HTMLImageElement).src = PRODUCT_PLACEHOLDER }}
                         className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-grow">

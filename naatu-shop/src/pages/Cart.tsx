@@ -5,12 +5,13 @@ import { useLangStore } from '../store/langStore'
 import { Link } from 'react-router-dom'
 import { BRAND_EN, BRAND_TA, BRAND_SUBTITLE, BRAND_WHATSAPP, BRAND_WHATSAPP_LINK } from '../lib/brand'
 import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, getQuantityStepForProduct } from '../lib/retail'
+import { PLACEHOLDER as PRODUCT_PLACEHOLDER } from '../lib/productImages'
 
 export default function Cart() {
   const { items, remove, updateQty, total, count, clear } = useCartStore()
   const { t, lang } = useLangStore()
   const sub = total()
-  const shipping = sub === 0 ? 0 : sub >= 500 ? 0 : 50
+  const shipping = sub === 0 ? 0 : 50
   const grand = sub + shipping
 
   const getStep = (item: (typeof items)[number]) => getQuantityStepForProduct({
@@ -55,7 +56,7 @@ export default function Cart() {
                     className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4 sm:py-5">
                     <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden shrink-0 bg-gray-50 border border-sand/40">
                       <img src={item.image} alt={item.name}
-                        onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=200&q=80' }}
+                        onError={(e) => { (e.target as HTMLImageElement).src = PRODUCT_PLACEHOLDER }}
                         className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-grow flex flex-col items-start gap-0.5 sm:gap-1">
@@ -135,9 +136,9 @@ export default function Cart() {
               </Link>
             </div>
 
-            {sub > 0 && sub < 500 && (
+            {sub > 0 && (
               <p className="text-xs text-center text-amber-600 bg-amber-50 px-3 py-2 rounded-lg mt-3 font-medium">
-                {t('cart.add_more').replace('{amt}', String(500 - sub))}
+                {t('cart.add_more')}
               </p>
             )}
           </div>
