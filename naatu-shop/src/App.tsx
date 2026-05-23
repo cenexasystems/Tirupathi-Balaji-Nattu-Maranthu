@@ -151,6 +151,7 @@ function AppShell() {
         </Routes>
       </main>
       <ProductDetailModal
+        key={`${modalProduct?.id ?? 'none'}-${modalOpen ? 'open' : 'closed'}`}
         product={modalProduct}
         open={modalOpen}
         onClose={closeProduct}

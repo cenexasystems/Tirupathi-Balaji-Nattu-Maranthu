@@ -55,8 +55,16 @@ export default function ProductDetailModal({
   const { addItem } = useCartStore()
   const { toggle, isFav } = useFavStore()
   const { t } = useLangStore()
-  const [displayUnit, setDisplayUnit] = useState<string>('')
-  const [displayQty, setDisplayQty] = useState<number>(1)
+  const [displayUnit, setDisplayUnit] = useState<string>(() => product?.unitLabel ?? '')
+  const [displayQty, setDisplayQty] = useState<number>(() =>
+    product
+      ? getDefaultQuantityForProduct({
+          unitType: product.unitType,
+          baseQuantity: product.baseQuantity,
+          predefinedOptions: product.predefinedOptions,
+        })
+      : 1,
+  )
   const [toast, setToast] = useState(false)
 
   useEffect(() => {
@@ -72,18 +80,6 @@ export default function ProductDetailModal({
       document.removeEventListener('keydown', handleKey)
     }
   }, [open, onClose])
-
-  useEffect(() => {
-    if (!product) return
-    setDisplayUnit(product.unitLabel)
-    setDisplayQty(
-      getDefaultQuantityForProduct({
-        unitType: product.unitType,
-        baseQuantity: product.baseQuantity,
-        predefinedOptions: product.predefinedOptions,
-      }),
-    )
-  }, [product])
 
   const basePrice = product
     ? (product.offerPrice && product.offerPrice < product.price ? product.offerPrice : product.price)
