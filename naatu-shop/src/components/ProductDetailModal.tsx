@@ -176,7 +176,7 @@ export default function ProductDetailModal({
                     Premium focus
                   </div>
 
-                  <div className="relative aspect-square max-h-[52svh] min-h-[40svh] sm:aspect-[16/13] sm:min-h-0 sm:max-h-none">
+                  <div className="relative aspect-[4/3] min-h-[44svh] max-h-[58svh] sm:aspect-[16/11] sm:min-h-[52svh] sm:max-h-none">
                     <img
                       src={heroImage}
                       alt={product.name}
