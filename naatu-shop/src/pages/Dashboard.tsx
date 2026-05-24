@@ -773,7 +773,7 @@ export default function Dashboard() {
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
                             o.order_mode === 'offline' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
-                          }`}>{o.order_mode === 'offline' ? '≡ƒÅ¬ Offline' : '≡ƒîÉ Online'}</span>
+                          }`}>{o.order_mode === 'offline' ? 'Offline' : 'Online'}</span>
                         </td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
@@ -1180,3 +1180,4 @@ export default function Dashboard() {
     </div>
   )
 }
+
