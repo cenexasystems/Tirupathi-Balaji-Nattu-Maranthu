@@ -4,7 +4,7 @@ import { useCartStore, useAuthStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { ArrowLeft, MessageCircle, CheckCircle, ShoppingBag } from 'lucide-react'
 import { createOrderWithStock } from '../services/orderService'
-import { BRAND_EN, BRAND_PHONE_DISPLAY, BRAND_WHATSAPP_LINK } from '../lib/brand'
+import { BRAND_EN, BRAND_WHATSAPP, BRAND_WHATSAPP_LINK } from '../lib/brand'
 import { PLACEHOLDER as PRODUCT_PLACEHOLDER } from '../lib/productImages'
 import {
   buildStructuredOrderItem,
@@ -174,7 +174,7 @@ export default function Checkout() {
                 <p className="font-bold text-green-800 text-sm">WhatsApp Opened</p>
               </div>
               <p className="text-green-700 text-xs leading-relaxed">
-                A WhatsApp chat with our store ({BRAND_PHONE_DISPLAY}) should have opened automatically with your order details. If it didn't open, tap the button below.
+                A WhatsApp chat with our store ({BRAND_WHATSAPP}) should have opened automatically with your order details. If it didn't open, tap the button below.
               </p>
             </div>
 
@@ -252,7 +252,7 @@ export default function Checkout() {
                   <MessageCircle size={15} className="shrink-0" />
                   <strong>Order via WhatsApp</strong>
                 </div>
-                <p className="text-xs leading-relaxed">After placing your order, you'll be connected to WhatsApp ({BRAND_PHONE_DISPLAY}) to confirm delivery charges and details.</p>
+                <p className="text-xs leading-relaxed">After placing your order, you'll be connected to WhatsApp ({BRAND_WHATSAPP}) to confirm delivery charges and details.</p>
               </div>
 
               {!user && (

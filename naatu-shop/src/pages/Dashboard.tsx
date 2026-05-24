@@ -2,13 +2,27 @@ import React, { useCallback, useEffect, useState, useMemo, type FormEvent } from
 import {
   BarChart2, Trash2, Edit2, List, ShoppingCart, LayoutDashboard,
   Box, AlertCircle, ArrowUp, ArrowDown, Power, Download, TrendingUp,
-  Package, IndianRupee, Search, RefreshCw, Users, ShieldCheck, ShieldOff,
+  Package, IndianRupee, Search, RefreshCw, Users, ShieldCheck, ShieldOff, Trophy,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { useAuthStore, useProductStore, type Product } from '../store/store'
 import { uploadProductImage } from '../lib/storage'
 import { formatCurrency, normalizeUnitType, toNumber, type UnitType } from '../lib/retail'
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+} from 'recharts'
 
 type Category = { id: string | number; name_en: string; name_ta: string; is_active?: boolean; sort_order?: number }
 type DashboardOrder = {
@@ -20,6 +34,11 @@ type TabKey = 'overview' | 'billing' | 'products' | 'categories' | 'users'
 type ProfileUser = { id: string; email: string; name: string; mobile: string; role: string; created_at: string }
 
 const normalizeStatus = (v: unknown) => String(v || '').trim().toLowerCase()
+const normalizeMode = (v: unknown) => String(v || '').trim().toLowerCase()
+const isCompletedStatus = (v: unknown) => {
+  const status = normalizeStatus(v)
+  return status === 'completed' || status === 'paid'
+}
 const parseOrderItems = (items: unknown): Record<string, unknown>[] => {
   if (Array.isArray(items)) return items.filter((e): e is Record<string, unknown> => typeof e === 'object' && e !== null)
   if (typeof items === 'string') { try { const p = JSON.parse(items); return Array.isArray(p) ? p : [] } catch { return [] } }
@@ -110,56 +129,129 @@ export default function Dashboard() {
 
   // ── Analytics ──────────────────────────────────────────────
   const analytics = useMemo(() => {
-    const active   = orders.filter(o => normalizeStatus(o.status) !== 'cancelled')
-    const revenue  = active.reduce((s, o) => s + toNumber(o.total, 0), 0)
-    const pending   = active.filter(o => normalizeStatus(o.status) === 'pending').length
-    const completed = active.filter(o => ['completed', 'paid'].includes(normalizeStatus(o.status))).length
-    const lowStock  = products.filter(p => toNumber(p.stockQuantity ?? p.stock, 0) < 10).length
+    const nonCancelledOrders = orders.filter((order) => normalizeStatus(order.status) !== 'cancelled')
+    const completedOrders = nonCancelledOrders.filter((order) => isCompletedStatus(order.status))
+    const pendingOrders = nonCancelledOrders.filter((order) => normalizeStatus(order.status) === 'pending')
 
-    // Online vs Offline revenue
-    const onlineRevenue  = active.filter(o => o.order_mode !== 'offline').reduce((s, o) => s + toNumber(o.total, 0), 0)
-    const offlineRevenue = active.filter(o => o.order_mode === 'offline').reduce((s, o) => s + toNumber(o.total, 0), 0)
+    const completedRevenue = completedOrders.reduce((sum, order) => sum + toNumber(order.total, 0), 0)
+    const todayKey = new Date().toISOString().slice(0, 10)
+    const monthKey = todayKey.slice(0, 7)
 
-    // Today's revenue
-    const today = new Date().toISOString().slice(0, 10)
-    const todayRevenue = active.filter(o => o.created_at.startsWith(today)).reduce((s, o) => s + toNumber(o.total, 0), 0)
+    const todaySales = completedOrders
+      .filter((order) => order.created_at.startsWith(todayKey))
+      .reduce((sum, order) => sum + toNumber(order.total, 0), 0)
 
-    const pMap = new Map<string, { name: string; qty: number; revenue: number }>()
-    const activeIds = new Set(active.map(o => o.id))
-    const items = orderItems.length > 0
-      ? orderItems.filter(i => activeIds.has(i.order_id))
-      : active.flatMap(o => parseOrderItems(o.items).map(r => ({
-          order_id: o.id,
-          product_name: String(r.product_name || r.name || 'Product'),
-          quantity: toNumber(r.quantity ?? r.qty, 0),
-          line_total: toNumber(r.line_total ?? r.lineTotal, 0),
+    const monthlyRevenue = completedOrders
+      .filter((order) => order.created_at.startsWith(monthKey))
+      .reduce((sum, order) => sum + toNumber(order.total, 0), 0)
+
+    const onlineCompleted = completedOrders.filter((order) => normalizeMode(order.order_mode) !== 'offline')
+    const offlineCompleted = completedOrders.filter((order) => normalizeMode(order.order_mode) === 'offline')
+    const onlineRevenue = onlineCompleted.reduce((sum, order) => sum + toNumber(order.total, 0), 0)
+    const offlineRevenue = offlineCompleted.reduce((sum, order) => sum + toNumber(order.total, 0), 0)
+
+    const completedOrderIds = new Set(completedOrders.map((order) => order.id))
+    const completedItems = orderItems.length > 0
+      ? orderItems.filter((item) => completedOrderIds.has(item.order_id))
+      : completedOrders.flatMap((order) => parseOrderItems(order.items).map((row) => ({
+          order_id: order.id,
+          product_name: String(row.product_name || row.name || 'Product'),
+          quantity: toNumber(row.quantity ?? row.qty, 0),
+          line_total: toNumber(row.line_total ?? row.lineTotal, 0),
         })))
 
-    items.forEach(({ product_name, quantity, line_total }) => {
-      const cur = pMap.get(product_name) || { name: product_name, qty: 0, revenue: 0 }
-      cur.qty += quantity; cur.revenue += line_total
-      pMap.set(product_name, cur)
+    const productMap = new Map<string, { name: string; qty: number; revenue: number }>()
+    const categoryMap = new Map<string, { name: string; qty: number; revenue: number }>()
+    const productCategoryLookup = new Map(
+      products.map((product) => [String(product.name || '').trim().toLowerCase(), product.category || 'Uncategorized'])
+    )
+
+    let totalProductsSold = 0
+    completedItems.forEach(({ product_name, quantity, line_total }) => {
+      const qty = toNumber(quantity, 0)
+      const lineRevenue = toNumber(line_total, 0)
+      totalProductsSold += qty
+
+      const productKey = String(product_name || 'Product').trim() || 'Product'
+      const productCur = productMap.get(productKey) || { name: productKey, qty: 0, revenue: 0 }
+      productCur.qty += qty
+      productCur.revenue += lineRevenue
+      productMap.set(productKey, productCur)
+
+      const categoryName = productCategoryLookup.get(productKey.toLowerCase()) || 'Uncategorized'
+      const catCur = categoryMap.get(categoryName) || { name: categoryName, qty: 0, revenue: 0 }
+      catCur.qty += qty
+      catCur.revenue += lineRevenue
+      categoryMap.set(categoryName, catCur)
     })
-    const topProducts = Array.from(pMap.values()).sort((a, b) => b.qty - a.qty).slice(0, 8)
-    return { revenue, totalOrders: orders.length, pendingOrders: pending, completedOrders: completed, lowStockCount: lowStock, topProducts, onlineRevenue, offlineRevenue, todayRevenue }
+
+    const topProducts = Array.from(productMap.values()).sort((a, b) => b.qty - a.qty)
+    const topCategories = Array.from(categoryMap.values()).sort((a, b) => b.qty - a.qty)
+    const bestProduct = topProducts[0]?.name || 'No sales yet'
+    const bestCategory = topCategories[0]?.name || 'No sales yet'
+
+    const monthlyRevenueMap = new Map<string, number>()
+    completedOrders.forEach((order) => {
+      const key = order.created_at.slice(0, 7)
+      monthlyRevenueMap.set(key, (monthlyRevenueMap.get(key) || 0) + toNumber(order.total, 0))
+    })
+
+    const monthlyTrend = Array.from({ length: 6 }, (_, index) => {
+      const date = new Date()
+      date.setMonth(date.getMonth() - (5 - index))
+      const key = date.toISOString().slice(0, 7)
+      return {
+        key,
+        month: date.toLocaleDateString('en-IN', { month: 'short' }),
+        revenue: monthlyRevenueMap.get(key) || 0,
+      }
+    })
+
+    const statusDistribution = [
+      { name: 'Pending', value: pendingOrders.length, color: '#f59e0b' },
+      { name: 'Completed', value: completedOrders.length, color: '#10b981' },
+    ]
+
+    const channelDistribution = [
+      { name: 'Online', value: onlineRevenue, color: '#3b82f6' },
+      { name: 'Offline POS', value: offlineRevenue, color: '#f97316' },
+    ]
+
+    const weeklyRevenueMap = new Map<string, number>()
+    completedOrders.forEach((order) => {
+      const key = order.created_at.slice(0, 10)
+      weeklyRevenueMap.set(key, (weeklyRevenueMap.get(key) || 0) + toNumber(order.total, 0))
+    })
+
+    const weeklySales = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date()
+      date.setDate(date.getDate() - (6 - index))
+      const key = date.toISOString().slice(0, 10)
+      return {
+        day: date.toLocaleDateString('en-IN', { weekday: 'short' }),
+        date: key,
+        revenue: weeklyRevenueMap.get(key) || 0,
+      }
+    })
+
+    return {
+      totalCompletedRevenue: completedRevenue,
+      todaySales,
+      pendingOrders: pendingOrders.length,
+      completedOrders: completedOrders.length,
+      onlineRevenue,
+      offlineRevenue,
+      monthlyRevenue,
+      totalProductsSold,
+      bestCategory,
+      bestProduct,
+      monthlyTrend,
+      channelDistribution,
+      statusDistribution,
+      topCategories: topCategories.slice(0, 6),
+      weeklySales,
+    }
   }, [orders, orderItems, products])
-
-  // ── Date-wise revenue ──────────────────────────────────────
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo]     = useState('')
-
-  const filteredRevenue = useMemo(() => {
-    let subset = orders.filter(o => normalizeStatus(o.status) !== 'cancelled')
-    if (dateFrom) subset = subset.filter(o => o.created_at >= `${dateFrom}T00:00:00`)
-    if (dateTo)   subset = subset.filter(o => o.created_at <= `${dateTo}T23:59:59`)
-
-    const byDay = new Map<string, number>()
-    subset.forEach(o => {
-      const day = o.created_at.slice(0, 10)
-      byDay.set(day, (byDay.get(day) || 0) + toNumber(o.total, 0))
-    })
-    return { total: subset.reduce((s, o) => s + toNumber(o.total, 0), 0), count: subset.length, byDay }
-  }, [orders, dateFrom, dateTo])
 
   // ── Load data ──────────────────────────────────────────────
   const loadData = useCallback(async () => {
@@ -431,7 +523,7 @@ export default function Dashboard() {
         {tab === 'overview' && (
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-xl font-black text-[#2C392A]">Analytics Overview</h2>
+              <h2 className="text-xl font-black text-[#2C392A]">Business Control Center</h2>
               <div className="flex gap-2">
                 <button onClick={() => void loadData()}
                   className="flex items-center gap-1.5 px-3 py-2 bg-white border border-[#EAD7B7]/40 rounded-xl text-[12px] font-bold text-[#5F6D59] hover:bg-[#F7F6F2]">
@@ -443,144 +535,192 @@ export default function Dashboard() {
                 </button>
               </div>
             </div>
-
-            {/* KPI Cards — row 1 */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 sm:gap-4">
               {[
-                { label: 'Total Revenue', value: formatCurrency(analytics.revenue), icon: <IndianRupee size={18} />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                { label: 'Today Revenue', value: formatCurrency(analytics.todayRevenue), icon: <TrendingUp size={18} />, color: 'text-blue-600', bg: 'bg-blue-50' },
-                { label: 'Pending Orders', value: analytics.pendingOrders, icon: <Package size={18} />, color: 'text-amber-600', bg: 'bg-amber-50' },
-                { label: 'Completed Orders', value: analytics.completedOrders, icon: <TrendingUp size={18} />, color: 'text-purple-600', bg: 'bg-purple-50' },
-              ].map((k, i) => (
-                <div key={i} className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-4 sm:p-5 shadow-sm">
-                  <div className="flex items-start justify-between mb-3">
-                    <p className="text-[10px] uppercase font-black text-[#5F6D59] tracking-wider">{k.label}</p>
-                    <div className={`w-8 h-8 rounded-xl ${k.bg} flex items-center justify-center ${k.color}`}>{k.icon}</div>
+                {
+                  label: 'Total Completed Revenue',
+                  helper: 'Money Earned',
+                  value: formatCurrency(analytics.totalCompletedRevenue),
+                  icon: <IndianRupee size={18} />,
+                  color: 'text-emerald-700',
+                  bg: 'bg-emerald-50',
+                },
+                {
+                  label: "Today's Sales",
+                  helper: 'Completed today',
+                  value: formatCurrency(analytics.todaySales),
+                  icon: <TrendingUp size={18} />,
+                  color: 'text-blue-700',
+                  bg: 'bg-blue-50',
+                },
+                {
+                  label: 'Pending Orders',
+                  helper: 'Awaiting confirmation',
+                  value: analytics.pendingOrders,
+                  icon: <Package size={18} />,
+                  color: 'text-amber-700',
+                  bg: 'bg-amber-50',
+                },
+                {
+                  label: 'Completed Orders',
+                  helper: 'Confirmed sales',
+                  value: analytics.completedOrders,
+                  icon: <Trophy size={18} />,
+                  color: 'text-green-700',
+                  bg: 'bg-green-50',
+                },
+                {
+                  label: 'Online Orders Revenue',
+                  helper: 'Completed online',
+                  value: formatCurrency(analytics.onlineRevenue),
+                  icon: <IndianRupee size={18} />,
+                  color: 'text-cyan-700',
+                  bg: 'bg-cyan-50',
+                },
+                {
+                  label: 'Offline POS Revenue',
+                  helper: 'Completed POS',
+                  value: formatCurrency(analytics.offlineRevenue),
+                  icon: <ShoppingCart size={18} />,
+                  color: 'text-orange-700',
+                  bg: 'bg-orange-50',
+                },
+                {
+                  label: 'Monthly Revenue',
+                  helper: 'Current month',
+                  value: formatCurrency(analytics.monthlyRevenue),
+                  icon: <BarChart2 size={18} />,
+                  color: 'text-violet-700',
+                  bg: 'bg-violet-50',
+                },
+                {
+                  label: 'Total Products Sold',
+                  helper: 'From completed orders',
+                  value: Math.round(analytics.totalProductsSold),
+                  icon: <Box size={18} />,
+                  color: 'text-indigo-700',
+                  bg: 'bg-indigo-50',
+                },
+                {
+                  label: 'Best Selling Category',
+                  helper: 'Top category now',
+                  value: analytics.bestCategory,
+                  icon: <List size={18} />,
+                  color: 'text-sky-700',
+                  bg: 'bg-sky-50',
+                },
+                {
+                  label: 'Best Selling Product',
+                  helper: 'Most sold item',
+                  value: analytics.bestProduct,
+                  icon: <Trophy size={18} />,
+                  color: 'text-pink-700',
+                  bg: 'bg-pink-50',
+                },
+              ].map((card, index) => (
+                <div key={index} className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <p className="text-[10px] uppercase font-black text-[#5F6D59] tracking-wider">{card.label}</p>
+                    <div className={`w-8 h-8 rounded-xl ${card.bg} flex items-center justify-center ${card.color}`}>{card.icon}</div>
                   </div>
-                  <p className="text-2xl font-black text-[#2C392A]">{k.value}</p>
+                  <p className="text-[11px] text-[#7A846F] font-semibold mb-2">{card.helper}</p>
+                  <p className="text-[22px] leading-tight font-black text-[#2C392A] break-words">{card.value}</p>
                 </div>
               ))}
             </div>
 
-            {/* KPI Cards — row 2: Online vs Offline */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {[
-                { label: 'Online Revenue', value: formatCurrency(analytics.onlineRevenue), icon: '🌐', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
-                { label: 'Offline Revenue', value: formatCurrency(analytics.offlineRevenue), icon: '🏪', color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200' },
-                { label: 'Low Stock Items', value: analytics.lowStockCount, icon: '⚠️', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
-              ].map((k, i) => (
-                <div key={i} className={`bg-white rounded-2xl border ${k.border} p-4 sm:p-5 shadow-sm`}>
-                  <div className="flex items-start justify-between mb-3">
-                    <p className="text-[10px] uppercase font-black text-[#5F6D59] tracking-wider">{k.label}</p>
-                    <span className="text-xl">{k.icon}</span>
-                  </div>
-                  <p className={`text-2xl font-black ${k.color}`}>{k.value}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Date-wise Revenue Filter */}
-            <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 sm:p-6 shadow-sm">
-              <h3 className="text-base font-black text-[#2C392A] mb-4">Revenue by Date Range</h3>
-              <div className="flex flex-wrap gap-3 items-end mb-5">
-                <div>
-                  <label className="block text-[10px] font-black text-[#5F6D59] uppercase tracking-wider mb-1">From</label>
-                  <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                    className="px-3 py-2 bg-[#F7F6F2] rounded-xl text-[13px] font-semibold border-none outline-none" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-[#5F6D59] uppercase tracking-wider mb-1">To</label>
-                  <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                    className="px-3 py-2 bg-[#F7F6F2] rounded-xl text-[13px] font-semibold border-none outline-none" />
-                </div>
-                <button onClick={() => { setDateFrom(''); setDateTo('') }}
-                  className="px-4 py-2 bg-[#F7F6F2] text-[#5F6D59] rounded-xl text-[12px] font-bold hover:bg-[#EAD7B7]/40">
-                  Clear
-                </button>
-                <button onClick={() => exportCSV(orders.filter(o =>
-                  (!dateFrom || o.created_at >= `${dateFrom}T00:00:00`) &&
-                  (!dateTo   || o.created_at <= `${dateTo}T23:59:59`)))}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#2C392A] text-white rounded-xl text-[12px] font-bold hover:bg-[#1e2817]">
-                  <Download size={12} /> Export Range
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-4 mb-5">
-                <div className="bg-[#F7F6F2] rounded-xl p-4">
-                  <p className="text-[10px] font-black uppercase text-[#5F6D59]">Period Revenue</p>
-                  <p className="text-xl font-black text-[#2C392A] mt-1">{formatCurrency(filteredRevenue.total)}</p>
-                </div>
-                <div className="bg-[#F7F6F2] rounded-xl p-4">
-                  <p className="text-[10px] font-black uppercase text-[#5F6D59]">Orders in Period</p>
-                  <p className="text-xl font-black text-[#2C392A] mt-1">{filteredRevenue.count}</p>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm">
+                <h3 className="text-base font-black text-[#2C392A] mb-4">Monthly Revenue Trend</h3>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={analytics.monthlyTrend}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ead7b7" />
+                      <XAxis dataKey="month" tick={{ fill: '#5F6D59', fontSize: 12 }} />
+                      <YAxis tick={{ fill: '#5F6D59', fontSize: 12 }} />
+                      <Tooltip formatter={(value) => formatCurrency(toNumber(value as number | string, 0))} />
+                      <Line type="monotone" dataKey="revenue" stroke="#2C8A59" strokeWidth={3} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
-              {/* Day-wise breakdown */}
-              {filteredRevenue.byDay.size > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-[10px] uppercase tracking-wider text-[#5F6D59] border-b border-[#EAD7B7]/30">
-                        <th className="py-2 text-left">Date</th>
-                        <th className="py-2 text-right">Revenue</th>
-                        <th className="py-2 pr-0">
-                          <div className="w-full" />
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Array.from(filteredRevenue.byDay.entries())
-                        .sort((a, b) => b[0].localeCompare(a[0]))
-                        .slice(0, 30)
-                        .map(([day, rev]) => {
-                          const maxRev = Math.max(...Array.from(filteredRevenue.byDay.values()))
-                          const pct = maxRev > 0 ? (rev / maxRev) * 100 : 0
-                          return (
-                            <tr key={day} className="border-b border-[#EAD7B7]/20">
-                              <td className="py-2 font-semibold text-[#2C392A]">{new Date(day).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                              <td className="py-2 text-right font-bold text-[#2C392A]">{formatCurrency(rev)}</td>
-                              <td className="py-2 pl-4 w-32">
-                                <div className="h-2 bg-[#EAD7B7]/30 rounded-full overflow-hidden">
-                                  <div className="h-full bg-[#7DAA8F] rounded-full" style={{ width: `${pct}%` }} />
-                                </div>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
 
-            {/* Top products */}
-            <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 sm:p-6 shadow-sm">
-              <h3 className="text-base font-black text-[#2C392A] mb-4">Best Selling Products</h3>
-              <div className="space-y-2.5">
-                {analytics.topProducts.map((row, i) => {
-                  const maxQty = analytics.topProducts[0]?.qty || 1
-                  return (
-                    <div key={row.name} className="flex items-center gap-3">
-                      <span className="text-[11px] font-black text-[#5F6D59] w-5 shrink-0">#{i + 1}</span>
-                      <div className="flex-grow min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-[13px] font-semibold text-[#2C392A] truncate">{row.name}</p>
-                          <p className="text-[12px] font-bold text-[#7DAA8F] ml-2 shrink-0">{row.qty} sold</p>
-                        </div>
-                        <div className="h-1.5 bg-[#EAD7B7]/30 rounded-full">
-                          <div className="h-full bg-[#7DAA8F] rounded-full" style={{ width: `${(row.qty / maxQty) * 100}%` }} />
-                        </div>
-                      </div>
-                      <p className="text-[12px] font-bold text-[#2C392A] w-20 text-right shrink-0">{formatCurrency(row.revenue)}</p>
+              <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm">
+                <h3 className="text-base font-black text-[#2C392A] mb-4">Online vs Offline Sales</h3>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={analytics.channelDistribution} dataKey="value" nameKey="name" innerRadius={65} outerRadius={95} paddingAngle={3}>
+                        {analytics.channelDistribution.map((entry) => (
+                          <Cell key={entry.name} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => formatCurrency(toNumber(value as number | string, 0))} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[12px] font-bold">
+                  {analytics.channelDistribution.map((entry) => (
+                    <div key={entry.name} className="flex items-center gap-2 text-[#2C392A]">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                      <span>{entry.name}: {formatCurrency(entry.value)}</span>
                     </div>
-                  )
-                })}
-                {analytics.topProducts.length === 0 && <p className="text-sm text-[#5F6D59]">No orders yet.</p>}
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm">
+                <h3 className="text-base font-black text-[#2C392A] mb-4">Order Status Distribution</h3>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analytics.statusDistribution}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ead7b7" />
+                      <XAxis dataKey="name" tick={{ fill: '#5F6D59', fontSize: 12 }} />
+                      <YAxis allowDecimals={false} tick={{ fill: '#5F6D59', fontSize: 12 }} />
+                      <Tooltip formatter={(value) => toNumber(value as number | string, 0)} />
+                      <Bar dataKey="value" radius={[10, 10, 0, 0]}>
+                        {analytics.statusDistribution.map((entry) => (
+                          <Cell key={entry.name} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm">
+                <h3 className="text-base font-black text-[#2C392A] mb-4">Top Categories</h3>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analytics.topCategories} layout="vertical" margin={{ left: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ead7b7" />
+                      <XAxis type="number" tick={{ fill: '#5F6D59', fontSize: 12 }} />
+                      <YAxis type="category" dataKey="name" width={120} tick={{ fill: '#5F6D59', fontSize: 11 }} />
+                      <Tooltip formatter={(value) => toNumber(value as number | string, 0)} />
+                      <Bar dataKey="qty" fill="#7DAA8F" radius={[0, 8, 8, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm xl:col-span-2">
+                <h3 className="text-base font-black text-[#2C392A] mb-4">Weekly Sales Bars</h3>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analytics.weeklySales}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ead7b7" />
+                      <XAxis dataKey="day" tick={{ fill: '#5F6D59', fontSize: 12 }} />
+                      <YAxis tick={{ fill: '#5F6D59', fontSize: 12 }} />
+                      <Tooltip formatter={(value) => formatCurrency(toNumber(value as number | string, 0))} labelFormatter={(_value, payload) => String(payload?.[0]?.payload?.date || '')} />
+                      <Bar dataKey="revenue" fill="#2C392A" radius={[10, 10, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </div>
 
-            {/* Invoice / Customer Search */}
             <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 sm:p-6 shadow-sm">
-              <h3 className="text-base font-black text-[#2C392A] mb-4">Invoice & Customer Search</h3>
+              <h3 className="text-base font-black text-[#2C392A] mb-4">Order Management</h3>
               <form onSubmit={runSearch} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                 {[
                   { key: 'invoiceNo', placeholder: 'Invoice No (INV-...)' },
@@ -617,7 +757,7 @@ export default function Dashboard() {
                 <table className="w-full min-w-[600px] text-left text-[13px]">
                   <thead className="bg-[#F7F6F2] text-[10px] uppercase tracking-wider text-[#5F6D59]">
                     <tr>
-                      {['Invoice','Customer','Phone','Date','Total','Mode','Status'].map(h => (
+                      {['Invoice','Customer','Phone','Date','Total','Order Type','Status Badge','Change Status'].map(h => (
                         <th key={h} className="px-4 py-3 font-black">{h}</th>
                       ))}
                     </tr>
@@ -636,6 +776,13 @@ export default function Dashboard() {
                           }`}>{o.order_mode === 'offline' ? '🏪 Offline' : '🌐 Online'}</span>
                         </td>
                         <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                            normalizeStatus(o.status) === 'completed'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}>{normalizeStatus(o.status) === 'completed' ? 'Completed' : 'Pending'}</span>
+                        </td>
+                        <td className="px-4 py-3">
                           <select
                             value={normalizeStatus(o.status)}
                             onChange={e => void updateOrderStatus(o.id, e.target.value)}
@@ -652,7 +799,7 @@ export default function Dashboard() {
                       </tr>
                     ))}
                     {searchResults.length === 0 && (
-                      <tr><td colSpan={7} className="px-4 py-8 text-center text-[#5F6D59]">No matching orders</td></tr>
+                      <tr><td colSpan={8} className="px-4 py-8 text-center text-[#5F6D59]">No matching orders</td></tr>
                     )}
                   </tbody>
                 </table>
