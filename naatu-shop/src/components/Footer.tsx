@@ -3,7 +3,18 @@ import { Leaf, Phone, Mail, MapPin } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useLangStore } from '../store/langStore'
 import { useProductStore } from '../store/store'
-import { BRAND_EN, BRAND_SUBTITLE, BRAND_EMAIL, BRAND_LOCATION_LINK, BRAND_PHONE_DISPLAY, BRAND_WHATSAPP_LINK } from '../lib/brand'
+import {
+  BRAND_EN,
+  BRAND_SUBTITLE,
+  BRAND_EMAIL,
+  BRAND_LOCATION_LINK,
+  BRAND_PRIMARY_PHONE_DISPLAY,
+  BRAND_PRIMARY_PHONE_E164,
+  BRAND_SECONDARY_PHONE_DISPLAY,
+  BRAND_SECONDARY_PHONE_E164,
+  BRAND_THIRD_PHONE_DISPLAY,
+  BRAND_THIRD_PHONE_E164,
+} from '../lib/brand'
 
 export default function Footer() {
   const { t } = useLangStore()
@@ -21,6 +32,24 @@ export default function Footer() {
       ? derived.slice(0, 6)
       : ['Herbal Powder', 'Herbal Oil', 'Herbal Root', 'Herbal Spice', 'Herbal Tablet']
   }, [products])
+
+  const contactNumbers = [
+    {
+      label: t('footer.primary_number'),
+      display: BRAND_PRIMARY_PHONE_DISPLAY,
+      href: `tel:${BRAND_PRIMARY_PHONE_E164}`,
+    },
+    {
+      label: t('footer.secondary_number'),
+      display: BRAND_SECONDARY_PHONE_DISPLAY,
+      href: `tel:${BRAND_SECONDARY_PHONE_E164}`,
+    },
+    {
+      label: t('footer.third_number'),
+      display: BRAND_THIRD_PHONE_DISPLAY,
+      href: `tel:${BRAND_THIRD_PHONE_E164}`,
+    },
+  ]
 
   const remedies = useMemo(() => {
     const derived = Array.from(new Set(
@@ -69,13 +98,22 @@ export default function Footer() {
           <h5 className="text-white font-bold mb-4 sm:mb-5 uppercase text-xs tracking-widest">{t('footer.contact')}</h5>
           <ul className="flex flex-col gap-4 text-sm">
             <li className="flex items-start gap-3"><MapPin size={15} className="text-sage mt-0.5 shrink-0" /><a href={BRAND_LOCATION_LINK} target="_blank" rel="noreferrer" className="hover:text-white transition-colors">Google Maps</a></li>
-            <li className="flex items-center gap-3"><Phone size={15} className="text-sage shrink-0" /><a href={BRAND_WHATSAPP_LINK} target="_blank" rel="noreferrer" className="hover:text-white transition-colors">{BRAND_PHONE_DISPLAY}</a></li>
+            {contactNumbers.map((contact) => (
+              <li key={contact.label} className="flex items-start gap-3">
+                <Phone size={15} className="text-sage mt-0.5 shrink-0" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-gray-500">{contact.label}</span>
+                  <a href={contact.href} className="hover:text-white transition-colors">{contact.display}</a>
+                </div>
+              </li>
+            ))}
             <li className="flex items-center gap-3"><Mail size={15} className="text-sage shrink-0" /><a href={`mailto:${BRAND_EMAIL}`} className="hover:text-white transition-colors">{BRAND_EMAIL}</a></li>
           </ul>
         </div>
       </div>
-      <div className="border-t border-white/10 py-5 text-center text-xs text-gray-500">
-        {t('footer.rights')}
+      <div className="border-t border-white/10 py-5 text-center text-xs text-gray-500 space-y-1">
+        <div>{t('footer.rights')}</div>
+        <div>{t('footer.powered_by')}</div>
       </div>
     </footer>
   )
