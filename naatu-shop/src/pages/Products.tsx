@@ -270,10 +270,10 @@ export default function Products() {
                <button onClick={clear} className="text-sm font-black text-[#7DAA8F] hover:underline">Clear all filters</button>
             </div>
           ) : (
-            <motion.div layout className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+            <motion.div layout className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4 items-stretch">
               <AnimatePresence mode="popLayout">
                 {filtered.map(p => (
-                  <motion.div key={p.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+                  <motion.div key={p.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className="flex flex-col">
                      <ProductCard product={p} />
                   </motion.div>
                 ))}

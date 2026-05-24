@@ -70,7 +70,7 @@ export default function ProductCard({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className="group relative flex flex-col overflow-hidden surface-panel-compact transition-shadow hover:shadow-[0_14px_32px_rgba(44,57,42,0.12)]"
+      className="group relative flex h-full flex-col overflow-hidden surface-panel-compact transition-shadow hover:shadow-[0_14px_32px_rgba(44,57,42,0.12)]"
     >
       {/* Wishlist */}
       <motion.button
@@ -141,13 +141,13 @@ export default function ProductCard({
 
         {/* Weight / Volume Option Pills */}
         {hasOptions && selectedOpt && (
-          <div className="flex flex-wrap gap-1 mt-0.5">
+          <div className="flex gap-1 overflow-x-auto hide-scrollbar mt-0.5 pb-0.5">
             {product.predefinedOptions.map(opt => (
               <button
                 key={opt.label}
                 type="button"
                 onClick={() => setSelectedOpt(opt)}
-                className={`rounded-lg px-2 py-0.5 text-[10px] font-bold transition-colors border ${
+                className={`shrink-0 rounded-lg px-2 py-0.5 text-[10px] font-bold transition-colors border ${
                   selectedOpt.label === opt.label
                     ? 'bg-[#2C392A] text-white border-[#2C392A]'
                     : 'bg-[#F7F6F2] text-[#5F6D59] border-[#EAD7B7]/60 hover:border-[#7DAA8F]'
