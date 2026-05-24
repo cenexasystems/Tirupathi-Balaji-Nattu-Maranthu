@@ -14,6 +14,7 @@ import {
   BRAND_SECONDARY_PHONE_E164,
   BRAND_THIRD_PHONE_DISPLAY,
   BRAND_THIRD_PHONE_E164,
+  BRAND_ADDRESS,
 } from '../lib/brand'
 
 export default function Footer() {
@@ -97,7 +98,13 @@ export default function Footer() {
         <div>
           <h5 className="text-white font-bold mb-4 sm:mb-5 uppercase text-xs tracking-widest">{t('footer.contact')}</h5>
           <ul className="flex flex-col gap-4 text-sm">
-            <li className="flex items-start gap-3"><MapPin size={15} className="text-sage mt-0.5 shrink-0" /><a href={BRAND_LOCATION_LINK} target="_blank" rel="noreferrer" className="hover:text-white transition-colors">Google Maps</a></li>
+            <li className="flex items-start gap-3">
+              <MapPin size={15} className="text-sage mt-0.5 shrink-0" />
+              <div className="flex flex-col gap-1">
+                <a href={BRAND_LOCATION_LINK} target="_blank" rel="noreferrer" className="hover:text-white transition-colors">Google Maps</a>
+                <span className="text-[11px] leading-relaxed text-gray-500 max-w-[260px]">{BRAND_ADDRESS}</span>
+              </div>
+            </li>
             {contactNumbers.map((contact) => (
               <li key={contact.label} className="flex items-start gap-3">
                 <Phone size={15} className="text-sage mt-0.5 shrink-0" />

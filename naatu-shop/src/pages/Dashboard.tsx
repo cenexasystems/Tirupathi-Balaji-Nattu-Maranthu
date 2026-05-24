@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useMemo, type FormEvent } from 'react'
+﻿import React, { useCallback, useEffect, useState, useMemo, type FormEvent } from 'react'
 import {
   BarChart2, Trash2, Edit2, List, ShoppingCart, LayoutDashboard,
   Box, AlertCircle, ArrowUp, ArrowDown, Power, Download, TrendingUp,
@@ -62,7 +62,7 @@ const exportCSV = (orders: DashboardOrder[]) => {
     toNumber(o.total, 0).toFixed(2), o.status,
   ])
   const csv = [header, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const blob = new Blob(['∩╗┐' + csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -127,7 +127,7 @@ export default function Dashboard() {
     items: row.items,
   })
 
-  // ── Analytics ──────────────────────────────────────────────
+  // ΓöÇΓöÇ Analytics ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const analytics = useMemo(() => {
     const nonCancelledOrders = orders.filter((order) => normalizeStatus(order.status) !== 'cancelled')
     const completedOrders = nonCancelledOrders.filter((order) => isCompletedStatus(order.status))
@@ -253,7 +253,7 @@ export default function Dashboard() {
     }
   }, [orders, orderItems, products])
 
-  // ── Load data ──────────────────────────────────────────────
+  // ΓöÇΓöÇ Load data ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const loadData = useCallback(async () => {
     if (!isSupabaseConfigured) return
     setLoading(true)
@@ -328,7 +328,7 @@ export default function Dashboard() {
     if (tab === 'users') void loadUsers()
   }, [tab, loadUsers])
 
-  // ── Order search ───────────────────────────────────────────
+  // ΓöÇΓöÇ Order search ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const runSearch = async (e?: FormEvent) => {
     e?.preventDefault()
     setSearchLoading(true)
@@ -357,7 +357,7 @@ export default function Dashboard() {
     finally { setSearchLoading(false) }
   }
 
-  // ── Product CRUD ───────────────────────────────────────────
+  // ΓöÇΓöÇ Product CRUD ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const handleSaveProd = async (e: FormEvent) => {
     e.preventDefault()
     setProductNotice('')
@@ -519,7 +519,7 @@ export default function Dashboard() {
       {/* Main */}
       <main className="flex-grow p-4 sm:p-6 lg:p-8 overflow-x-hidden">
 
-        {/* ── ANALYTICS TAB ── */}
+        {/* ΓöÇΓöÇ ANALYTICS TAB ΓöÇΓöÇ */}
         {tab === 'overview' && (
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -632,14 +632,14 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm">
                 <h3 className="text-base font-black text-[#2C392A] mb-4">Monthly Revenue Trend</h3>
-                <div className="h-72">
+                <div className="h-56 sm:h-60">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={analytics.monthlyTrend}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ead7b7" />
-                      <XAxis dataKey="month" tick={{ fill: '#5F6D59', fontSize: 12 }} />
-                      <YAxis tick={{ fill: '#5F6D59', fontSize: 12 }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E8DFD0" />
+                      <XAxis dataKey="month" tick={{ fill: '#6B7661', fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: '#6B7661', fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
                       <Tooltip formatter={(value) => formatCurrency(toNumber(value as number | string, 0))} />
-                      <Line type="monotone" dataKey="revenue" stroke="#2C8A59" strokeWidth={3} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="revenue" stroke="#2C8A59" strokeWidth={2.2} dot={{ r: 2.5 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -647,10 +647,10 @@ export default function Dashboard() {
 
               <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm">
                 <h3 className="text-base font-black text-[#2C392A] mb-4">Online vs Offline Sales</h3>
-                <div className="h-72">
+                <div className="h-56 sm:h-60">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={analytics.channelDistribution} dataKey="value" nameKey="name" innerRadius={65} outerRadius={95} paddingAngle={3}>
+                      <Pie data={analytics.channelDistribution} dataKey="value" nameKey="name" innerRadius={54} outerRadius={78} paddingAngle={3}>
                         {analytics.channelDistribution.map((entry) => (
                           <Cell key={entry.name} fill={entry.color} />
                         ))}
@@ -671,14 +671,14 @@ export default function Dashboard() {
 
               <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm">
                 <h3 className="text-base font-black text-[#2C392A] mb-4">Order Status Distribution</h3>
-                <div className="h-72">
+                <div className="h-56 sm:h-60">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={analytics.statusDistribution}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ead7b7" />
-                      <XAxis dataKey="name" tick={{ fill: '#5F6D59', fontSize: 12 }} />
-                      <YAxis allowDecimals={false} tick={{ fill: '#5F6D59', fontSize: 12 }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E8DFD0" />
+                      <XAxis dataKey="name" tick={{ fill: '#6B7661', fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis allowDecimals={false} tick={{ fill: '#6B7661', fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
                       <Tooltip formatter={(value) => toNumber(value as number | string, 0)} />
-                      <Bar dataKey="value" radius={[10, 10, 0, 0]}>
+                      <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={22}>
                         {analytics.statusDistribution.map((entry) => (
                           <Cell key={entry.name} fill={entry.color} />
                         ))}
@@ -690,14 +690,14 @@ export default function Dashboard() {
 
               <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm">
                 <h3 className="text-base font-black text-[#2C392A] mb-4">Top Categories</h3>
-                <div className="h-72">
+                <div className="h-56 sm:h-60">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analytics.topCategories} layout="vertical" margin={{ left: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ead7b7" />
-                      <XAxis type="number" tick={{ fill: '#5F6D59', fontSize: 12 }} />
-                      <YAxis type="category" dataKey="name" width={120} tick={{ fill: '#5F6D59', fontSize: 11 }} />
+                    <BarChart data={analytics.topCategories} layout="vertical" margin={{ left: 12 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E8DFD0" />
+                      <XAxis type="number" tick={{ fill: '#6B7661', fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis type="category" dataKey="name" width={108} tick={{ fill: '#6B7661', fontSize: 10.5 }} axisLine={false} tickLine={false} />
                       <Tooltip formatter={(value) => toNumber(value as number | string, 0)} />
-                      <Bar dataKey="qty" fill="#7DAA8F" radius={[0, 8, 8, 0]} />
+                      <Bar dataKey="qty" fill="#7DAA8F" radius={[0, 7, 7, 0]} barSize={12} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -705,14 +705,14 @@ export default function Dashboard() {
 
               <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm xl:col-span-2">
                 <h3 className="text-base font-black text-[#2C392A] mb-4">Weekly Sales Bars</h3>
-                <div className="h-72">
+                <div className="h-56 sm:h-60">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={analytics.weeklySales}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ead7b7" />
-                      <XAxis dataKey="day" tick={{ fill: '#5F6D59', fontSize: 12 }} />
-                      <YAxis tick={{ fill: '#5F6D59', fontSize: 12 }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E8DFD0" />
+                      <XAxis dataKey="day" tick={{ fill: '#6B7661', fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: '#6B7661', fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
                       <Tooltip formatter={(value) => formatCurrency(toNumber(value as number | string, 0))} labelFormatter={(_value, payload) => String(payload?.[0]?.payload?.date || '')} />
-                      <Bar dataKey="revenue" fill="#2C392A" radius={[10, 10, 0, 0]} />
+                      <Bar dataKey="revenue" fill="#2C8A59" radius={[8, 8, 0, 0]} barSize={18} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -773,7 +773,7 @@ export default function Dashboard() {
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
                             o.order_mode === 'offline' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
-                          }`}>{o.order_mode === 'offline' ? '🏪 Offline' : '🌐 Online'}</span>
+                          }`}>{o.order_mode === 'offline' ? '≡ƒÅ¬ Offline' : '≡ƒîÉ Online'}</span>
                         </td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
@@ -808,7 +808,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── POS TAB ── */}
+        {/* ΓöÇΓöÇ POS TAB ΓöÇΓöÇ */}
         {tab === 'billing' && (
           <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-6 shadow-sm">
             <h3 className="text-xl font-black text-[#2C392A] mb-2">POS Terminal</h3>
@@ -819,7 +819,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── INVENTORY TAB ── */}
+        {/* ΓöÇΓöÇ INVENTORY TAB ΓöÇΓöÇ */}
         {tab === 'products' && (
           <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
             {/* Product Form */}
@@ -862,10 +862,10 @@ export default function Dashboard() {
                   <div className="col-span-2">
                     <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Tamil Name</label>
                     <input className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
-                      placeholder="மஞ்சள் பொடி" value={prodForm.nameTa} onChange={e => setProdForm(f => ({...f, nameTa: e.target.value}))} />
+                      placeholder="α««α«₧α»ìα«Üα«│α»ì α«¬α»èα«ƒα«┐" value={prodForm.nameTa} onChange={e => setProdForm(f => ({...f, nameTa: e.target.value}))} />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Price (₹) *</label>
+                    <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Price (Γé╣) *</label>
                     <input required type="number" min="0" step="0.01"
                       className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
                       value={prodForm.price} onChange={e => setProdForm(f => ({...f, price: Number(e.target.value)}))} />
@@ -894,7 +894,7 @@ export default function Dashboard() {
                         const sel = cats.find(c => c.name_en === e.target.value)
                         setProdForm(f => ({ ...f, category: e.target.value, categoryId: sel?.id || null }))
                       }}>
-                      <option value="">Select category…</option>
+                      <option value="">Select categoryΓÇª</option>
                       {cats.map(c => <option key={c.id} value={c.name_en}>{c.name_en}</option>)}
                     </select>
                   </div>
@@ -917,7 +917,7 @@ export default function Dashboard() {
                 <div>
                   <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Description</label>
                   <textarea rows={2} className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold resize-none"
-                    placeholder="Short product description…" value={prodForm.description}
+                    placeholder="Short product descriptionΓÇª" value={prodForm.description}
                     onChange={e => setProdForm(f => ({...f, description: e.target.value}))} />
                 </div>
 
@@ -938,7 +938,7 @@ export default function Dashboard() {
                   <input type="file" accept="image/*"
                     className="w-full px-3 py-2 bg-[#F7F6F2] rounded-xl text-[12px] text-[#5F6D59]"
                     onChange={e => void handleUploadImage(e.target.files?.[0])} />
-                  {imageUploading && <p className="text-[11px] text-[#7DAA8F] font-bold">Uploading image…</p>}
+                  {imageUploading && <p className="text-[11px] text-[#7DAA8F] font-bold">Uploading imageΓÇª</p>}
                   {prodForm.image && (
                     <div className="w-16 h-16 rounded-xl overflow-hidden bg-[#F7F6F2] border border-[#EAD7B7]/40">
                       <img src={prodForm.image} alt="preview" className="w-full h-full object-cover" />
@@ -955,7 +955,7 @@ export default function Dashboard() {
                 <div className="flex gap-2 pt-1">
                   <button type="submit" disabled={loading}
                     className="flex-grow py-3 bg-[#7DAA8F] hover:bg-[#5e8c72] text-white font-black rounded-xl disabled:opacity-60">
-                    {loading ? 'Saving…' : editingProd ? 'Update Product' : 'Add Product'}
+                    {loading ? 'SavingΓÇª' : editingProd ? 'Update Product' : 'Add Product'}
                   </button>
                   <button type="button" onClick={() => { setEditingProd(null); setProdForm(emptyForm); setProductNotice('') }}
                     className="px-5 py-3 bg-[#F7F6F2] text-[#5F6D59] font-bold rounded-xl hover:bg-[#EAD7B7]/40">
@@ -1012,7 +1012,7 @@ export default function Dashboard() {
                               {toNumber(p.stockQuantity ?? p.stock, 0)}
                             </span>
                           </td>
-                          <td className="px-3 py-3 font-bold text-[#2C392A]">₹{p.price}</td>
+                          <td className="px-3 py-3 font-bold text-[#2C392A]">Γé╣{p.price}</td>
                           <td className="px-3 py-3 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <button onClick={() => handleEdit(p)} className="p-1.5 text-[#7DAA8F] hover:bg-[#7DAA8F]/10 rounded-lg">
@@ -1036,7 +1036,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── CATEGORIES TAB ── */}
+        {/* ΓöÇΓöÇ CATEGORIES TAB ΓöÇΓöÇ */}
         {tab === 'categories' && (
           <div className="max-w-lg space-y-6">
             <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 sm:p-6 shadow-sm">
@@ -1073,7 +1073,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── USERS TAB ── */}
+        {/* ΓöÇΓöÇ USERS TAB ΓöÇΓöÇ */}
         {tab === 'users' && (
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1089,7 +1089,7 @@ export default function Dashboard() {
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BAB9A]" />
               <input
                 className="w-full pl-9 pr-4 py-2.5 bg-white border border-[#EAD7B7]/60 rounded-xl text-[13px] font-bold text-[#2C392A] placeholder-[#9BAB9A] focus:outline-none focus:ring-2 focus:ring-[#7DAA8F]/40"
-                placeholder="Search by name or email…"
+                placeholder="Search by name or emailΓÇª"
                 value={userSearch}
                 onChange={e => setUserSearch(e.target.value)}
               />
@@ -1103,7 +1103,7 @@ export default function Dashboard() {
 
             <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 shadow-sm overflow-hidden">
               {usersLoading ? (
-                <div className="p-8 text-center text-[13px] font-bold text-[#5F6D59]">Loading users…</div>
+                <div className="p-8 text-center text-[13px] font-bold text-[#5F6D59]">Loading usersΓÇª</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-[13px]">
@@ -1126,11 +1126,11 @@ export default function Dashboard() {
                         })
                         .map(u => (
                           <tr key={u.id} className="hover:bg-[#F7F6F2]/60 transition-colors">
-                            <td className="px-4 py-3 font-bold text-[#2C392A]">{u.name || '—'}</td>
-                            <td className="px-4 py-3 text-[#5F6D59]">{u.email || '—'}</td>
-                            <td className="px-4 py-3 text-[#5F6D59]">{u.mobile || '—'}</td>
+                            <td className="px-4 py-3 font-bold text-[#2C392A]">{u.name || 'ΓÇö'}</td>
+                            <td className="px-4 py-3 text-[#5F6D59]">{u.email || 'ΓÇö'}</td>
+                            <td className="px-4 py-3 text-[#5F6D59]">{u.mobile || 'ΓÇö'}</td>
                             <td className="px-4 py-3 text-[#9BAB9A] text-[11px]">
-                              {u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN') : '—'}
+                              {u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN') : 'ΓÇö'}
                             </td>
                             <td className="px-4 py-3 text-center">
                               <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black ${
@@ -1171,7 +1171,7 @@ export default function Dashboard() {
             </div>
 
             <p className="text-[11px] text-[#9BAB9A] font-bold">
-              ⚡ Role changes take effect on the user's next login. Admins get Dashboard + POS Billing access.
+              ΓÜí Role changes take effect on the user's next login. Admins get Dashboard + POS Billing access.
             </p>
           </div>
         )}

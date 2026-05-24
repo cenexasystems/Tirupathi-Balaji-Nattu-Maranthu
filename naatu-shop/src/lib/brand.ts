@@ -14,4 +14,5 @@ export const BRAND_WHATSAPP = BRAND_THIRD_PHONE_DISPLAY
 export const WHATSAPP_NUM = BRAND_THIRD_PHONE_E164
 export const BRAND_WHATSAPP_LINK = `https://wa.me/${BRAND_THIRD_PHONE_E164}`
 export const BRAND_EMAIL = 'eshwarbalaji07@gmail.com'
+export const BRAND_ADDRESS = 'No47, Bazaar Rd, Basha Garden, Mylapore, Chennai, Tamil Nadu 600004'
 export const BRAND_LOCATION_LINK = 'https://share.google/32hLCvO4ZYTpUhyRD'
