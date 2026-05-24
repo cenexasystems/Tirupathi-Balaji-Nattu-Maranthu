@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState, useMemo, type FormEvent } from 'react'
+import React, { useCallback, useEffect, useState, useMemo, type FormEvent } from 'react'
 import {
   BarChart2, Trash2, Edit2, List, ShoppingCart, LayoutDashboard,
   Box, AlertCircle, ArrowUp, ArrowDown, Power, Download, TrendingUp,
@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { useAuthStore, useProductStore, type Product } from '../store/store'
 import { uploadProductImage } from '../lib/storage'
-import { formatCurrency, normalizeUnitType, toNumber, type UnitType } from '../lib/retail'
+import { formatCurrency, normalizeOrderMode, normalizeUnitType, toNumber, type UnitType } from '../lib/retail'
 import {
   ResponsiveContainer,
   LineChart,
@@ -34,7 +34,6 @@ type TabKey = 'overview' | 'billing' | 'products' | 'categories' | 'users'
 type ProfileUser = { id: string; email: string; name: string; mobile: string; role: string; created_at: string }
 
 const normalizeStatus = (v: unknown) => String(v || '').trim().toLowerCase()
-const normalizeMode = (v: unknown) => String(v || '').trim().toLowerCase()
 const isCompletedStatus = (v: unknown) => {
   const status = normalizeStatus(v)
   return status === 'completed' || status === 'paid'
@@ -122,7 +121,7 @@ export default function Dashboard() {
     customer_name: String(row.customer_name || ''), phone: String(row.phone || ''),
     created_at: String(row.created_at || ''), total: toNumber(row.total, 0),
     status: String(row.status || 'pending'),
-    order_mode: String(row.order_mode || 'online'),
+    order_mode: normalizeOrderMode(row.order_mode),
     user_id: typeof row.user_id === 'string' ? row.user_id : null,
     items: row.items,
   })
@@ -145,8 +144,8 @@ export default function Dashboard() {
       .filter((order) => order.created_at.startsWith(monthKey))
       .reduce((sum, order) => sum + toNumber(order.total, 0), 0)
 
-    const onlineCompleted = completedOrders.filter((order) => normalizeMode(order.order_mode) !== 'offline')
-    const offlineCompleted = completedOrders.filter((order) => normalizeMode(order.order_mode) === 'offline')
+    const onlineCompleted = completedOrders.filter((order) => normalizeOrderMode(order.order_mode) !== 'offline')
+    const offlineCompleted = completedOrders.filter((order) => normalizeOrderMode(order.order_mode) === 'offline')
     const onlineRevenue = onlineCompleted.reduce((sum, order) => sum + toNumber(order.total, 0), 0)
     const offlineRevenue = offlineCompleted.reduce((sum, order) => sum + toNumber(order.total, 0), 0)
 
@@ -772,8 +771,8 @@ export default function Dashboard() {
                         <td className="px-4 py-3 font-bold text-[13px]">{formatCurrency(toNumber(o.total, 0))}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                            o.order_mode === 'offline' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
-                          }`}>{o.order_mode === 'offline' ? 'Offline' : 'Online'}</span>
+                            normalizeOrderMode(o.order_mode) === 'offline' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                          }`}>{normalizeOrderMode(o.order_mode) === 'offline' ? 'OFFLINE' : 'ONLINE'}</span>
                         </td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${

@@ -248,7 +248,7 @@ export default function Home() {
         style={{ background: 'linear-gradient(140deg, #f4f8f1 0%, #f9f8f5 55%, #fffaf4 100%)' }}
       >
         {/* Ambient background glows — very subtle, premium feel */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none overflow-hidden hidden sm:block">
           <div className="absolute -top-24 -right-12 w-[480px] h-[480px] rounded-full blur-[140px] opacity-[0.055]"
             style={{ background: '#7DAA8F' }} />
           <div className="absolute -bottom-16 -left-16 w-[380px] h-[380px] rounded-full blur-[120px] opacity-[0.04]"

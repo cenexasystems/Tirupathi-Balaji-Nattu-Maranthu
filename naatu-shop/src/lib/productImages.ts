@@ -34,6 +34,8 @@ const isStorageImage = (url: string | null | undefined): url is string =>
 const isLocalAsset = (url: string | null | undefined): url is string =>
   !!url && url.startsWith('/assets/')
 
+const preferWebpAsset = (url: string) => (url.match(/\.png$/i) ? url.replace(/\.png$/i, '.webp') : url)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PRODUCT_OVERRIDES — Exact product name → known image URL
 // Add entries here when you have real product photos.
@@ -425,13 +427,13 @@ export function getProductImage(
   }
 
   // 0b. Local static asset stored in public/assets — use directly
-  if (isLocalAsset(dbUrl)) return dbUrl
+  if (isLocalAsset(dbUrl)) return preferWebpAsset(dbUrl)
 
   const hay = name.toLowerCase().trim()
 
   // 1. Explicit product overrides (exact / substring match)
   for (const [key, url] of Object.entries(PRODUCT_OVERRIDES)) {
-    if (hay === key || hay.includes(key)) return url
+    if (hay === key || hay.includes(key)) return preferWebpAsset(url)
   }
 
   // 2. Keyword map
@@ -444,7 +446,7 @@ export function getProductImage(
 
   // 3. Category map — exact
   if (CATEGORY_MAP[category]) {
-    return CATEGORY_MAP[category]
+    return preferWebpAsset(CATEGORY_MAP[category])
       .replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, `q=${q}`)
   }
 
@@ -452,12 +454,12 @@ export function getProductImage(
   const catLow = category.toLowerCase()
   for (const [key, url] of Object.entries(CATEGORY_MAP)) {
     if (catLow.includes(key.toLowerCase().split(' ')[0])) {
-      return url.replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, `q=${q}`)
+      return preferWebpAsset(url).replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, `q=${q}`)
     }
   }
 
   // 5. Premium neutral placeholder
-  return PLACEHOLDER.replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, `q=${q}`)
+  return preferWebpAsset(PLACEHOLDER).replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, `q=${q}`)
 }
 
 /** Stable onError handler — sets final fallback, marks element so it
@@ -466,5 +468,5 @@ export function onImgError(e: React.SyntheticEvent<HTMLImageElement>) {
   const img = e.currentTarget
   if (img.dataset.errored) return          // already set fallback — stop
   img.dataset.errored = '1'
-  img.src = PLACEHOLDER
+  img.src = preferWebpAsset(PLACEHOLDER)
 }

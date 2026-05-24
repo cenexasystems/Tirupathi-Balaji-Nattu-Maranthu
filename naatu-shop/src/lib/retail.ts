@@ -76,6 +76,16 @@ export const normalizeUnitType = (value: unknown, fallback: UnitType = 'unit'): 
   return fallback
 }
 
+export const normalizeOrderMode = (value: unknown): 'online' | 'offline' => {
+  const raw = String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z]/g, '')
+
+  if (raw === 'offline') return 'offline'
+  return 'online'
+}
+
 const normalizeUnitToken = (value: string) => {
   const token = value.trim().toLowerCase()
   if (!token) return ''

@@ -4,7 +4,11 @@
 
 @layer base {
   * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
   body {
     background-color: #F7F6F2;
     color: #2C392A;
@@ -13,6 +17,14 @@
     font-family: 'Inter', 'Noto Sans Tamil', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
+    text-rendering: optimizeLegibility;
+  }
+  button, a, input, textarea, select {
+    -webkit-tap-highlight-color: transparent;
+  }
+  img {
+    max-width: 100%;
+    display: block;
   }
   h1, h2, h3, h4, h5, h6 {
     /* Poppins for Latin headings; Noto Sans Tamil for any Tamil heading text */
@@ -46,7 +58,31 @@
 
   /* Consistent soft shadow for cards */
   .shadow-soft {
-    @apply shadow-sm;
+    box-shadow: 0 10px 28px rgba(44, 57, 42, 0.08);
+  }
+
+  .surface-panel {
+    @apply rounded-[24px] border border-[#EAD7B7]/50 bg-white shadow-soft;
+  }
+
+  .surface-panel-compact {
+    @apply rounded-[20px] border border-[#EAD7B7]/45 bg-white shadow-soft;
+  }
+
+  .mobile-chip {
+    @apply inline-flex min-h-[44px] items-center justify-center rounded-full px-3.5 py-2 text-[12px] font-black;
+  }
+
+  .mobile-cta-bar {
+    @apply border-t border-[#EAD7B7]/50 bg-white/95 backdrop-blur pb-[calc(env(safe-area-inset-bottom)+0.75rem)];
+  }
+
+  .mobile-section-title {
+    @apply text-[11px] font-black uppercase tracking-[0.24em] text-[#7DAA8F];
+  }
+
+  .mobile-page-shell {
+    @apply bg-[#fbfaf6] min-h-screen;
   }
   
   /* Consistent button styles */

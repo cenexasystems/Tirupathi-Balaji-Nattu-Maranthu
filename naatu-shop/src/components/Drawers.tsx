@@ -1,9 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { X, Trash2, Plus, Minus, ShoppingBag, MessageCircle } from 'lucide-react'
+import { X, Trash2, Plus, Minus, ShoppingBag } from 'lucide-react'
 import { useCartStore, useFavStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { Link } from 'react-router-dom'
-import { BRAND_EN, BRAND_WHATSAPP_LINK } from '../lib/brand'
 import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, getDefaultQuantityForProduct } from '../lib/retail'
 import { PLACEHOLDER as PRODUCT_PLACEHOLDER } from '../lib/productImages'
 
@@ -20,15 +19,6 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
       predefinedOptions: item.predefinedOptions,
     })
   }
-
-  const waText = encodeURIComponent(
-    `🌿 *${BRAND_EN}* — Cart Enquiry\n\n` +
-    items.map(i => {
-      const dbName = lang === 'ta' && i.nameTa ? i.nameTa : i.name;
-      return `• ${dbName} (${formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)}) — ${formatCurrency(i.lineTotal)}`
-    }).join('\n') +
-    `\n\n*Order Total: ${formatCurrency(orderTotal)}*\n_Delivery charges will be confirmed before dispatch._`
-  )
 
   return (
     <AnimatePresence>
@@ -86,10 +76,6 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                 <div className="flex justify-between font-bold text-textMain text-base">
                   <span>Order Total</span><span>{formatCurrency(orderTotal)}</span>
                 </div>
-                <p className="text-xs text-textMuted">🚚 Delivery charges confirmed via WhatsApp</p>
-                <a href={`${BRAND_WHATSAPP_LINK}?text=${waText}`} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl transition-colors">
-                  <MessageCircle size={16} /> {t('drawer.send_wa')}
-                </a>
                 <Link to="/cart" onClick={onClose} className="flex items-center justify-center w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3 rounded-xl transition-colors">
                   {t('drawer.view_cart')}
                 </Link>

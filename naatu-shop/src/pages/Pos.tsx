@@ -253,7 +253,7 @@ export default function Pos() {
     }))
 
     return (
-      <div className="bg-bgMain min-h-screen print:bg-white print:min-h-0">
+      <div className="mobile-page-shell print:bg-white print:min-h-0">
         {/* Screen UI */}
         <div className="max-w-2xl mx-auto px-4 py-6 print:hidden space-y-4">
           {/* Header */}
@@ -269,7 +269,7 @@ export default function Pos() {
           </div>
 
           {/* Total summary */}
-          <div className="bg-white rounded-2xl border border-sand/50 p-5 shadow-soft">
+          <div className="surface-panel p-5">
             <div className="flex justify-between items-center mb-4">
               <p className="text-lg font-bold text-textMain">Total Amount</p>
               <p className="text-3xl font-black text-sageDark">{formatCurrency(invoice.total)}</p>
@@ -318,7 +318,7 @@ export default function Pos() {
           </div>
 
           {/* Items summary */}
-          <div className="bg-white rounded-2xl border border-sand/50 p-4 shadow-soft">
+          <div className="surface-panel p-4">
             <p className="text-xs font-bold text-textMuted uppercase tracking-wide mb-3">Items Sold</p>
             <div className="space-y-1.5">
               {invoice.items.map(item => (
@@ -352,7 +352,7 @@ export default function Pos() {
 
   // ══ MAIN POS SCREEN ══════════════════════════════════════════════════
   return (
-    <div className="bg-[#F0F2EE] h-screen flex flex-col overflow-hidden print:hidden">
+    <div className="mobile-page-shell h-screen flex flex-col overflow-hidden print:hidden">
 
       {/* ── Top bar ─────────────────────────────────────────────────── */}
       <div className="bg-[#2C392A] text-white px-4 py-2.5 flex items-center justify-between shrink-0">
@@ -645,7 +645,7 @@ export default function Pos() {
 
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-[#5F6D59] mb-1">
               <span className={`px-2 py-0.5 rounded-full ${orderMode === 'offline' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
-                {orderMode === 'offline' ? '⬇ Offline Sale' : '⬆ Online Order'}
+                {orderMode === 'offline' ? 'OFFLINE' : 'ONLINE'}
               </span>
             </div>
             <button

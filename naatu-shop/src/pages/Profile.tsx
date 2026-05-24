@@ -228,14 +228,14 @@ export default function Profile() {
   }
 
   return (
-    <div className="bg-bgMain min-h-screen py-10">
+    <div className="mobile-page-shell py-10">
       <div className="max-w-5xl mx-auto px-4">
         <h1 className="text-2xl sm:text-3xl font-bold font-headline text-textMain mb-6 sm:mb-8">My Account</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Sidebar */}
           <div className="md:col-span-1">
-            <div className="bg-white p-6 rounded-2xl shadow-soft border border-sand/50">
+            <div className="surface-panel p-6">
               {/* Avatar */}
               <div className="flex flex-col items-center text-center mb-6 pb-6 border-b border-sand">
                 <div className="relative mb-3">
@@ -309,7 +309,7 @@ export default function Profile() {
           <div className="md:col-span-2">
             {/* Account Info */}
             {activeTab === 'info' && (
-              <div className="bg-white p-6 rounded-2xl shadow-soft border border-sand/50">
+              <div className="surface-panel p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-bold text-textMain flex items-center gap-2">
                     <User size={20} className="text-sageDark" /> Account Information
@@ -413,7 +413,7 @@ export default function Profile() {
 
             {/* Orders */}
             {activeTab === 'orders' && (
-              <div className="bg-white p-6 rounded-2xl shadow-soft border border-sand/50">
+              <div className="surface-panel p-6">
                 <h2 className="text-xl font-bold text-textMain mb-6 flex items-center gap-2">
                   <Package size={20} className="text-sageDark" /> Order History
                   <span className="ml-auto text-sm font-normal text-textMuted">{orders.length} orders</span>

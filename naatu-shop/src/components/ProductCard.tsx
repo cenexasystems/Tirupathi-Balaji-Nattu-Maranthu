@@ -69,14 +69,14 @@ export default function ProductCard({
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-      className="group relative flex flex-col overflow-hidden rounded-2xl border border-[#EAD7B7]/50 bg-white shadow-sm hover:shadow-md transition-shadow"
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      className="group relative flex flex-col overflow-hidden surface-panel-compact transition-shadow hover:shadow-[0_14px_32px_rgba(44,57,42,0.12)]"
     >
       {/* Wishlist */}
       <motion.button
         whileTap={{ scale: 0.95 }}
         onClick={() => void toggle(product)}
-        className={`absolute right-2.5 top-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border transition-colors ${
+        className={`touch-target absolute right-1.5 top-1.5 z-10 flex items-center justify-center rounded-full border transition-colors ${
           fav ? 'border-rose-200 bg-rose-50' : 'border-[#EAD7B7] bg-white/90'
         }`}
         type="button"
@@ -93,23 +93,24 @@ export default function ProductCard({
       )}
 
       {/* Image — stable aspect-ratio container prevents layout shift */}
-      <button
+        <button
         type="button"
         onClick={handleOpen}
-        className="block aspect-square w-full overflow-hidden bg-[#E8EDE4] text-left"
+          className="block aspect-[1/1.02] w-full overflow-hidden bg-[#E8EDE4] text-left sm:aspect-square"
       >
         <img
           src={getProductImage(product.name, product.category, product.imageUrl, 'card')}
           alt={product.name}
           loading="lazy"
           decoding="async"
+          sizes="(max-width: 640px) 50vw, 280px"
           onError={onImgError}
           className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
         />
       </button>
 
       {/* Content */}
-      <div className="flex flex-1 flex-col gap-1.5 p-3 sm:p-3.5">
+        <div className="flex flex-1 flex-col gap-1.5 p-2.5 sm:p-3.5">
         {/* Category */}
         <span className="truncate text-[9px] sm:text-[10px] font-black uppercase tracking-[0.14em] text-[#7DAA8F]">
           {product.category}
@@ -117,7 +118,7 @@ export default function ProductCard({
 
         {/* Name — min-h accommodates 2 Tamil lines at 1.65 line-height */}
         <button type="button" onClick={handleOpen} className="text-left">
-          <h3 className="line-clamp-2 min-h-[2.75rem] text-[12px] sm:text-[13px] font-bold leading-[1.65] text-[#2C392A] hover:text-[#7DAA8F] transition-colors ta-text">
+            <h3 className="line-clamp-2 min-h-[2.55rem] text-[11.5px] sm:text-[13px] font-bold leading-[1.6] text-[#2C392A] hover:text-[#7DAA8F] transition-colors ta-text">
             {displayName}
           </h3>
         </button>
@@ -164,7 +165,7 @@ export default function ProductCard({
             <button
               type="button"
               onClick={() => setQty(q => Math.max(1, q - 1))}
-              className="w-6 h-6 rounded-lg bg-[#F7F6F2] border border-[#EAD7B7]/60 flex items-center justify-center text-[#5F6D59] hover:bg-[#7DAA8F]/10 transition-colors"
+              className="touch-target w-6 h-6 rounded-lg bg-[#F7F6F2] border border-[#EAD7B7]/60 flex items-center justify-center text-[#5F6D59] hover:bg-[#7DAA8F]/10 transition-colors"
             >
               <Minus size={10} />
             </button>
@@ -172,7 +173,7 @@ export default function ProductCard({
             <button
               type="button"
               onClick={() => setQty(q => q + 1)}
-              className="w-6 h-6 rounded-lg bg-[#F7F6F2] border border-[#EAD7B7]/60 flex items-center justify-center text-[#5F6D59] hover:bg-[#7DAA8F]/10 transition-colors"
+              className="touch-target w-6 h-6 rounded-lg bg-[#F7F6F2] border border-[#EAD7B7]/60 flex items-center justify-center text-[#5F6D59] hover:bg-[#7DAA8F]/10 transition-colors"
             >
               <Plus size={10} />
             </button>
@@ -187,7 +188,7 @@ export default function ProductCard({
                 {formatCurrency(displayOriginalPrice)}
               </span>
             )}
-            <span className="text-[14px] sm:text-[15px] font-black text-[#2C392A] leading-tight tabular-nums">
+              <span className="text-[13px] sm:text-[15px] font-black text-[#2C392A] leading-tight tabular-nums">
               {formatCurrency(displayPrice)}
             </span>
           </div>

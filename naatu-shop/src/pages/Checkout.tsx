@@ -157,9 +157,9 @@ export default function Checkout() {
     )
 
     return (
-      <div className="bg-bgMain min-h-screen py-16">
+      <div className="mobile-page-shell py-16">
         <div className="max-w-lg mx-auto px-4">
-          <div className="bg-white p-8 rounded-3xl shadow-soft border border-sand/50 text-center">
+          <div className="surface-panel p-8 text-center">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
               <CheckCircle size={44} className="text-green-500" />
             </div>
@@ -206,15 +206,15 @@ export default function Checkout() {
 
   // ── Checkout Form ───────────────────────────────────────────────
   return (
-    <div className="bg-bgMain min-h-screen py-8 sm:py-10">
+    <div className="mobile-page-shell min-h-screen py-4 sm:py-10 pb-28 sm:pb-10">
       <div className="max-w-4xl mx-auto px-4">
-        <button onClick={() => navigate('/cart')} className="flex items-center gap-2 mb-6 text-sageDark font-bold">
+        <button onClick={() => navigate('/cart')} className="touch-target flex items-center gap-2 mb-4 sm:mb-6 text-sageDark font-bold">
           <ArrowLeft size={16} /> Back to Cart
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
           {/* Form */}
-          <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-soft border border-sand/50 h-fit">
+          <div className="surface-panel p-4 sm:p-6 h-fit">
             <h2 className="text-xl font-bold text-textMain mb-2">Your Details</h2>
             <p className="text-sm text-textMuted mb-5">We'll send your order summary to WhatsApp</p>
 
@@ -274,7 +274,7 @@ export default function Checkout() {
           </div>
 
           {/* Order summary */}
-          <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-soft border border-sand/50">
+          <div className="surface-panel p-4 sm:p-6">
             <h2 className="text-xl font-bold text-textMain mb-5">Order Summary</h2>
             <div className="space-y-4 divide-y divide-sand/30">
               {items.map(item => {
@@ -303,6 +303,19 @@ export default function Checkout() {
               <p className="text-xs text-textMuted bg-bgMain px-3 py-2 rounded-lg mt-3">
                 🚚 Delivery charges will be confirmed via WhatsApp before dispatch.
               </p>
+            </div>
+          </div>
+
+          <div className="lg:hidden fixed inset-x-0 bottom-0 z-20 mobile-cta-bar px-4 py-3">
+            <div className="mx-auto flex max-w-4xl items-center gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold text-textMuted">Payable</p>
+                <p className="text-lg font-black text-textMain leading-tight">{formatCurrency(orderTotal)}</p>
+              </div>
+              <button onClick={handleCheckout} disabled={loading}
+                className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-2xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+                {loading ? 'Saving…' : 'Place Order'}
+              </button>
             </div>
           </div>
         </div>

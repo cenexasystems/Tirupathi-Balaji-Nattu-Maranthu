@@ -114,7 +114,10 @@ export default function Footer() {
                 </div>
               </li>
             ))}
-            <li className="flex items-center gap-3"><Mail size={15} className="text-sage shrink-0" /><a href={`mailto:${BRAND_EMAIL}`} className="hover:text-white transition-colors">{BRAND_EMAIL}</a></li>
+            <li className="flex items-start gap-3 flex-wrap">
+              <Mail size={15} className="text-sage mt-0.5 shrink-0" />
+              <a href={`mailto:${BRAND_EMAIL}`} className="min-w-0 break-all hover:text-white transition-colors">{BRAND_EMAIL}</a>
+            </li>
           </ul>
         </div>
       </div>
