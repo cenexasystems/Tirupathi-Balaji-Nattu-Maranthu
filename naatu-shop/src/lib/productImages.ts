@@ -44,10 +44,14 @@ const preferWebpAsset = (url: string) => (url.match(/\.png$/i) ? url.replace(/\.
 export const PRODUCT_OVERRIDES: Record<string, string> = {
   // ── Pooja Items ───────────────────────────────────────────────────────────
   'kungumam':          '/assets/images/Kungumam.png',
+  'vibhoothi':         '/assets/images/Thiru Neer.png',
+  'vibhuti':           '/assets/images/Thiru Neer.png',
+  'vibuthi':           '/assets/images/Thiru Neer.png',
+  'vibhoodi':          '/assets/images/Thiru Neer.png',
+  'thiru neeru':       '/assets/images/Thiru Neer.png',
   'karpooram':         '/assets/images/Karpooram.png',
   'agarbatti':         '/assets/images/Agarbatti.png',
   'sandhanam':         '/assets/images/Sandhanam.png',
-  'thiru neeru':       '/assets/images/Thiru Neer.png',
   'poo varisai':       '/assets/images/Poo varisai.png',
   'panchagavyam':      '/assets/images/Panchagavyam.png',
   'navagraha bit':     '/assets/images/Navagraha Bit.png',

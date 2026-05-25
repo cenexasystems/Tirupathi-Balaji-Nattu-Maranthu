@@ -1,5 +1,5 @@
 import './index.css'
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
@@ -54,6 +54,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
 function AppShell() {
   const location = useLocation()
+  const previousPathname = useRef(location.pathname)
   const initialize = useAuthStore((state) => state.initialize)
   const fetchProducts = useProductStore((state) => state.fetchProducts)
   const products = useProductStore((state) => state.products)
@@ -92,6 +93,31 @@ function AppShell() {
   }, [])
 
   useEffect(() => {
+    if (previousPathname.current !== location.pathname) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+      if (modalOpen) {
+        closeProduct()
+      }
+      previousPathname.current = location.pathname
+    }
+  }, [closeProduct, location.pathname, modalOpen])
+
+  useEffect(() => {
+    if (!modalOpen) return
+
+    const handlePopState = () => {
+      closeProduct()
+    }
+
+    window.history.pushState({ productModalOpen: true }, '', window.location.href)
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [closeProduct, modalOpen])
+
+  useEffect(() => {
     void fetchProducts()
 
     if (!isSupabaseConfigured) {
@@ -113,6 +139,15 @@ function AppShell() {
   const relatedProducts = products.length > 0 && modalProduct
     ? products.filter((item) => item.isActive && item.category === modalProduct.category && item.id !== modalProduct.id).slice(0, 10)
     : []
+
+  const handleCloseProduct = () => {
+    if (modalOpen && window.history.state?.productModalOpen) {
+      window.history.back()
+      return
+    }
+
+    closeProduct()
+  }
 
   return (
     <div className="flex flex-col min-h-screen print:block print:min-h-0">
@@ -154,7 +189,7 @@ function AppShell() {
         key={`${modalProduct?.id ?? 'none'}-${modalOpen ? 'open' : 'closed'}`}
         product={modalProduct}
         open={modalOpen}
-        onClose={closeProduct}
+        onClose={handleCloseProduct}
         onSelectProduct={openProduct}
         relatedProducts={relatedProducts}
       />

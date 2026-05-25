@@ -61,7 +61,7 @@ const exportCSV = (orders: DashboardOrder[]) => {
     toNumber(o.total, 0).toFixed(2), o.status,
   ])
   const csv = [header, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
-  const blob = new Blob(['∩╗┐' + csv], { type: 'text/csv;charset=utf-8;' })
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -127,6 +127,7 @@ export default function Dashboard() {
   })
 
   // ΓöÇΓöÇ Analytics ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // Analytics
   const analytics = useMemo(() => {
     const nonCancelledOrders = orders.filter((order) => normalizeStatus(order.status) !== 'cancelled')
     const completedOrders = nonCancelledOrders.filter((order) => isCompletedStatus(order.status))
@@ -252,7 +253,7 @@ export default function Dashboard() {
     }
   }, [orders, orderItems, products])
 
-  // ΓöÇΓöÇ Load data ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // Load dashboard data
   const loadData = useCallback(async () => {
     if (!isSupabaseConfigured) return
     setLoading(true)
@@ -327,7 +328,7 @@ export default function Dashboard() {
     if (tab === 'users') void loadUsers()
   }, [tab, loadUsers])
 
-  // ΓöÇΓöÇ Order search ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // Order search
   const runSearch = async (e?: FormEvent) => {
     e?.preventDefault()
     setSearchLoading(true)
@@ -861,10 +862,10 @@ export default function Dashboard() {
                   <div className="col-span-2">
                     <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Tamil Name</label>
                     <input className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
-                      placeholder="α««α«₧α»ìα«Üα«│α»ì α«¬α»èα«ƒα«┐" value={prodForm.nameTa} onChange={e => setProdForm(f => ({...f, nameTa: e.target.value}))} />
+                      placeholder="எ.கா. மஞ்சள் பொடி" value={prodForm.nameTa} onChange={e => setProdForm(f => ({...f, nameTa: e.target.value}))} />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Price (Γé╣) *</label>
+                    <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Price (₹) *</label>
                     <input required type="number" min="0" step="0.01"
                       className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
                       value={prodForm.price} onChange={e => setProdForm(f => ({...f, price: Number(e.target.value)}))} />
@@ -1011,7 +1012,7 @@ export default function Dashboard() {
                               {toNumber(p.stockQuantity ?? p.stock, 0)}
                             </span>
                           </td>
-                          <td className="px-3 py-3 font-bold text-[#2C392A]">Γé╣{p.price}</td>
+                          <td className="px-3 py-3 font-bold text-[#2C392A]">{formatCurrency(p.price)}</td>
                           <td className="px-3 py-3 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <button onClick={() => handleEdit(p)} className="p-1.5 text-[#7DAA8F] hover:bg-[#7DAA8F]/10 rounded-lg">
