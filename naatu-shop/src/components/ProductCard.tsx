@@ -146,23 +146,6 @@ export default function ProductCard({
         </div>
       )}
 
-      {/* Image — stable aspect-ratio container prevents layout shift */}
-        <button
-        type="button"
-        onClick={handleOpen}
-          className="block aspect-[1/1.02] w-full overflow-hidden bg-[#E8EDE4] text-left sm:aspect-square"
-      >
-        <img
-          src={getProductImage(product.name, product.category, product.imageUrl, 'card')}
-          alt={product.name}
-          loading="lazy"
-          decoding="async"
-          sizes="(max-width: 640px) 50vw, 280px"
-          onError={onImgError}
-          className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
-        />
-      </button>
-
       <div className="flex flex-1 flex-col gap-1.5 p-2.5 sm:p-3.5">
         <button
           type="button"

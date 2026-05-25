@@ -221,8 +221,10 @@ export default function Home() {
   [products])
 
   const featured = useMemo(() =>
-    products.filter(p => p.isActive).slice(4, 8),
-  [products])
+    products
+      .filter(p => p.isActive && !topSelling.some(top => top.id === p.id))
+      .slice(0, 4),
+  [products, topSelling])
 
   const derivedCats = useMemo(() => {
     const names = Array.from(new Set(products.filter(p => p.isActive).map(p => p.category))).filter(Boolean)
