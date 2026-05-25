@@ -893,7 +893,7 @@ export default function Dashboard() {
                         const sel = cats.find(c => c.name_en === e.target.value)
                         setProdForm(f => ({ ...f, category: e.target.value, categoryId: sel?.id || null }))
                       }}>
-                      <option value="">Select categoryΓÇª</option>
+                      <option value="">Select category…</option>
                       {cats.map(c => <option key={c.id} value={c.name_en}>{c.name_en}</option>)}
                     </select>
                   </div>
@@ -916,7 +916,7 @@ export default function Dashboard() {
                 <div>
                   <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Description</label>
                   <textarea rows={2} className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold resize-none"
-                    placeholder="Short product descriptionΓÇª" value={prodForm.description}
+                    placeholder="Short product description…" value={prodForm.description}
                     onChange={e => setProdForm(f => ({...f, description: e.target.value}))} />
                 </div>
 
@@ -937,7 +937,7 @@ export default function Dashboard() {
                   <input type="file" accept="image/*"
                     className="w-full px-3 py-2 bg-[#F7F6F2] rounded-xl text-[12px] text-[#5F6D59]"
                     onChange={e => void handleUploadImage(e.target.files?.[0])} />
-                  {imageUploading && <p className="text-[11px] text-[#7DAA8F] font-bold">Uploading imageΓÇª</p>}
+                  {imageUploading && <p className="text-[11px] text-[#7DAA8F] font-bold">Uploading image…</p>}
                   {prodForm.image && (
                     <div className="w-16 h-16 rounded-xl overflow-hidden bg-[#F7F6F2] border border-[#EAD7B7]/40">
                       <img src={prodForm.image} alt="preview" className="w-full h-full object-cover" />
@@ -954,7 +954,7 @@ export default function Dashboard() {
                 <div className="flex gap-2 pt-1">
                   <button type="submit" disabled={loading}
                     className="flex-grow py-3 bg-[#7DAA8F] hover:bg-[#5e8c72] text-white font-black rounded-xl disabled:opacity-60">
-                    {loading ? 'SavingΓÇª' : editingProd ? 'Update Product' : 'Add Product'}
+                    {loading ? 'Saving…' : editingProd ? 'Update Product' : 'Add Product'}
                   </button>
                   <button type="button" onClick={() => { setEditingProd(null); setProdForm(emptyForm); setProductNotice('') }}
                     className="px-5 py-3 bg-[#F7F6F2] text-[#5F6D59] font-bold rounded-xl hover:bg-[#EAD7B7]/40">
@@ -1088,7 +1088,7 @@ export default function Dashboard() {
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9BAB9A]" />
               <input
                 className="w-full pl-9 pr-4 py-2.5 bg-white border border-[#EAD7B7]/60 rounded-xl text-[13px] font-bold text-[#2C392A] placeholder-[#9BAB9A] focus:outline-none focus:ring-2 focus:ring-[#7DAA8F]/40"
-                placeholder="Search by name or emailΓÇª"
+                placeholder="Search by name or email…"
                 value={userSearch}
                 onChange={e => setUserSearch(e.target.value)}
               />
@@ -1102,7 +1102,7 @@ export default function Dashboard() {
 
             <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 shadow-sm overflow-hidden">
               {usersLoading ? (
-                <div className="p-8 text-center text-[13px] font-bold text-[#5F6D59]">Loading usersΓÇª</div>
+                <div className="p-8 text-center text-[13px] font-bold text-[#5F6D59]">Loading users…</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-[13px]">
@@ -1125,11 +1125,11 @@ export default function Dashboard() {
                         })
                         .map(u => (
                           <tr key={u.id} className="hover:bg-[#F7F6F2]/60 transition-colors">
-                            <td className="px-4 py-3 font-bold text-[#2C392A]">{u.name || 'ΓÇö'}</td>
-                            <td className="px-4 py-3 text-[#5F6D59]">{u.email || 'ΓÇö'}</td>
-                            <td className="px-4 py-3 text-[#5F6D59]">{u.mobile || 'ΓÇö'}</td>
+                            <td className="px-4 py-3 font-bold text-[#2C392A]">{u.name || '—'}</td>
+                            <td className="px-4 py-3 text-[#5F6D59]">{u.email || '—'}</td>
+                            <td className="px-4 py-3 text-[#5F6D59]">{u.mobile || '—'}</td>
                             <td className="px-4 py-3 text-[#9BAB9A] text-[11px]">
-                              {u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN') : 'ΓÇö'}
+                              {u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN') : '—'}
                             </td>
                             <td className="px-4 py-3 text-center">
                               <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black ${
@@ -1170,7 +1170,7 @@ export default function Dashboard() {
             </div>
 
             <p className="text-[11px] text-[#9BAB9A] font-bold">
-              ΓÜí Role changes take effect on the user's next login. Admins get Dashboard + POS Billing access.
+              • Role changes take effect on the user's next login. Admins get Dashboard + POS Billing access.
             </p>
           </div>
         )}

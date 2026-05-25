@@ -316,6 +316,7 @@ export const useCartStore = create<CartState>()(
         const lineTotal = calculateLineTotal(qty, product.unitType, product.baseQuantity, basePrice)
 
         if (existing) {
+          existing.selectedUnit = unit
           const mergedQty = normalizeSelectedQuantity(
             existing.qty + qty,
             existing.unitType,

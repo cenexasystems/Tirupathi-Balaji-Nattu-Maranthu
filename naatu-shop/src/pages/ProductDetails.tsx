@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, Heart, Minus, Plus, ShoppingCart, Star, ArrowLeft } from 'lucide-react'
 import { useCartStore, useFavStore, useProductStore, type Product } from '../store/store'
 import { useLangStore } from '../store/langStore'
@@ -14,6 +15,24 @@ import {
   normalizeSelectedQuantity,
 } from '../lib/retail'
 import { getProductImage, onImgError } from '../lib/productImages'
+
+const getCompactPackOptions = (product: Product) => {
+  if (product.predefinedOptions.length > 0) return product.predefinedOptions
+  if (product.unitType === 'weight') {
+    return [
+      { quantity: 100, unit: 'g', label: '100g' },
+      { quantity: 250, unit: 'g', label: '250g' },
+      { quantity: 500, unit: 'g', label: '500g' },
+    ]
+  }
+  if (product.unitType === 'volume') {
+    return [
+      { quantity: 500, unit: 'ml', label: '500ml' },
+      { quantity: 1000, unit: 'ml', label: '1L' },
+    ]
+  }
+  return []
+}
 
 const getUnitOptions = (product: Product) => {
   if (product.unitType === 'weight') {
@@ -38,6 +57,8 @@ export default function ProductDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
   const addItem = useCartStore((state) => state.addItem)
+  const removeItem = useCartStore((state) => state.removeItem)
+  const updateQuantity = useCartStore((state) => state.updateQuantity)
   const fetchProducts = useProductStore((state) => state.fetchProducts)
   const allProducts = useProductStore((state) => state.products)
   const { t, lang } = useLangStore()
@@ -47,6 +68,8 @@ export default function ProductDetails() {
   const [error, setError] = useState('')
   const [displayUnit, setDisplayUnit] = useState('')
   const [displayQty, setDisplayQty] = useState(1)
+  const [mobileQty, setMobileQty] = useState(0)
+  const [mobilePack, setMobilePack] = useState<{ quantity: number; unit: string; label: string } | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -92,6 +115,8 @@ export default function ProductDetails() {
         predefinedOptions: product.predefinedOptions,
       }),
     )
+    setMobileQty(0)
+    setMobilePack(product.predefinedOptions[0] ?? null)
   }, [product])
 
   const displayName = lang === 'ta' && product?.nameTa ? product.nameTa : product?.name ?? ''
@@ -153,11 +178,47 @@ export default function ProductDetails() {
     addItem(product, normalizedQuantity, selectedUnit)
   }
 
+  const handleMobileAdd = () => {
+    const pack = mobilePack
+    const quantity = pack ? pack.quantity : 1
+    addItem(product, quantity, pack?.unit ?? product.unitLabel)
+    setMobileQty(1)
+  }
+
+  const handleMobileChangeQty = (nextQty: number) => {
+    if (nextQty <= 0) {
+      removeItem(product.id)
+      setMobileQty(0)
+      return
+    }
+
+    const pack = mobilePack
+    const quantity = pack ? nextQty * pack.quantity : nextQty
+
+    if (mobileQty <= 0) {
+      addItem(product, quantity, pack?.unit ?? product.unitLabel)
+    } else {
+      updateQuantity(product.id, quantity)
+    }
+
+    setMobileQty(nextQty)
+  }
+
+  const handleMobilePackChange = (option: { quantity: number; unit: string; label: string }) => {
+    if (option.label === mobilePack?.label) return
+    const currentQty = mobileQty
+    setMobilePack(option)
+    if (currentQty > 0) {
+      removeItem(product.id)
+      addItem(product, currentQty * option.quantity, option.unit)
+    }
+  }
+
   const heroImage = getProductImage(product.name, product.category, product.imageUrl, 'detail')
 
   return (
     <div className="min-h-screen bg-[#fbfaf6] pb-[calc(7.75rem+env(safe-area-inset-bottom))]">
-      <div className="sticky top-0 z-30 border-b border-white/60 bg-[#fbfaf6]/92 px-4 py-3 backdrop-blur sm:px-6">
+      <div className="lg:hidden sticky top-0 z-30 border-b border-white/60 bg-[#fbfaf6]/92 px-4 py-3 backdrop-blur sm:px-6">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
           <Link
             to="/products"
@@ -179,7 +240,116 @@ export default function ProductDetails() {
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-3xl flex-col gap-0 px-0 sm:px-6 lg:px-8">
+      <div className="lg:hidden mx-auto flex max-w-3xl flex-col gap-0 px-0 sm:px-6 lg:px-8">
+        <section className="px-4 pt-4 sm:px-0 sm:pt-6">
+          <div className="relative overflow-hidden rounded-[30px] border border-white/70 bg-gradient-to-b from-[#f2ede2] via-white to-[#edf3ea] shadow-[0_20px_50px_rgba(45,60,35,0.14)]">
+            <div className="absolute left-3 top-3 z-10 rounded-full bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-[#5f6d59] shadow-sm backdrop-blur">
+              Premium focus
+            </div>
+            <div className="relative aspect-[4/3] min-h-[24svh] max-h-[34svh] sm:aspect-[16/11] sm:min-h-[22rem] sm:max-h-[24rem]">
+              <img
+                src={heroImage}
+                alt={product.name}
+                loading="lazy"
+                decoding="async"
+                onError={onImgError}
+                className="h-full w-full object-contain p-4 sm:p-6"
+              />
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.45),transparent_56%)]" />
+            </div>
+          </div>
+        </section>
+
+        <section className="px-4 pt-4 sm:px-0 sm:pt-5">
+          <div className="space-y-2">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">{t('cat.' + product.category)}</p>
+            <h1 className="text-[1.55rem] leading-tight font-black text-[#2c392a] sm:text-4xl">{displayName}</h1>
+            {product.nameTa && <p className="text-base font-bold text-[#5f6d59] ta-text sm:text-lg">{product.nameTa}</p>}
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-[#2c392a] shadow-sm ring-1 ring-[#ead7b7]/50">
+                <Star size={12} className="fill-amber-400 text-amber-400" />
+                {(product.rating || 4.7).toFixed(1)}
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full bg-[#f7f4ed] px-3 py-1.5 text-[11px] font-black text-[#5f6d59] shadow-sm ring-1 ring-[#ead7b7]/45">
+                <span className="text-[#7daa8f]">{formatCurrency(basePrice)}</span>
+                {hasDiscount && <span className="text-[#b0a89a] line-through">{formatCurrency(product.price)}</span>}
+              </span>
+              {discount > 0 && <span className="rounded-full bg-[#2c392a] px-3 py-1.5 text-[11px] font-black text-white">{discount}% OFF</span>}
+            </div>
+          </div>
+        </section>
+
+        <section className="px-4 pt-4 sm:px-0">
+          <div className="rounded-[24px] bg-white/95 p-3.5 shadow-sm ring-1 ring-[#ead7b7]/55 sm:p-4">
+            <AnimatePresence mode="wait">
+              {mobileQty === 0 ? (
+                <motion.button
+                  key="mobile-add"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 6 }}
+                  transition={{ duration: 0.18 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleMobileAdd}
+                  type="button"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#2c392a] py-3 text-sm font-black text-white shadow-[0_16px_30px_rgba(44,57,42,0.22)]"
+                >
+                  <ShoppingCart size={16} /> Add
+                </motion.button>
+              ) : (
+                <motion.div
+                  key="mobile-stepper"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 6 }}
+                  transition={{ duration: 0.18 }}
+                  className="space-y-3"
+                >
+                  {(product.predefinedOptions.length > 0 && (product.unitType === 'weight' || product.unitType === 'volume')) ? (
+                    <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
+                      {getCompactPackOptions(product).map((option) => (
+                        <button
+                          key={option.label}
+                          type="button"
+                          onClick={() => handleMobilePackChange(option)}
+                          className={`shrink-0 rounded-full border px-3 py-2 text-[11px] font-black transition-colors ${
+                            mobilePack?.label === option.label
+                              ? 'border-[#2c392a] bg-[#2c392a] text-white'
+                              : 'border-[#ead7b7]/70 bg-[#f7f4ed] text-[#5f6d59]'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <div className="inline-flex w-full items-center justify-between gap-2 rounded-full bg-white px-2 py-1 shadow-sm ring-1 ring-[#ead7b7]/55">
+                    <button
+                      type="button"
+                      onClick={() => handleMobileChangeQty(mobileQty - 1)}
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59]"
+                    >
+                      <Minus size={13} />
+                    </button>
+                    <span className="min-w-[2rem] text-center text-[14px] font-black text-[#2c392a]">{mobileQty}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleMobileChangeQty(mobileQty + 1)}
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59]"
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </section>
+      </div>
+
+      <div className="hidden lg:block mx-auto flex max-w-3xl flex-col gap-0 px-0 sm:px-6 lg:px-8">
         <section className="px-4 pt-4 sm:px-0 sm:pt-6">
           <div className="relative overflow-hidden rounded-[34px] border border-white/70 bg-gradient-to-b from-[#f2ede2] via-white to-[#edf3ea] shadow-[0_24px_60px_rgba(45,60,35,0.14)]">
             <div className="absolute left-3 top-3 z-10 rounded-full bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-[#5f6d59] shadow-sm backdrop-blur">
