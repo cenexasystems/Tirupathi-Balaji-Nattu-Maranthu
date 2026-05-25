@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDown, Heart, Minus, Plus, ShoppingCart, Star, X } from 'lucide-react'
+import { ChevronDown, Flower2, Heart, Leaf, Minus, Plus, ShieldCheck, ShoppingCart, Sparkles, Star, X } from 'lucide-react'
 import { useCartStore, useFavStore, type Product } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import {
@@ -219,6 +219,11 @@ export default function ProductDetailModal({
   }
 
   const heroImage = getProductImage(product.name, product.category, product.imageUrl, 'detail')
+  const galleryImages = [...new Set([
+    heroImage,
+    getProductImage(product.name, product.category, product.imageUrl, 'card'),
+    getProductImage(product.name, product.category, product.imageUrl, 'tile'),
+  ])]
 
   return (
     <AnimatePresence>
@@ -425,67 +430,109 @@ export default function ProductDetailModal({
           </motion.div>
         </div>
 
-        <div className="hidden lg:flex relative z-10 h-full min-h-0 items-end justify-center p-0 sm:p-3 md:items-center md:p-4">
+        <div className="hidden lg:flex relative z-10 h-full min-h-0 items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.985, y: 18 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.99, y: 18 }}
             transition={{ type: 'spring', stiffness: 130, damping: 20, mass: 0.9 }}
-            className="relative flex h-[100dvh] w-full max-w-4xl flex-col overflow-hidden rounded-t-[28px] bg-[#fbfaf6] shadow-[0_-8px_40px_rgba(22,35,20,0.22)] md:h-[min(90dvh,860px)] md:rounded-[32px]"
+            className="relative flex h-[min(92dvh,920px)] w-full max-w-[1180px] overflow-hidden rounded-[34px] bg-[#fbfaf6] shadow-[0_26px_80px_rgba(22,35,20,0.22)]"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex shrink-0 justify-center pb-1 pt-3 md:hidden">
-              <div className="h-1 w-10 rounded-full bg-[#d4cfc6]" />
-            </div>
-            <div className="flex-1 overflow-y-auto pb-[calc(6.75rem+env(safe-area-inset-bottom))]">
-              <section className="px-4 pt-3 sm:px-6 sm:pt-6">
-                <div className="relative overflow-hidden rounded-[34px] border border-white/70 bg-gradient-to-b from-[#f2ede2] via-white to-[#edf3ea] shadow-[0_24px_60px_rgba(45,60,35,0.14)]">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/90 text-[#2c392a] shadow-sm backdrop-blur transition-transform hover:scale-[1.03]"
-                    aria-label="Close"
-                  >
-                    <X size={16} />
-                  </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute right-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/90 text-[#2c392a] shadow-[0_6px_18px_rgba(45,60,35,0.12)] backdrop-blur transition-transform hover:scale-[1.03]"
+              aria-label="Close product details"
+            >
+              <X size={16} />
+            </button>
 
-                  <div className="absolute left-3 top-3 z-10 rounded-full bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-[#5f6d59] shadow-sm backdrop-blur">
+            <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-[minmax(0,1.06fr)_minmax(0,0.94fr)]">
+              <div className="flex h-full min-h-0 flex-col overflow-y-auto border-b border-[#ead7b7]/40 bg-[#f7f2ea] px-5 pb-6 pt-5 lg:border-b-0 lg:border-r lg:px-6 lg:pb-8 lg:pt-6 xl:px-8">
+                <div className="flex items-center justify-between gap-3 pb-4">
+                  <div className="rounded-full bg-white/85 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-[#5f6d59] shadow-sm backdrop-blur">
+                    Premium pooja item
+                  </div>
+                  <div className="rounded-full bg-white/85 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[#7daa8f] shadow-sm backdrop-blur">
+                    Pooja items
+                  </div>
+                </div>
+
+                <div className="relative overflow-hidden rounded-[34px] border border-white/70 bg-gradient-to-b from-[#f2ede2] via-white to-[#edf3ea] shadow-[0_24px_60px_rgba(45,60,35,0.12)]">
+                  <div className="absolute left-4 top-4 z-10 rounded-full bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-[#5f6d59] shadow-sm backdrop-blur">
                     Premium focus
                   </div>
 
-                  <div className="relative aspect-[4/3] min-h-[28svh] max-h-[42svh] sm:aspect-[16/10] sm:min-h-[24rem] sm:max-h-[26rem]">
+                  <div className="relative flex min-h-[28rem] items-center justify-center px-4 py-6 sm:px-6 sm:py-8">
                     <img
                       src={heroImage}
                       alt={product.name}
                       loading="lazy"
                       decoding="async"
                       onError={onImgError}
-                      className="h-full w-full object-contain p-4 sm:p-6"
+                      className="max-h-[28rem] w-full object-contain"
                     />
-                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.45),transparent_56%)]" />
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.42),transparent_56%)]" />
                   </div>
                 </div>
-              </section>
 
-              <section className="px-4 pt-4 sm:px-6 sm:pt-5">
-                <div className="space-y-2">
+                <div className="mt-4 grid grid-cols-4 gap-3">
+                  {galleryImages.map((image, index) => (
+                    <div
+                      key={`${image}-${index}`}
+                      className={`overflow-hidden rounded-[18px] border bg-white shadow-sm ${index === 0 ? 'border-[#2c392a]/50 ring-2 ring-[#2c392a]/10' : 'border-[#ead7b7]/45'}`}
+                    >
+                      <div className="aspect-square bg-[#f2f0e8] p-2">
+                        <img
+                          src={image}
+                          alt={`${product.name} preview ${index + 1}`}
+                          loading="lazy"
+                          decoding="async"
+                          onError={onImgError}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex h-full min-h-0 flex-col overflow-y-auto bg-[#fbfaf6] px-5 pb-[7.75rem] pt-5 lg:px-6 lg:pb-[7.5rem] lg:pt-6 xl:px-8">
+                <section>
                   <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">{t('cat.' + product.category)}</p>
-                  <h2 className="text-[1.8rem] leading-tight font-black text-[#2c392a] sm:text-4xl">{product.name}</h2>
-                  {tamilName && <p className="text-base font-bold text-[#5f6d59] ta-text sm:text-lg">{tamilName}</p>}
+                  <h2 className="mt-1 text-[2rem] leading-[1.02] font-black text-[#2c392a] sm:text-[2.5rem]">{product.name}</h2>
+                  {tamilName && <p className="mt-1.5 text-[1rem] font-bold text-[#5f6d59] ta-text sm:text-[1.08rem]">{tamilName}</p>}
 
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-[#2c392a] shadow-sm ring-1 ring-[#ead7b7]/50">
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f7f4ed] px-3 py-1.5 text-[11px] font-black text-[#2c392a] ring-1 ring-[#ead7b7]/40">
                       <Star size={12} className="fill-amber-400 text-amber-400" />
                       {(product.rating || 4.7).toFixed(1)}
                     </span>
-                    <span className="inline-flex items-center gap-2 rounded-full bg-[#f7f4ed] px-3 py-1.5 text-[11px] font-black text-[#5f6d59] shadow-sm ring-1 ring-[#ead7b7]/45">
-                      <span className="text-[#7daa8f]">{formatCurrency(basePrice)}</span>
-                      {hasDiscount && <span className="text-[#b0a89a] line-through">{formatCurrency(product.price)}</span>}
+                    <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-[#5f6d59] shadow-sm ring-1 ring-[#ead7b7]/45">
+                      Trusted by 1000+ devotees
                     </span>
                     {discount > 0 && <span className="rounded-full bg-[#2c392a] px-3 py-1.5 text-[11px] font-black text-white">{discount}% OFF</span>}
                   </div>
+                </section>
 
-                  <div className="pt-1">
+                <section className="mt-5 rounded-[26px] bg-white/88 px-4 py-4 shadow-sm ring-1 ring-[#ead7b7]/45 backdrop-blur sm:px-5">
+                  <div className="flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">Price</p>
+                      <p className="mt-1 text-[2rem] font-black leading-none text-[#2c392a]">{formatCurrency(basePrice)}</p>
+                      {hasDiscount && <p className="mt-1 text-[11px] font-bold text-[#b0a89a] line-through">{formatCurrency(product.price)}</p>}
+                    </div>
+                    <p className="max-w-[12rem] text-right text-[11px] font-bold text-[#95a28f]">Inclusive of taxes</p>
+                  </div>
+                </section>
+
+                <section className="mt-5 rounded-[26px] bg-white/88 px-4 py-4 shadow-sm ring-1 ring-[#ead7b7]/45 backdrop-blur sm:px-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">Pack size</p>
+                      <p className="mt-1 text-[11px] font-bold text-[#95a28f]">{selectedSummary}</p>
+                    </div>
                     <button
                       type="button"
                       onClick={() => void toggle(product)}
@@ -498,25 +545,10 @@ export default function ProductDetailModal({
                       {favorite ? 'Saved' : 'Save'}
                     </button>
                   </div>
-                </div>
-              </section>
 
-              <section className="px-4 pt-4 sm:px-6">
-                <div className="rounded-[24px] bg-white/95 p-3.5 shadow-sm ring-1 ring-[#ead7b7]/55 sm:p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">Pack & quantity</p>
-                      <p className="mt-1 text-[11px] font-bold text-[#95a28f]">{selectedSummary}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] font-bold text-[#7daa8f]">Selected total</p>
-                      <p className="text-lg font-black text-[#2c392a]">{formatCurrency(lineTotal)}</p>
-                    </div>
-                  </div>
-
-                  {product.predefinedOptions.length > 0 && (product.unitType === 'weight' || product.unitType === 'volume') ? (
+                  {compactPackOptions.length > 0 && (product.unitType === 'weight' || product.unitType === 'volume') ? (
                     <div className="mt-3 flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
-                      {product.predefinedOptions.map((option) => (
+                      {compactPackOptions.map((option) => (
                         <button
                           key={option.label}
                           type="button"
@@ -587,14 +619,32 @@ export default function ProductDetailModal({
                   <div className="mt-3 text-[11px] font-bold text-[#7daa8f]">
                     {formatPricePerUnit(basePrice, product.baseQuantity, product.unitLabel, product.unitType)}
                   </div>
-                </div>
-              </section>
+                </section>
 
-              <section className="px-4 pt-4 sm:px-6">
-                <div className="grid gap-2.5">
+                <section className="mt-5 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    { icon: Leaf, title: '100% Natural', subtitle: 'Pure & Handpicked' },
+                    { icon: Sparkles, title: 'Fresh & Fragrant', subtitle: 'Daily Selection' },
+                    { icon: Flower2, title: 'Pooja Ready', subtitle: 'Temple Quality' },
+                    { icon: ShieldCheck, title: 'Safe Packaging', subtitle: 'Hygienically Packed' },
+                  ].map((item) => {
+                    const Icon = item.icon
+                    return (
+                      <div key={item.title} className="rounded-[22px] border border-[#ead7b7]/45 bg-white/90 px-3 py-3 shadow-sm">
+                        <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59] ring-1 ring-[#ead7b7]/45">
+                          <Icon size={16} />
+                        </div>
+                        <p className="mt-2 text-[12px] font-black text-[#2c392a]">{item.title}</p>
+                        <p className="mt-0.5 text-[10px] font-bold text-[#95a28f]">{item.subtitle}</p>
+                      </div>
+                    )
+                  })}
+                </section>
+
+                <section className="mt-5 grid gap-2.5">
                   <details className={accordionClass}>
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black text-[#2c392a]">
-                      <span>Description</span>
+                      <span>Product Details</span>
                       <ChevronDown size={16} className="text-[#7daa8f] transition-transform group-open:rotate-180" />
                     </summary>
                     <p className="mt-3 text-sm leading-relaxed text-[#5f6d59]">{product.description || 'Carefully selected herbal product made for daily use.'}</p>
@@ -602,7 +652,7 @@ export default function ProductDetailModal({
 
                   <details className={accordionClass}>
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black text-[#2c392a]">
-                      <span>Benefits & care</span>
+                      <span>Benefits</span>
                       <ChevronDown size={16} className="text-[#7daa8f] transition-transform group-open:rotate-180" />
                     </summary>
                     <div className="mt-3 space-y-2 text-sm leading-relaxed text-[#5f6d59]">
@@ -610,41 +660,17 @@ export default function ProductDetailModal({
                       <p>{buildUsageNote(product)}</p>
                     </div>
                   </details>
-                </div>
-              </section>
 
-              <section className="px-4 pt-4 sm:px-6">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-[11px] font-black uppercase tracking-[0.24em] text-[#7daa8f]">Related products</h3>
-                  <span className="text-[11px] font-bold text-[#9aa893]">Swipe for more</span>
-                </div>
-                <div className="mt-3 flex gap-3 overflow-x-auto pb-2 hide-scrollbar">
-                  {relatedProducts.length === 0 && <div className="text-sm text-[#7a8672]">No related items yet.</div>}
-                  {relatedProducts.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => onSelectProduct?.(item)}
-                      className="group min-w-[124px] overflow-hidden rounded-[20px] bg-white text-left shadow-sm ring-1 ring-[#ead7b7]/55 transition-transform hover:-translate-y-0.5"
-                    >
-                      <div className="aspect-square bg-[#f2f0e8]">
-                        <img
-                          src={getProductImage(item.name, item.category, item.imageUrl, 'tile')}
-                          alt={item.name}
-                          loading="lazy"
-                          decoding="async"
-                          onError={onImgError}
-                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                      </div>
-                      <div className="space-y-1.5 p-2.5">
-                        <p className="line-clamp-2 text-[11px] font-bold leading-snug text-[#2c392a]">{item.name}</p>
-                        <p className="text-[10px] font-black text-[#7daa8f]">{formatCurrency(item.offerPrice || item.price)}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </section>
+                  <details className={accordionClass}>
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black text-[#2c392a]">
+                      <span>How to Use</span>
+                      <ChevronDown size={16} className="text-[#7daa8f] transition-transform group-open:rotate-180" />
+                    </summary>
+                    <p className="mt-3 text-sm leading-relaxed text-[#5f6d59]">Use as per traditional practice. Store in a cool, dry place away from moisture.</p>
+                  </details>
+                </section>
+              </div>
+
             </div>
 
             <div className="absolute inset-x-0 bottom-0 z-20 border-t border-[#ead7b7]/50 bg-white/95 px-4 py-3 backdrop-blur pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
