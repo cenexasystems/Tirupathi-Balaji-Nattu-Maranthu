@@ -84,7 +84,7 @@ export default function Cart() {
           <div className="lg:hidden fixed inset-x-0 bottom-0 z-20 mobile-cta-bar px-4 py-3">
             <div className="mx-auto flex max-w-7xl items-center gap-3">
               <div className="min-w-0">
-                <p className="text-[11px] font-bold text-textMuted">Order Total</p>
+                <p className="text-[11px] font-bold text-textMuted">Cart Total</p>
                 <p className="text-lg font-black text-textMain leading-tight">{formatCurrency(orderTotal)}</p>
               </div>
               <Link to="/checkout"
@@ -122,7 +122,7 @@ export default function Cart() {
             {/* Totals */}
             <div className="border-t border-sand pt-4 space-y-2 text-sm mb-5">
               <div className="flex justify-between font-bold text-textMain text-base">
-                <span>Order Total</span>
+                <span>Cart Total</span>
                 <span>{formatCurrency(orderTotal)}</span>
               </div>
               <p className="text-xs text-textMuted bg-bgMain px-3 py-2 rounded-lg">

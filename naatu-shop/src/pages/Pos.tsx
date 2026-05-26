@@ -27,15 +27,23 @@ type PosItem = Product & {
   selectedUnit: string
   basePrice: number
   lineTotal: number
+  source?: 'catalogue' | 'manual'
+  note?: string | null
 }
 
 type InvoiceSnap = {
   id: string
   invoiceNo: string
+  orderType: 'online_request' | 'pos_sale' | 'manual_sale'
   date: string
   items: PosItem[]
   subtotal: number
   shipping: number
+  couponCode?: string
+  couponDiscount: number
+  manualDiscountAmount: number
+  manualDiscountType: 'flat' | 'percent'
+  manualDiscountValue: number
   total: number
   customerName: string
   phone: string
@@ -89,6 +97,13 @@ export default function Pos() {
   const [items, setItems] = useState<PosItem[]>([])
   const [customer, setCustomer] = useState({ name: '', phone: '', address: '' })
   const [saving, setSaving] = useState(false)
+  const [shipping, setShipping] = useState<string>('0')
+  const [couponInput, setCouponInput] = useState('')
+  const [couponLoading, setCouponLoading] = useState(false)
+  const [couponError, setCouponError] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; percentage: number; discount: number } | null>(null)
+  const [manualDiscountType, setManualDiscountType] = useState<'flat' | 'percent'>('flat')
+  const [manualDiscountValue, setManualDiscountValue] = useState('')
   const [error, setError] = useState('')
   const [invoice, setInvoice] = useState<InvoiceSnap | null>(null)
   const [cashReceived, setCashReceived] = useState<string>('')
@@ -124,7 +139,12 @@ export default function Pos() {
   }, [products, search, activeCategory])
 
   const subtotal = items.reduce((s, i) => s + i.lineTotal, 0)
-  const total = subtotal
+  const couponDiscount = appliedCoupon?.discount || 0
+  const manualDiscountNumeric = Math.max(0, Number(manualDiscountValue) || 0)
+  const manualDiscountAmount = manualDiscountType === 'percent'
+    ? Math.max(0, Math.round((subtotal * manualDiscountNumeric / 100) * 100) / 100)
+    : manualDiscountNumeric
+  const total = Math.max(0, subtotal - couponDiscount - manualDiscountAmount + (Number(shipping || 0) || 0))
 
   const itemQtyMap = useMemo(() => {
     const m: Record<string | number, number> = {}
@@ -142,6 +162,46 @@ export default function Pos() {
       const inc = ex.unitType === 'unit' || ex.unitType === 'bundle' ? 1 : ex.baseQuantity
       return cur.map(i => i.id === product.id ? recalc(i, i.qty + inc) : i)
     })
+  }
+
+  // Manual product addition (minimal, non-destructive)
+  const [manualName, setManualName] = useState('')
+  const [manualPrice, setManualPrice] = useState('')
+  const addManualItem = () => {
+    setError('')
+    const name = manualName.trim()
+    const price = Number(manualPrice || 0)
+    if (!name) { setError('Enter product name'); return }
+    if (!(price > 0)) { setError('Enter valid price'); return }
+    const prod: Product = {
+      id: `manual-${Date.now()}`,
+      name,
+      category: 'Manual',
+      remedy: [],
+      price,
+      offerPrice: null,
+      unitType: 'unit',
+      unitLabel: 'pc',
+      baseQuantity: 1,
+      stockQuantity: 999,
+      stockUnit: 'pc',
+      allowDecimalQuantity: false,
+      predefinedOptions: [],
+      isActive: true,
+      sortOrder: 0,
+      unit: '1pc',
+      rating: 5,
+      stock: 999,
+      description: '',
+      benefits: '',
+      image: '/assets/images/default-herb.jpg',
+      imageUrl: undefined,
+      source: 'manual',
+    }
+    setManualName('')
+    setManualPrice('')
+    setItems(cur => [...cur, { ...makePosItem(prod), source: 'manual' }])
+    setMobilePanelView('catalogue')
   }
 
   const removeItem = (id: string | number) => setItems(cur => cur.filter(i => i.id !== id))
@@ -166,18 +226,86 @@ export default function Pos() {
     setCustomer({ name: '', phone: '', address: '' })
     setInvoice(null)
     setCashReceived('')
+    setCouponInput('')
+    setAppliedCoupon(null)
+    setCouponError('')
+    setManualDiscountValue('')
+    setManualDiscountType('flat')
     setError('')
     searchRef.current?.focus()
   }
 
+  const applyCoupon = async () => {
+    const code = couponInput.trim().toUpperCase()
+    if (!code) { setCouponError('Enter a coupon code'); return }
+
+    setCouponLoading(true)
+    setCouponError('')
+    setAppliedCoupon(null)
+
+    try {
+      if (!isSupabaseConfigured) {
+        setCouponError('Coupon validation requires a live connection')
+        return
+      }
+
+      const { data, error: dbErr } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('is_active', true)
+        .ilike('code', code)
+        .single()
+
+      if (dbErr || !data) {
+        setCouponError('Invalid or expired coupon code')
+        return
+      }
+
+      if (data.expiry_date && new Date(data.expiry_date) < new Date()) {
+        setCouponError('This coupon has expired')
+        return
+      }
+
+      if (data.usage_limit && data.usage_count >= data.usage_limit) {
+        setCouponError('Coupon usage limit has been reached')
+        return
+      }
+
+      if (data.min_order_value && subtotal < Number(data.min_order_value)) {
+        setCouponError(`Minimum order of ${formatCurrency(Number(data.min_order_value))} required`)
+        return
+      }
+
+      const discount = Math.round((subtotal * Number(data.percentage) / 100) * 100) / 100
+      setAppliedCoupon({ code: String(data.code), percentage: Number(data.percentage), discount })
+    } catch {
+      setCouponError('Failed to validate coupon. Try again.')
+    } finally {
+      setCouponLoading(false)
+    }
+  }
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null)
+    setCouponInput('')
+    setCouponError('')
+  }
+
+  const getOrderType = (): 'pos_sale' | 'manual_sale' => (items.length > 0 && items.every((item) => item.source === 'manual') ? 'manual_sale' : 'pos_sale')
+
   // ── Generate bill ─────────────────────────────────────────────────────
   const generateBill = async () => {
     if (!items.length) { setError('Add at least one product.'); return }
+    // Validate required phone
+    const phoneDigits = (customer.phone || '').replace(/\D/g, '')
+    if (phoneDigits.length !== 10) { setError('Please enter a valid 10-digit phone number'); return }
+    // Validate online mode availability
+    if (orderMode === 'online' && !isSupabaseConfigured) { setError('Cannot place online orders while offline'); return }
     setSaving(true); setError('')
     try {
       const created = await createOrderWithStock({
         customerName: customer.name.trim() || 'Walk-in Customer',
-        phone: customer.phone.trim() || '0000000000',
+        phone: customer.phone.trim(),
         address: customer.address.trim() || 'POS Counter',
         items: items.map(item => buildStructuredOrderItem({
           productId: toProductId(item.id),
@@ -189,18 +317,34 @@ export default function Pos() {
           baseQuantity: item.baseQuantity,
           basePrice: item.basePrice,
           imageUrl: item.imageUrl || item.image || null,
+          source: item.source || 'catalogue',
+          note: item.note || null,
         })),
-        shipping: 0,
+        shipping: Number(shipping || 0),
         status: 'completed',
         orderMode,
+        orderType: getOrderType(),
+        deliveryCharge: Number(shipping || 0),
+        discountAmount: couponDiscount,
+        manualDiscountAmount,
+        manualDiscountType,
+        manualDiscountValue: manualDiscountNumeric,
+        couponCode: appliedCoupon?.code,
+        couponPercentage: appliedCoupon?.percentage,
       })
       setInvoice({
         id: created.orderId,
         invoiceNo: created.invoiceNo,
+        orderType: getOrderType(),
         date: created.createdAt,
         items: [...items],
         subtotal,
-        shipping: 0,
+        shipping: Number(shipping || 0),
+        couponCode: appliedCoupon?.code,
+        couponDiscount,
+        manualDiscountAmount,
+        manualDiscountType,
+        manualDiscountValue: manualDiscountNumeric,
         total,
         customerName: customer.name.trim() || 'Walk-in Customer',
         phone: customer.phone.trim() || '',
@@ -221,18 +365,26 @@ export default function Pos() {
 
   const sendPosWhatsApp = (inv: InvoiceSnap) => {
     const lines = inv.items
-      .map(i => `• ${i.name} × ${formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)} = ${formatCurrency(i.lineTotal)}`)
+      .map((i, idx) => `  ${idx + 1}. ${i.name} × ${formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)}  →  ${formatCurrency(i.lineTotal)}`)
       .join('\n')
+    const targetPhone = (inv.phone || customer.phone || '').replace(/\D/g, '')
+    const waLink = targetPhone ? `https://wa.me/${targetPhone}` : BRAND_WHATSAPP_LINK
+    const sep = '━━━━━━━━━━━━━━━━━━━━'
     const text = encodeURIComponent(
       `🌿 *${BRAND_EN}*\n` +
-      `📋 *Invoice:* ${inv.invoiceNo}\n` +
+      `${sep}\n` +
+      `📋 *Receipt:* ${inv.invoiceNo}\n` +
       (inv.customerName !== 'Walk-in Customer' ? `👤 *Customer:* ${inv.customerName}\n` : '') +
       (inv.phone ? `📞 ${inv.phone}\n` : '') +
-      `\n${lines}\n\n` +
-      `*Total: ${formatCurrency(inv.total)}*\n\n` +
+      `${sep}\n` +
+      `🛒 *Items:*\n\n` +
+      `${lines}\n\n` +
+      `${sep}\n` +
+      `💰 *Total: ${formatCurrency(inv.total)}*\n` +
+      `${sep}\n\n` +
       `நன்றி! | Thank you! 🙏`
     )
-    window.open(`${BRAND_WHATSAPP_LINK}?text=${text}`, '_blank')
+    window.open(`${waLink}?text=${text}`, '_blank')
   }
 
   // ══ INVOICE SCREEN ════════════════════════════════════════════════════
@@ -451,6 +603,25 @@ export default function Pos() {
             </div>
           </div>
 
+            {/* Manual add small form */}
+            <div className="bg-white px-3 py-2.5 border-b border-[#D5DAD0] shrink-0">
+              <div className="flex items-center gap-2">
+                <input
+                  value={manualName}
+                  onChange={e => setManualName(e.target.value)}
+                  placeholder="Manual item name"
+                  className="flex-1 px-3 py-1.5 bg-[#F0F2EE] rounded-lg text-[12px] outline-none border border-transparent focus:border-[#7DAA8F]"
+                />
+                <input
+                  value={manualPrice}
+                  onChange={e => setManualPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                  placeholder="Price"
+                  className="w-24 px-3 py-1.5 bg-[#F0F2EE] rounded-lg text-[12px] outline-none border border-transparent focus:border-[#7DAA8F] text-right"
+                />
+                <button onClick={addManualItem} className="px-3 py-1.5 bg-[#2C392A] text-white rounded-lg font-black text-[12px]">Add</button>
+              </div>
+            </div>
+
           {/* Product grid */}
           {(productError && products.length === 0) && (
             <div className="m-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">{productError}</div>
@@ -538,7 +709,7 @@ export default function Pos() {
             <input
               value={customer.phone}
               onChange={e => setCustomer(c => ({ ...c, phone: e.target.value.replace(/\D/g, '') }))}
-              placeholder="Phone (optional)"
+              placeholder="Phone (required)"
               maxLength={10}
               className="w-full px-3 py-1.5 bg-[#F0F2EE] rounded-lg text-[12px] outline-none border border-transparent focus:border-[#7DAA8F]"
             />
@@ -632,10 +803,74 @@ export default function Pos() {
               <p className="text-[11px] text-red-500 font-bold bg-red-50 px-3 py-2 rounded-lg">{error}</p>
             )}
 
+            <div className="space-y-2 rounded-xl border border-[#E8EDE4] bg-[#F7F8F5] p-3">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-[#5F6D59] mb-1">Coupon</label>
+                <div className="flex gap-2">
+                  <input
+                    value={couponInput}
+                    onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponError('') }}
+                    placeholder="WELCOME10"
+                    className="flex-1 px-3 py-2 rounded-lg border border-[#D5DAD0] bg-white text-[12px] font-bold uppercase outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void applyCoupon()}
+                    disabled={couponLoading || !couponInput.trim()}
+                    className="px-3 py-2 rounded-lg bg-[#2C392A] text-white font-black text-[11px] disabled:opacity-50"
+                  >
+                    {couponLoading ? '...' : 'Apply'}
+                  </button>
+                </div>
+                {couponError && <p className="mt-1 text-[10px] font-bold text-red-500">{couponError}</p>}
+                {appliedCoupon && (
+                  <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2">
+                    <div>
+                      <p className="text-[11px] font-black text-green-800">{appliedCoupon.code} · {appliedCoupon.percentage}% off</p>
+                      <p className="text-[10px] text-green-700">{formatCurrency(appliedCoupon.discount)} coupon discount</p>
+                    </div>
+                    <button type="button" onClick={removeCoupon} className="text-[10px] font-black text-green-700 hover:text-red-500 uppercase">Clear</button>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-[#5F6D59] mb-1">Manual Discount</label>
+                <div className="flex gap-2">
+                  <select
+                    value={manualDiscountType}
+                    onChange={e => setManualDiscountType(e.target.value === 'percent' ? 'percent' : 'flat')}
+                    className="w-24 px-2 py-2 rounded-lg border border-[#D5DAD0] bg-white text-[11px] font-bold"
+                  >
+                    <option value="flat">Flat ₹</option>
+                    <option value="percent">%</option>
+                  </select>
+                  <input
+                    value={manualDiscountValue}
+                    onChange={e => setManualDiscountValue(e.target.value.replace(/[^0-9.]/g, ''))}
+                    placeholder={manualDiscountType === 'percent' ? '10' : '50'}
+                    className="flex-1 px-3 py-2 rounded-lg border border-[#D5DAD0] bg-white text-[12px] font-bold outline-none text-right"
+                  />
+                </div>
+                <p className="mt-1 text-[10px] text-[#5F6D59] font-medium">
+                  {manualDiscountAmount > 0 ? `Manual discount: ${formatCurrency(manualDiscountAmount)}` : 'No manual discount applied'}
+                </p>
+              </div>
+            </div>
+
             <div className="space-y-1 text-[12px]">
               <div className="flex justify-between text-[#5F6D59]">
                 <span>Items</span>
                 <span className="font-bold">{items.length}</span>
+              </div>
+              <div className="flex justify-between text-[#5F6D59] items-center">
+                <span>Delivery</span>
+                <input
+                  type="number"
+                  value={shipping}
+                  onChange={e => setShipping(e.target.value.replace(/[^0-9.]/g, ''))}
+                  className="w-24 text-right px-2 py-1 rounded-lg border border-[#D5DAD0] bg-white text-[12px]"
+                />
               </div>
               <div className="flex justify-between font-black text-[#2C392A] text-[16px] pt-1 border-t border-[#E8EDE4]">
                 <span>Total</span>

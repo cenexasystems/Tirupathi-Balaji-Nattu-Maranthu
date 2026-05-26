@@ -45,6 +45,8 @@ export interface Product {
   benefitsTa?: string
   image: string
   imageUrl?: string
+  source?: 'catalogue' | 'manual'
+  note?: string | null
 }
 
 export interface CartItem extends Product {

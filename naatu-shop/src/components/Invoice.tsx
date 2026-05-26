@@ -31,6 +31,9 @@ export interface InvoiceProps {
   total: number
   status?: string
   userId?: string
+  deliveryCharge?: number
+  discountAmount?: number
+  couponCode?: string | null
 }
 
 export const Invoice: React.FC<InvoiceProps> = ({
@@ -45,6 +48,9 @@ export const Invoice: React.FC<InvoiceProps> = ({
   total,
   status = 'Pending',
   userId,
+  deliveryCharge = 0,
+  discountAmount = 0,
+  couponCode,
 }) => {
   const dateStr = (() => {
     try { return new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) }
@@ -52,6 +58,7 @@ export const Invoice: React.FC<InvoiceProps> = ({
   })()
 
   const statusColor = status === 'completed' ? '#16a34a' : status === 'cancelled' ? '#dc2626' : '#d97706'
+  const effectiveDelivery = deliveryCharge || shipping
 
   return (
     <div
@@ -69,7 +76,7 @@ export const Invoice: React.FC<InvoiceProps> = ({
         flexDirection: 'column',
       }}
     >
-      {/* ── HEADER ──────────────────────────────────────────────────── */}
+      {/* ── HEADER ────────────────────────────────────────────────── */}
       <div style={{ borderBottom: '3px solid #2d5a27', paddingBottom: 24, marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
@@ -82,8 +89,8 @@ export const Invoice: React.FC<InvoiceProps> = ({
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 28, fontWeight: 900, color: '#1a1a2e', letterSpacing: -1 }}>INVOICE</div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: '#2d5a27', marginTop: 4 }}>#{invoiceNo}</div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#1a1a2e', letterSpacing: -1 }}>BILL / RECEIPT</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#2d5a27', marginTop: 4 }}>Bill No: {invoiceNo}</div>
             <div
               style={{
                 display: 'inline-block', marginTop: 8, padding: '3px 12px', borderRadius: 99,
@@ -97,10 +104,10 @@ export const Invoice: React.FC<InvoiceProps> = ({
         </div>
       </div>
 
-      {/* ── META ROW ──────────────────────────────────────────────────── */}
+      {/* ── META ROW ──────────────────────────────────────────────── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 28, gap: 24 }}>
         <div>
-          <div style={{ fontSize: 9, fontWeight: 800, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Invoice Date</div>
+          <div style={{ fontSize: 9, fontWeight: 800, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Order Date</div>
           <div style={{ fontSize: 13, fontWeight: 700 }}>{dateStr}</div>
           {userId && (
             <>
@@ -110,17 +117,17 @@ export const Invoice: React.FC<InvoiceProps> = ({
           )}
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 9, fontWeight: 800, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Bill To</div>
+          <div style={{ fontSize: 9, fontWeight: 800, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Customer</div>
           <div style={{ fontSize: 14, fontWeight: 800, color: '#1a1a2e' }}>{customerName}</div>
           <div style={{ fontSize: 12, color: '#555', marginTop: 3 }}>{phone}</div>
           <div style={{ fontSize: 11, color: '#777', marginTop: 4, maxWidth: 220, textAlign: 'right', lineHeight: 1.5 }}>{address}</div>
         </div>
       </div>
 
-      {/* ── DIVIDER ───────────────────────────────────────────────────── */}
+      {/* ── DIVIDER ──────────────────────────────────────────────── */}
       <div style={{ borderTop: '1px dashed #d0d0d0', marginBottom: 24 }} />
 
-      {/* ── ITEMS TABLE ───────────────────────────────────────────────── */}
+      {/* ── ITEMS TABLE ──────────────────────────────────────────── */}
       <div style={{ flexGrow: 1 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
@@ -159,34 +166,48 @@ export const Invoice: React.FC<InvoiceProps> = ({
         </table>
       </div>
 
-      {/* ── TOTALS ────────────────────────────────────────────────────── */}
+      {/* ── TOTALS ───────────────────────────────────────────────── */}
       <div style={{ marginTop: 28, borderTop: '2px solid #2d5a27', paddingTop: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ minWidth: 240 }}>
+          <div style={{ minWidth: 260 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
               <span style={{ fontSize: 13, color: '#666' }}>Subtotal</span>
               <span style={{ fontSize: 13, fontWeight: 700 }}>{formatCurrency(subtotal)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 13, color: '#666' }}>Shipping</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: shipping === 0 ? '#16a34a' : '#1a1a2e' }}>
-                {shipping === 0 ? 'FREE' : formatCurrency(shipping)}
-              </span>
-            </div>
+            {discountAmount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, color: '#16a34a' }}>
+                  Discount{couponCode ? ` (${couponCode})` : ''}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#16a34a' }}>−{formatCurrency(discountAmount)}</span>
+              </div>
+            )}
+            {effectiveDelivery > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, color: '#666' }}>Delivery</span>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>{formatCurrency(effectiveDelivery)}</span>
+              </div>
+            )}
+            {effectiveDelivery === 0 && discountAmount === 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, color: '#666' }}>Delivery</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#16a34a' }}>FREE</span>
+              </div>
+            )}
             <div
               style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 borderTop: '2px solid #2d5a27', paddingTop: 12,
               }}
             >
-              <span style={{ fontSize: 16, fontWeight: 900, color: '#2d5a27', textTransform: 'uppercase', letterSpacing: 0.5 }}>Grand Total</span>
+              <span style={{ fontSize: 16, fontWeight: 900, color: '#2d5a27', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total</span>
               <span style={{ fontSize: 22, fontWeight: 900, color: '#2d5a27' }}>{formatCurrency(total)}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── FOOTER ────────────────────────────────────────────────────── */}
+      {/* ── FOOTER ───────────────────────────────────────────────── */}
       <div
         style={{
           marginTop: 40, paddingTop: 20, borderTop: '1px dashed #d0d0d0',
@@ -209,4 +230,3 @@ export const Invoice: React.FC<InvoiceProps> = ({
     </div>
   )
 }
-
