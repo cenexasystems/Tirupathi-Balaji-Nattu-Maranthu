@@ -17,6 +17,8 @@ export type StructuredOrderItem = {
   base_price: number
   line_total: number
   image_url: string | null
+  source?: 'catalogue' | 'manual'
+  note?: string | null
 }
 
 type UnitFactors = Record<string, number>
@@ -398,6 +400,8 @@ export const buildStructuredOrderItem = (input: {
   baseQuantity: number
   basePrice: number
   imageUrl?: string | null
+  source?: 'catalogue' | 'manual'
+  note?: string | null
 }): StructuredOrderItem => {
   const safeQuantity = normalizeSelectedQuantity(
     input.quantity,
@@ -420,6 +424,8 @@ export const buildStructuredOrderItem = (input: {
     base_price: safeBasePrice,
     line_total: calculateLineTotal(safeQuantity, input.unitType, safeBaseQuantity, safeBasePrice),
     image_url: input.imageUrl ? String(input.imageUrl) : null,
+    source: input.source || 'catalogue',
+    note: input.note ? String(input.note) : null,
   }
 }
 
@@ -462,5 +468,7 @@ export const normalizeStructuredOrderItem = (raw: Record<string, unknown>): Stru
     base_price: basePrice,
     line_total: lineTotal,
     image_url: raw.image_url ? String(raw.image_url) : (raw.image ? String(raw.image) : null),
+    source: raw.source === 'manual' || raw.is_manual === true ? 'manual' : 'catalogue',
+    note: raw.note ? String(raw.note) : (raw.manual_note ? String(raw.manual_note) : null),
   }
 }

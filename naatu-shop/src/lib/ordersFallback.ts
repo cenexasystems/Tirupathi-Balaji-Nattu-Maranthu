@@ -31,6 +31,7 @@ export type LocalOrder = {
   shipping: number
   total: number
   status: 'pending' | 'processing' | 'completed' | 'cancelled'
+  order_type?: 'online_request' | 'pos_sale' | 'manual_sale'
   created_at: string
 }
 
@@ -60,6 +61,7 @@ export function createLocalOrder(input: {
   subtotal: number
   shipping: number
   total: number
+  orderType?: 'online_request' | 'pos_sale' | 'manual_sale'
 }): LocalOrder {
   const now = new Date()
   const order: LocalOrder = {
@@ -74,6 +76,7 @@ export function createLocalOrder(input: {
     shipping: input.shipping,
     total: input.total,
     status: 'pending',
+    order_type: input.orderType || 'online_request',
     created_at: now.toISOString(),
   }
 

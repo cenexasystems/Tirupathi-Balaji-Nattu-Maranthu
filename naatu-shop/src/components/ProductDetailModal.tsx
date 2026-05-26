@@ -99,9 +99,17 @@ export default function ProductDetailModal({
 
   useEffect(() => {
     if (!open || !product) return
-    setMobileQty(0)
-    setMobilePack(getCompactPackOptions(product)[0] ?? null)
+    // defer state updates to avoid synchronous setState-in-effect warning
+    const id = window.setTimeout(() => {
+      setMobileQty(0)
+      setMobilePack(getCompactPackOptions(product)[0] ?? null)
+    }, 0)
+    return () => window.clearTimeout(id)
   }, [open, product])
+
+  // Reference optional props to avoid ESLint unused-var errors without changing API
+  void onSelectProduct
+  void relatedProducts
 
   const basePrice = product
     ? (product.offerPrice && product.offerPrice < product.price ? product.offerPrice : product.price)

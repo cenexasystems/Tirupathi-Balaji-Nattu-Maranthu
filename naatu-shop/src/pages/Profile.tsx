@@ -25,6 +25,7 @@ interface ProfileOrderItem {
 interface ProfileOrder {
   id: string
   invoice_no: string
+  order_type: string
   customer_name: string
   phone: string
   address: string
@@ -138,6 +139,7 @@ export default function Profile() {
       const localOrders = getLocalOrdersForUser({ userId: user.id, phone: user.mobile })
       setOrders(localOrders.map((order) => ({
         ...order,
+        order_type: String(order.order_type || 'online_request'),
         subtotal: Number(order.subtotal),
         shipping: Number(order.shipping),
         total: Number(order.total),
@@ -159,7 +161,7 @@ export default function Profile() {
 
         const baseQuery = supabase
           .from('orders')
-          .select('id, invoice_no, customer_name, phone, address, items, subtotal, shipping, total, status, created_at')
+          .select('id, invoice_no, customer_name, phone, address, items, subtotal, shipping, total, status, created_at, order_type')
           .order('created_at', { ascending: false })
 
         let ordersData: Array<Record<string, unknown>> | null = null
@@ -187,6 +189,7 @@ export default function Profile() {
         const mappedOrders: ProfileOrder[] = ordersData.map((order) => ({
           id: String(order.id || ''),
           invoice_no: String(order.invoice_no || ''),
+          order_type: String(order.order_type || 'pos_sale'),
           customer_name: String(order.customer_name || ''),
           phone: String(order.phone || ''),
           address: String(order.address || ''),
@@ -445,7 +448,9 @@ export default function Profile() {
                             className="flex flex-wrap gap-4 items-center justify-between p-4 cursor-pointer hover:bg-bgMain transition-colors"
                           >
                             <div>
-                              <p className="font-bold text-sm text-textMain">{o.invoice_no}</p>
+                              <p className="font-bold text-sm text-textMain">
+                                {o.order_type === 'online_request' ? `Order Request ID: ${o.id}` : `Bill No: ${o.invoice_no}`}
+                              </p>
                               <p className="text-xs text-textMuted mt-0.5">
                                 {new Date(o.created_at).toLocaleDateString('en-GB')} · {o.items?.length || 0} items
                               </p>

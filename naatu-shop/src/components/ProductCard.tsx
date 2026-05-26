@@ -1,16 +1,11 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Heart, ShoppingCart, Star, Plus, Minus } from 'lucide-react'
+import { Heart, ShoppingCart, Plus, Minus } from 'lucide-react'
 import { useCartStore, useFavStore, useProductModalStore, type Product } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { formatCurrency, calculateLineTotal, type QuantityOption } from '../lib/retail'
 import { getProductImage, onImgError } from '../lib/productImages'
 
-function formatBaseQty(qty: number, unit: string): string {
-  if (unit === 'g' && qty >= 1000) return `${qty / 1000}kg`
-  if (unit === 'ml' && qty >= 1000) return `${qty / 1000}L`
-  return `${qty}${unit}`
-}
 
 function getCompactPackOptions(product: Product): QuantityOption[] {
   if (product.predefinedOptions.length > 0) return product.predefinedOptions
@@ -35,7 +30,7 @@ export default function ProductCard({
 }: {
   product: Product
 }) {
-  const { addItem, add, removeItem, updateQuantity } = useCartStore()
+  const { addItem, removeItem, updateQuantity } = useCartStore()
   const { toggle, isFav } = useFavStore()
   const openProduct = useProductModalStore((state) => state.openProduct)
   const { lang } = useLangStore()
@@ -48,7 +43,6 @@ export default function ProductCard({
   const [selectedOpt, setSelectedOpt] = useState<QuantityOption | null>(
     hasOptions ? product.predefinedOptions[0] : null
   )
-  const [qty, setQty] = useState(1)
   const [mobileQty, setMobileQty] = useState(0)
 
   const basePrice = product.offerPrice && product.offerPrice < product.price
@@ -69,16 +63,6 @@ export default function ProductCard({
   const displayName = lang === 'ta' && (product.nameTa || product.tamilName)
     ? (product.nameTa || product.tamilName)!
     : product.name
-
-  const handleAddToCart = () => {
-    if (hasOptions && selectedOpt) {
-      addItem(product, selectedOpt.quantity, selectedOpt.unit)
-    } else if (product.unitType === 'unit' || product.unitType === 'bundle') {
-      addItem(product, qty, product.unitLabel)
-    } else {
-      add(product)
-    }
-  }
 
   const handleOpen = () => {
     openProduct(product)

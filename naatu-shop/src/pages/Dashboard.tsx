@@ -27,13 +27,24 @@ import {
 type Category = { id: string | number; name_en: string; name_ta: string; is_active?: boolean; sort_order?: number }
 type DashboardOrder = {
   id: string; invoice_no: string; customer_name: string; phone: string
-  created_at: string; total: number; status: string; order_mode: string; user_id: string | null; items: unknown
+  created_at: string; total: number; status: string; order_mode: string; order_type: string; user_id: string | null; items: unknown
 }
-type DashboardOrderItem = { order_id: string; product_name: string; quantity: number; line_total: number }
-type TabKey = 'overview' | 'billing' | 'products' | 'categories' | 'users'
+type DashboardOrderItem = { order_id: string; product_name: string; quantity: number; line_total: number; is_manual?: boolean | null }
+type DashboardCoupon = {
+  id: number
+  code: string
+  percentage: number
+  is_active: boolean
+  expiry_date: string | null
+  usage_limit: number | null
+  usage_count: number
+  min_order_value: number
+}
+type TabKey = 'overview' | 'billing' | 'products' | 'categories' | 'coupons' | 'users'
 type ProfileUser = { id: string; email: string; name: string; mobile: string; role: string; created_at: string }
 
 const normalizeStatus = (v: unknown) => String(v || '').trim().toLowerCase()
+const normalizeOrderType = (v: unknown) => String(v || '').trim().toLowerCase() || 'pos_sale'
 const isCompletedStatus = (v: unknown) => {
   const status = normalizeStatus(v)
   return status === 'completed' || status === 'paid'
@@ -54,11 +65,11 @@ const emptyForm = {
 }
 
 const exportCSV = (orders: DashboardOrder[]) => {
-  const header = ['Invoice No', 'Customer', 'Phone', 'Date', 'Total (Rs)', 'Status']
+  const header = ['Order Ref', 'Customer', 'Phone', 'Date', 'Total (Rs)', 'Order Type', 'Status']
   const rows = orders.map(o => [
-    o.invoice_no, o.customer_name, o.phone,
+    o.order_type === 'online_request' ? o.id : o.invoice_no, o.customer_name, o.phone,
     new Date(o.created_at).toLocaleDateString('en-IN'),
-    toNumber(o.total, 0).toFixed(2), o.status,
+    toNumber(o.total, 0).toFixed(2), o.order_type, o.status,
   ])
   const csv = [header, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -97,6 +108,8 @@ export default function Dashboard() {
   const [editingProd, setEditingProd] = useState<Product | null>(null)
   const [prodForm, setProdForm] = useState(emptyForm)
   const [newCat, setNewCat] = useState({ name_en: '', name_ta: '' })
+  const [coupons, setCoupons] = useState<DashboardCoupon[]>([])
+  const [couponForm, setCouponForm] = useState({ code: '', percentage: 10, expiry_date: '', usage_limit: '', min_order_value: '' })
 
   // Search & date filter
   const [search, setSearch] = useState({ invoiceNo: '', phone: '', email: '', userId: '', dateFrom: '', dateTo: '' })
@@ -122,6 +135,7 @@ export default function Dashboard() {
     created_at: String(row.created_at || ''), total: toNumber(row.total, 0),
     status: String(row.status || 'pending'),
     order_mode: normalizeOrderMode(row.order_mode),
+    order_type: normalizeOrderType(row.order_type),
     user_id: typeof row.user_id === 'string' ? row.user_id : null,
     items: row.items,
   })
@@ -132,25 +146,27 @@ export default function Dashboard() {
     const nonCancelledOrders = orders.filter((order) => normalizeStatus(order.status) !== 'cancelled')
     const completedOrders = nonCancelledOrders.filter((order) => isCompletedStatus(order.status))
     const pendingOrders = nonCancelledOrders.filter((order) => normalizeStatus(order.status) === 'pending')
+    const onlineRequests = pendingOrders.filter((order) => normalizeOrderType(order.order_type) === 'online_request' || normalizeOrderMode(order.order_mode) === 'online')
+    const billableCompletedOrders = completedOrders.filter((order) => normalizeOrderType(order.order_type) !== 'online_request')
+    const posSales = completedOrders.filter((order) => normalizeOrderType(order.order_type) === 'pos_sale')
+    const manualSalesOrders = completedOrders.filter((order) => normalizeOrderType(order.order_type) === 'manual_sale')
 
-    const completedRevenue = completedOrders.reduce((sum, order) => sum + toNumber(order.total, 0), 0)
+    const completedRevenue = billableCompletedOrders.reduce((sum, order) => sum + toNumber(order.total, 0), 0)
     const todayKey = new Date().toISOString().slice(0, 10)
     const monthKey = todayKey.slice(0, 7)
 
-    const todaySales = completedOrders
+    const todaySales = billableCompletedOrders
       .filter((order) => order.created_at.startsWith(todayKey))
       .reduce((sum, order) => sum + toNumber(order.total, 0), 0)
 
-    const monthlyRevenue = completedOrders
+    const monthlyRevenue = billableCompletedOrders
       .filter((order) => order.created_at.startsWith(monthKey))
       .reduce((sum, order) => sum + toNumber(order.total, 0), 0)
 
-    const onlineCompleted = completedOrders.filter((order) => normalizeOrderMode(order.order_mode) !== 'offline')
-    const offlineCompleted = completedOrders.filter((order) => normalizeOrderMode(order.order_mode) === 'offline')
-    const onlineRevenue = onlineCompleted.reduce((sum, order) => sum + toNumber(order.total, 0), 0)
-    const offlineRevenue = offlineCompleted.reduce((sum, order) => sum + toNumber(order.total, 0), 0)
+    const posRevenue = posSales.reduce((sum, order) => sum + toNumber(order.total, 0), 0)
+    const manualRevenue = manualSalesOrders.reduce((sum, order) => sum + toNumber(order.total, 0), 0)
 
-    const completedOrderIds = new Set(completedOrders.map((order) => order.id))
+    const completedOrderIds = new Set(billableCompletedOrders.map((order) => order.id))
     const completedItems = orderItems.length > 0
       ? orderItems.filter((item) => completedOrderIds.has(item.order_id))
       : completedOrders.flatMap((order) => parseOrderItems(order.items).map((row) => ({
@@ -158,6 +174,7 @@ export default function Dashboard() {
           product_name: String(row.product_name || row.name || 'Product'),
           quantity: toNumber(row.quantity ?? row.qty, 0),
           line_total: toNumber(row.line_total ?? row.lineTotal, 0),
+          is_manual: row.is_manual === true || row.source === 'manual',
         })))
 
     const productMap = new Map<string, { name: string; qty: number; revenue: number }>()
@@ -167,6 +184,7 @@ export default function Dashboard() {
     )
 
     let totalProductsSold = 0
+    let totalManualRevenue = 0
     completedItems.forEach(({ product_name, quantity, line_total }) => {
       const qty = toNumber(quantity, 0)
       const lineRevenue = toNumber(line_total, 0)
@@ -185,13 +203,19 @@ export default function Dashboard() {
       categoryMap.set(categoryName, catCur)
     })
 
+    completedItems.forEach((item) => {
+      if (item.is_manual) {
+        totalManualRevenue += toNumber(item.line_total, 0)
+      }
+    })
+
     const topProducts = Array.from(productMap.values()).sort((a, b) => b.qty - a.qty)
     const topCategories = Array.from(categoryMap.values()).sort((a, b) => b.qty - a.qty)
     const bestProduct = topProducts[0]?.name || 'No sales yet'
     const bestCategory = topCategories[0]?.name || 'No sales yet'
 
     const monthlyRevenueMap = new Map<string, number>()
-    completedOrders.forEach((order) => {
+    billableCompletedOrders.forEach((order) => {
       const key = order.created_at.slice(0, 7)
       monthlyRevenueMap.set(key, (monthlyRevenueMap.get(key) || 0) + toNumber(order.total, 0))
     })
@@ -208,17 +232,30 @@ export default function Dashboard() {
     })
 
     const statusDistribution = [
-      { name: 'Pending', value: pendingOrders.length, color: '#f59e0b' },
+      { name: 'Requests', value: onlineRequests.length, color: '#3b82f6' },
+      { name: 'Pending', value: pendingOrders.length - onlineRequests.length, color: '#f59e0b' },
       { name: 'Completed', value: completedOrders.length, color: '#10b981' },
     ]
 
     const channelDistribution = [
-      { name: 'Online', value: onlineRevenue, color: '#3b82f6' },
-      { name: 'Offline POS', value: offlineRevenue, color: '#f97316' },
+      { name: 'POS Revenue', value: posRevenue, color: '#f97316' },
+      { name: 'Manual Sales', value: manualRevenue || totalManualRevenue, color: '#8b5cf6' },
     ]
 
+    const couponMap = new Map<string, { code: string; usage: number; discounts: number }>()
+    billableCompletedOrders.forEach((order) => {
+      const code = String((order as Record<string, unknown>).coupon_code || '').trim()
+      if (!code) return
+      const usage = couponMap.get(code) || { code, usage: 0, discounts: 0 }
+      usage.usage += 1
+      usage.discounts += toNumber((order as Record<string, unknown>).discount_amount, 0)
+      couponMap.set(code, usage)
+    })
+
+    const topCoupons = Array.from(couponMap.values()).sort((a, b) => b.usage - a.usage)
+
     const weeklyRevenueMap = new Map<string, number>()
-    completedOrders.forEach((order) => {
+    billableCompletedOrders.forEach((order) => {
       const key = order.created_at.slice(0, 10)
       weeklyRevenueMap.set(key, (weeklyRevenueMap.get(key) || 0) + toNumber(order.total, 0))
     })
@@ -238,9 +275,10 @@ export default function Dashboard() {
       totalCompletedRevenue: completedRevenue,
       todaySales,
       pendingOrders: pendingOrders.length,
+      onlineRequests: onlineRequests.length,
       completedOrders: completedOrders.length,
-      onlineRevenue,
-      offlineRevenue,
+      posRevenue,
+      manualRevenue: manualRevenue || totalManualRevenue,
       monthlyRevenue,
       totalProductsSold,
       bestCategory,
@@ -248,6 +286,7 @@ export default function Dashboard() {
       monthlyTrend,
       channelDistribution,
       statusDistribution,
+      topCoupons,
       topCategories: topCategories.slice(0, 6),
       weeklySales,
     }
@@ -270,15 +309,38 @@ export default function Dashboard() {
 
       const orderIds = mappedOrders.map(o => o.id).filter(Boolean)
       if (orderIds.length > 0) {
-        const { data: oi } = await supabase
-          .from('order_items').select('order_id,product_name,quantity,line_total')
+        let oi: unknown[] | null = null
+        let orderItemsError: unknown = null
+        const orderItemsResult = await supabase
+          .from('order_items').select('order_id,product_name,quantity,line_total,is_manual')
           .in('order_id', orderIds)
+        oi = orderItemsResult.data
+        orderItemsError = orderItemsResult.error
+
+        if (orderItemsError) {
+          const fallbackItemsResult = await supabase
+            .from('order_items').select('order_id,product_name,quantity,line_total')
+            .in('order_id', orderIds)
+          oi = fallbackItemsResult.data
+        }
+
         setOrderItems((oi || []).map(r => ({
           order_id: String((r as Record<string,unknown>).order_id || ''),
           product_name: String((r as Record<string,unknown>).product_name || 'Product'),
           quantity: toNumber((r as Record<string,unknown>).quantity, 0),
           line_total: toNumber((r as Record<string,unknown>).line_total, 0),
+          is_manual: Boolean((r as Record<string,unknown>).is_manual),
         })))
+      }
+
+      try {
+        const { data: couponRows } = await supabase
+          .from('coupons')
+          .select('id, code, percentage, is_active, expiry_date, usage_limit, usage_count, min_order_value')
+          .order('created_at', { ascending: false })
+        setCoupons((couponRows || []) as DashboardCoupon[])
+      } catch {
+        setCoupons([])
       }
     } catch (err) { console.error('Dashboard load error', err) }
     finally { setLoading(false) }
@@ -294,6 +356,15 @@ export default function Dashboard() {
     if (error) { setUsersError(error.message) }
     else { setAllUsers((data || []) as ProfileUser[]) }
     setUsersLoading(false)
+  }, [])
+
+  const loadCoupons = useCallback(async () => {
+    if (!isSupabaseConfigured) return
+    const { data } = await supabase
+      .from('coupons')
+      .select('id, code, percentage, is_active, expiry_date, usage_limit, usage_count, min_order_value')
+      .order('created_at', { ascending: false })
+    setCoupons((data || []) as DashboardCoupon[])
   }, [])
 
   const toggleUserRole = async (u: ProfileUser) => {
@@ -312,6 +383,29 @@ export default function Dashboard() {
     setSearchResults(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
   }
 
+  const saveCoupon = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!couponForm.code.trim()) return
+    const payload = {
+      code: couponForm.code.trim().toUpperCase(),
+      percentage: toNumber(couponForm.percentage, 0),
+      is_active: true,
+      expiry_date: couponForm.expiry_date || null,
+      usage_limit: couponForm.usage_limit ? toNumber(couponForm.usage_limit, 0) : null,
+      min_order_value: toNumber(couponForm.min_order_value, 0),
+    }
+    const { error } = await supabase.from('coupons').upsert(payload, { onConflict: 'code' })
+    if (!error) {
+      setCouponForm({ code: '', percentage: 10, expiry_date: '', usage_limit: '', min_order_value: '' })
+      await loadCoupons()
+    }
+  }
+
+  const toggleCoupon = async (coupon: DashboardCoupon) => {
+    await supabase.from('coupons').update({ is_active: !coupon.is_active }).eq('id', coupon.id)
+    await loadCoupons()
+  }
+
   useEffect(() => {
     if (!isAdmin) return
     void loadData()
@@ -326,7 +420,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (tab === 'users') void loadUsers()
-  }, [tab, loadUsers])
+    if (tab === 'coupons') void loadCoupons()
+  }, [tab, loadUsers, loadCoupons])
 
   // Order search
   const runSearch = async (e?: FormEvent) => {
@@ -484,6 +579,7 @@ export default function Dashboard() {
     { id: 'billing',     icon: <ShoppingCart size={17} />,   label: 'POS Terminal' },
     { id: 'products',    icon: <Box size={17} />,            label: 'Inventory' },
     { id: 'categories',  icon: <List size={17} />,           label: 'Categories' },
+    { id: 'coupons',     icon: <Trophy size={17} />,         label: 'Coupons' },
     { id: 'users',       icon: <Users size={17} />,          label: 'Users' },
   ]
 
@@ -538,8 +634,8 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 sm:gap-4">
               {[
                 {
-                  label: 'Total Completed Revenue',
-                  helper: 'Money Earned',
+                  label: 'POS Revenue',
+                  helper: 'Completed billing only',
                   value: formatCurrency(analytics.totalCompletedRevenue),
                   icon: <IndianRupee size={18} />,
                   color: 'text-emerald-700',
@@ -554,33 +650,33 @@ export default function Dashboard() {
                   bg: 'bg-blue-50',
                 },
                 {
-                  label: 'Pending Orders',
-                  helper: 'Awaiting confirmation',
-                  value: analytics.pendingOrders,
+                  label: 'Online Requests',
+                  helper: 'Pending WhatsApp requests',
+                  value: analytics.onlineRequests,
                   icon: <Package size={18} />,
                   color: 'text-amber-700',
                   bg: 'bg-amber-50',
                 },
                 {
-                  label: 'Completed Orders',
-                  helper: 'Confirmed sales',
+                  label: 'Completed Sales',
+                  helper: 'POS + manual bills',
                   value: analytics.completedOrders,
                   icon: <Trophy size={18} />,
                   color: 'text-green-700',
                   bg: 'bg-green-50',
                 },
                 {
-                  label: 'Online Orders Revenue',
-                  helper: 'Completed online',
-                  value: formatCurrency(analytics.onlineRevenue),
+                  label: 'POS Revenue',
+                  helper: 'Completed bills only',
+                  value: formatCurrency(analytics.posRevenue),
                   icon: <IndianRupee size={18} />,
                   color: 'text-cyan-700',
                   bg: 'bg-cyan-50',
                 },
                 {
-                  label: 'Offline POS Revenue',
-                  helper: 'Completed POS',
-                  value: formatCurrency(analytics.offlineRevenue),
+                  label: 'Manual Sales',
+                  helper: 'Manual item revenue',
+                  value: formatCurrency(analytics.manualRevenue),
                   icon: <ShoppingCart size={18} />,
                   color: 'text-orange-700',
                   bg: 'bg-orange-50',
@@ -594,23 +690,23 @@ export default function Dashboard() {
                   bg: 'bg-violet-50',
                 },
                 {
-                  label: 'Total Products Sold',
-                  helper: 'From completed orders',
+                  label: 'Total Items Sold',
+                  helper: 'From completed bills',
                   value: Math.round(analytics.totalProductsSold),
                   icon: <Box size={18} />,
                   color: 'text-indigo-700',
                   bg: 'bg-indigo-50',
                 },
                 {
-                  label: 'Best Selling Category',
-                  helper: 'Top category now',
+                  label: 'Top Category',
+                  helper: 'Most sold category',
                   value: analytics.bestCategory,
                   icon: <List size={18} />,
                   color: 'text-sky-700',
                   bg: 'bg-sky-50',
                 },
                 {
-                  label: 'Best Selling Product',
+                  label: 'Top Product',
                   helper: 'Most sold item',
                   value: analytics.bestProduct,
                   icon: <Trophy size={18} />,
@@ -646,7 +742,7 @@ export default function Dashboard() {
               </div>
 
               <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm">
-                <h3 className="text-base font-black text-[#2C392A] mb-4">Online vs Offline Sales</h3>
+                <h3 className="text-base font-black text-[#2C392A] mb-4">POS vs Manual Sales</h3>
                 <div className="h-56 sm:h-60">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -717,13 +813,33 @@ export default function Dashboard() {
                   </ResponsiveContainer>
                 </div>
               </div>
+
+              <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm xl:col-span-2">
+                <h3 className="text-base font-black text-[#2C392A] mb-4">Coupon Analytics</h3>
+                <div className="space-y-3">
+                  {analytics.topCoupons.length > 0 ? analytics.topCoupons.map((coupon) => (
+                    <div key={coupon.code} className="flex items-center justify-between gap-3 p-3 bg-[#F7F6F2] rounded-xl">
+                      <div>
+                        <p className="font-black text-[#2C392A]">{coupon.code}</p>
+                        <p className="text-[11px] text-[#5F6D59]">Used {coupon.usage} time(s)</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-black text-[#2C392A]">{formatCurrency(coupon.discounts)}</p>
+                        <p className="text-[11px] text-[#5F6D59]">Discounts given</p>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="text-center text-[13px] text-[#5F6D59] py-8">No coupon usage yet</div>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 sm:p-6 shadow-sm">
               <h3 className="text-base font-black text-[#2C392A] mb-4">Order Management</h3>
               <form onSubmit={runSearch} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                 {[
-                  { key: 'invoiceNo', placeholder: 'Invoice No (INV-...)' },
+                  { key: 'invoiceNo', placeholder: 'Order Request ID / Bill No' },
                   { key: 'phone',     placeholder: 'Mobile Number' },
                   { key: 'email',     placeholder: 'Email / User ID' },
                   { key: 'userId',    placeholder: 'Customer Code (CUST-...)' },
@@ -757,7 +873,7 @@ export default function Dashboard() {
                 <table className="w-full min-w-[600px] text-left text-[13px]">
                   <thead className="bg-[#F7F6F2] text-[10px] uppercase tracking-wider text-[#5F6D59]">
                     <tr>
-                      {['Invoice','Customer','Phone','Date','Total','Order Type','Status Badge','Change Status'].map(h => (
+                      {['Order Ref','Customer','Phone','Date','Total','Order Type','Status Badge','Change Status'].map(h => (
                         <th key={h} className="px-4 py-3 font-black">{h}</th>
                       ))}
                     </tr>
@@ -765,7 +881,7 @@ export default function Dashboard() {
                   <tbody className="divide-y divide-[#EAD7B7]/20">
                     {searchResults.slice(0, 50).map(o => (
                       <tr key={o.id} className="hover:bg-[#F7F6F2]/50">
-                        <td className="px-4 py-3 font-bold text-[#7DAA8F] text-[12px]">{o.invoice_no}</td>
+                        <td className="px-4 py-3 font-bold text-[#7DAA8F] text-[12px]">{normalizeOrderType(o.order_type) === 'online_request' ? o.id : o.invoice_no}</td>
                         <td className="px-4 py-3 font-semibold text-[13px]">{o.customer_name}</td>
                         <td className="px-4 py-3 text-[13px]">{o.phone}</td>
                         <td className="px-4 py-3 text-[12px]">{new Date(o.created_at).toLocaleDateString('en-IN')}</td>
@@ -773,7 +889,7 @@ export default function Dashboard() {
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
                             normalizeOrderMode(o.order_mode) === 'offline' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
-                          }`}>{normalizeOrderMode(o.order_mode) === 'offline' ? 'OFFLINE' : 'ONLINE'}</span>
+                          }`}>{normalizeOrderType(o.order_type) === 'online_request' ? 'REQUEST' : normalizeOrderType(o.order_type) === 'manual_sale' ? 'MANUAL' : 'POS'}</span>
                         </td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
@@ -1068,6 +1184,74 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ΓöÇΓöÇ COUPONS TAB ΓöÇΓöÇ */}
+        {tab === 'coupons' && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-black text-[#2C392A]">Coupon Management</h2>
+              <button onClick={() => void loadCoupons()}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-[#EAD7B7]/60 rounded-xl text-[13px] font-bold text-[#5F6D59] hover:bg-[#F7F6F2] transition-colors">
+                <RefreshCw size={14} /> Refresh
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <form onSubmit={saveCoupon} className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 sm:p-6 shadow-sm space-y-4">
+                <h3 className="text-base font-black text-[#2C392A]">Create Coupon</h3>
+                <input className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold uppercase"
+                  placeholder="WELCOME10"
+                  value={couponForm.code}
+                  onChange={e => setCouponForm(f => ({ ...f, code: e.target.value }))} />
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="number" min="1" max="100" className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
+                    placeholder="Percent"
+                    value={couponForm.percentage}
+                    onChange={e => setCouponForm(f => ({ ...f, percentage: Number(e.target.value) }))} />
+                  <input type="number" min="0" className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
+                    placeholder="Min order"
+                    value={couponForm.min_order_value}
+                    onChange={e => setCouponForm(f => ({ ...f, min_order_value: e.target.value }))} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="date" className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
+                    value={couponForm.expiry_date}
+                    onChange={e => setCouponForm(f => ({ ...f, expiry_date: e.target.value }))} />
+                  <input type="number" min="0" className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
+                    placeholder="Usage limit"
+                    value={couponForm.usage_limit}
+                    onChange={e => setCouponForm(f => ({ ...f, usage_limit: e.target.value }))} />
+                </div>
+                <button type="submit" className="w-full py-3 rounded-xl bg-[#2C392A] text-white font-black text-[13px] hover:bg-[#1e2817]">
+                  Save Coupon
+                </button>
+              </form>
+
+              <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 sm:p-6 shadow-sm">
+                <h3 className="text-base font-black text-[#2C392A] mb-4">Existing Coupons</h3>
+                <div className="space-y-3 max-h-[32rem] overflow-y-auto pr-1">
+                  {coupons.map((coupon) => (
+                    <div key={coupon.id} className="flex items-center justify-between gap-3 p-3 bg-[#F7F6F2] rounded-xl">
+                      <div>
+                        <p className="font-black text-[#2C392A]">{coupon.code}</p>
+                        <p className="text-[11px] text-[#5F6D59]">
+                          {coupon.percentage}% off · Used {coupon.usage_count} time(s)
+                        </p>
+                      </div>
+                      <button onClick={() => void toggleCoupon(coupon)}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase ${coupon.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {coupon.is_active ? 'Active' : 'Disabled'}
+                      </button>
+                    </div>
+                  ))}
+                  {coupons.length === 0 && (
+                    <div className="text-center text-[13px] text-[#5F6D59] py-8">No coupons yet</div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
