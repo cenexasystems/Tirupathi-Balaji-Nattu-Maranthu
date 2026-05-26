@@ -236,7 +236,7 @@ export default function Dashboard() {
     const statusDistribution = [
       { name: 'Requests', value: onlineRequests.length, color: '#3b82f6' },
       { name: 'Pending', value: pendingOrders.length - onlineRequests.length, color: '#f59e0b' },
-      { name: 'Completed', value: completedOrders.length, color: '#10b981' },
+      { name: 'Completed', value: billableCompletedOrders.length, color: '#10b981' },
     ]
 
     const channelDistribution = [
@@ -279,7 +279,7 @@ export default function Dashboard() {
       pendingOrders: pendingOrders.length,
       onlineRequests: onlineRequests.length,
       onlineRequestOrders: onlineRequests.slice(0, 15),
-      completedOrders: completedOrders.length,
+      completedOrders: billableCompletedOrders.length,
       posRevenue,
       manualRevenue: manualRevenue || totalManualRevenue,
       monthlyRevenue,

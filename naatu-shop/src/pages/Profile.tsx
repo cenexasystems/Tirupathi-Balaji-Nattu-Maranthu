@@ -41,6 +41,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }>
   pending: { bg: '#FEF3C7', text: '#92400E', label: 'Pending' },
   processing: { bg: '#DBEAFE', text: '#1E40AF', label: 'Processing' },
   completed: { bg: '#D1FAE5', text: '#065F46', label: 'Completed' },
+  responded: { bg: '#DBEAFE', text: '#1E40AF', label: 'Responded' },
   cancelled: { bg: '#FEE2E2', text: '#991B1B', label: 'Cancelled' },
 }
 
@@ -439,7 +440,11 @@ export default function Profile() {
                 ) : (
                   <div className="space-y-3">
                     {orders.map((o) => {
-                      const statusInfo = STATUS_COLORS[o.status] || STATUS_COLORS.pending
+                      const isOnlineRequest = o.order_type === 'online_request'
+                      const statusKey = isOnlineRequest && (o.status === 'completed' || o.status === 'paid')
+                        ? 'responded'
+                        : o.status
+                      const statusInfo = STATUS_COLORS[statusKey] || STATUS_COLORS.pending
                       const isExpanded = expanded === o.id
                       return (
                         <div key={o.id} className="border border-sand rounded-xl overflow-hidden">
