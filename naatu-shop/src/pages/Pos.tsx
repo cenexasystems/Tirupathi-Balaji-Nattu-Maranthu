@@ -305,7 +305,7 @@ export default function Pos() {
     try {
       const created = await createOrderWithStock({
         customerName: customer.name.trim() || 'Walk-in Customer',
-        phone: customer.phone.trim() || '0000000000',
+        phone: customer.phone.trim(),
         address: customer.address.trim() || 'POS Counter',
         items: items.map(item => buildStructuredOrderItem({
           productId: toProductId(item.id),
@@ -365,17 +365,23 @@ export default function Pos() {
 
   const sendPosWhatsApp = (inv: InvoiceSnap) => {
     const lines = inv.items
-      .map(i => `• ${i.name} × ${formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)} = ${formatCurrency(i.lineTotal)}`)
+      .map((i, idx) => `  ${idx + 1}. ${i.name} × ${formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)}  →  ${formatCurrency(i.lineTotal)}`)
       .join('\n')
     const targetPhone = (inv.phone || customer.phone || '').replace(/\D/g, '')
     const waLink = targetPhone ? `https://wa.me/${targetPhone}` : BRAND_WHATSAPP_LINK
+    const sep = '━━━━━━━━━━━━━━━━━━━━'
     const text = encodeURIComponent(
       `🌿 *${BRAND_EN}*\n` +
-      `📋 *Bill / Receipt:* ${inv.invoiceNo}\n` +
+      `${sep}\n` +
+      `📋 *Receipt:* ${inv.invoiceNo}\n` +
       (inv.customerName !== 'Walk-in Customer' ? `👤 *Customer:* ${inv.customerName}\n` : '') +
       (inv.phone ? `📞 ${inv.phone}\n` : '') +
-      `\n${lines}\n\n` +
-      `*Total: ${formatCurrency(inv.total)}*\n\n` +
+      `${sep}\n` +
+      `🛒 *Items:*\n\n` +
+      `${lines}\n\n` +
+      `${sep}\n` +
+      `💰 *Total: ${formatCurrency(inv.total)}*\n` +
+      `${sep}\n\n` +
       `நன்றி! | Thank you! 🙏`
     )
     window.open(`${waLink}?text=${text}`, '_blank')

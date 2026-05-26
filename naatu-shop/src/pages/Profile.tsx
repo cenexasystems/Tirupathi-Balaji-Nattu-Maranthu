@@ -449,7 +449,7 @@ export default function Profile() {
                           >
                             <div>
                               <p className="font-bold text-sm text-textMain">
-                                {o.order_type === 'online_request' ? `Order Request ID: ${o.id}` : `Bill No: ${o.invoice_no}`}
+                                {o.order_type === 'online_request' ? `WhatsApp Request: ${o.id}` : `Bill No: ${o.invoice_no}`}
                               </p>
                               <p className="text-xs text-textMuted mt-0.5">
                                 {new Date(o.created_at).toLocaleDateString('en-GB')} · {o.items?.length || 0} items

@@ -110,6 +110,8 @@ export default function Dashboard() {
   const [newCat, setNewCat] = useState({ name_en: '', name_ta: '' })
   const [coupons, setCoupons] = useState<DashboardCoupon[]>([])
   const [couponForm, setCouponForm] = useState({ code: '', percentage: 10, expiry_date: '', usage_limit: '', min_order_value: '' })
+  const [couponSaveError, setCouponSaveError] = useState('')
+  const [couponSaveSuccess, setCouponSaveSuccess] = useState('')
 
   // Search & date filter
   const [search, setSearch] = useState({ invoiceNo: '', phone: '', email: '', userId: '', dateFrom: '', dateTo: '' })
@@ -276,6 +278,7 @@ export default function Dashboard() {
       todaySales,
       pendingOrders: pendingOrders.length,
       onlineRequests: onlineRequests.length,
+      onlineRequestOrders: onlineRequests.slice(0, 15),
       completedOrders: completedOrders.length,
       posRevenue,
       manualRevenue: manualRevenue || totalManualRevenue,
@@ -383,9 +386,20 @@ export default function Dashboard() {
     setSearchResults(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
   }
 
+  const generateCouponCode = () => {
+    const prefixes = ['SAVE', 'FEST', 'NAATU', 'HERBAL', 'SHOP', 'SPECIAL', 'FRESH']
+    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)]
+    const suffix = Math.floor(Math.random() * 90 + 10)
+    setCouponForm(f => ({ ...f, code: `${prefix}${suffix}` }))
+    setCouponSaveError('')
+    setCouponSaveSuccess('')
+  }
+
   const saveCoupon = async (e: FormEvent) => {
     e.preventDefault()
-    if (!couponForm.code.trim()) return
+    setCouponSaveError('')
+    setCouponSaveSuccess('')
+    if (!couponForm.code.trim()) { setCouponSaveError('Coupon code is required'); return }
     const payload = {
       code: couponForm.code.trim().toUpperCase(),
       percentage: toNumber(couponForm.percentage, 0),
@@ -395,8 +409,11 @@ export default function Dashboard() {
       min_order_value: toNumber(couponForm.min_order_value, 0),
     }
     const { error } = await supabase.from('coupons').upsert(payload, { onConflict: 'code' })
-    if (!error) {
+    if (error) {
+      setCouponSaveError(error.message || 'Failed to save coupon')
+    } else {
       setCouponForm({ code: '', percentage: 10, expiry_date: '', usage_limit: '', min_order_value: '' })
+      setCouponSaveSuccess('Coupon saved successfully!')
       await loadCoupons()
     }
   }
@@ -631,98 +648,169 @@ export default function Dashboard() {
                 </button>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 sm:gap-4">
-              {[
-                {
-                  label: 'POS Revenue',
-                  helper: 'Completed billing only',
-                  value: formatCurrency(analytics.totalCompletedRevenue),
-                  icon: <IndianRupee size={18} />,
-                  color: 'text-emerald-700',
-                  bg: 'bg-emerald-50',
-                },
-                {
-                  label: "Today's Sales",
-                  helper: 'Completed today',
-                  value: formatCurrency(analytics.todaySales),
-                  icon: <TrendingUp size={18} />,
-                  color: 'text-blue-700',
-                  bg: 'bg-blue-50',
-                },
-                {
-                  label: 'Online Requests',
-                  helper: 'Pending WhatsApp requests',
-                  value: analytics.onlineRequests,
-                  icon: <Package size={18} />,
-                  color: 'text-amber-700',
-                  bg: 'bg-amber-50',
-                },
-                {
-                  label: 'Completed Sales',
-                  helper: 'POS + manual bills',
-                  value: analytics.completedOrders,
-                  icon: <Trophy size={18} />,
-                  color: 'text-green-700',
-                  bg: 'bg-green-50',
-                },
-                {
-                  label: 'POS Revenue',
-                  helper: 'Completed bills only',
-                  value: formatCurrency(analytics.posRevenue),
-                  icon: <IndianRupee size={18} />,
-                  color: 'text-cyan-700',
-                  bg: 'bg-cyan-50',
-                },
-                {
-                  label: 'Manual Sales',
-                  helper: 'Manual item revenue',
-                  value: formatCurrency(analytics.manualRevenue),
-                  icon: <ShoppingCart size={18} />,
-                  color: 'text-orange-700',
-                  bg: 'bg-orange-50',
-                },
-                {
-                  label: 'Monthly Revenue',
-                  helper: 'Current month',
-                  value: formatCurrency(analytics.monthlyRevenue),
-                  icon: <BarChart2 size={18} />,
-                  color: 'text-violet-700',
-                  bg: 'bg-violet-50',
-                },
-                {
-                  label: 'Total Items Sold',
-                  helper: 'From completed bills',
-                  value: Math.round(analytics.totalProductsSold),
-                  icon: <Box size={18} />,
-                  color: 'text-indigo-700',
-                  bg: 'bg-indigo-50',
-                },
-                {
-                  label: 'Top Category',
-                  helper: 'Most sold category',
-                  value: analytics.bestCategory,
-                  icon: <List size={18} />,
-                  color: 'text-sky-700',
-                  bg: 'bg-sky-50',
-                },
-                {
-                  label: 'Top Product',
-                  helper: 'Most sold item',
-                  value: analytics.bestProduct,
-                  icon: <Trophy size={18} />,
-                  color: 'text-pink-700',
-                  bg: 'bg-pink-50',
-                },
-              ].map((card, index) => (
-                <div key={index} className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <p className="text-[10px] uppercase font-black text-[#5F6D59] tracking-wider">{card.label}</p>
-                    <div className={`w-8 h-8 rounded-xl ${card.bg} flex items-center justify-center ${card.color}`}>{card.icon}</div>
-                  </div>
-                  <p className="text-[11px] text-[#7A846F] font-semibold mb-2">{card.helper}</p>
-                  <p className="text-[22px] leading-tight font-black text-[#2C392A] break-words">{card.value}</p>
+            {/* ── WhatsApp Customer Interactions ── */}
+            <div className="bg-white rounded-2xl border border-blue-200 p-5 shadow-sm">
+              <div className="flex items-center gap-2 mb-4">
+                <Package size={18} className="text-blue-600" />
+                <h3 className="text-base font-black text-[#2C392A]">WhatsApp Customer Interactions</h3>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                <div className="bg-blue-50 rounded-xl p-3">
+                  <p className="text-[10px] uppercase font-black text-blue-600 tracking-wider mb-1">Total Requests</p>
+                  <p className="text-[22px] font-black text-[#2C392A]">{analytics.onlineRequests}</p>
+                  <p className="text-[11px] text-[#7A846F]">Pending WA interactions</p>
                 </div>
-              ))}
+                <div className="bg-amber-50 rounded-xl p-3">
+                  <p className="text-[10px] uppercase font-black text-amber-600 tracking-wider mb-1">Awaiting Response</p>
+                  <p className="text-[22px] font-black text-[#2C392A]">{analytics.onlineRequestOrders.filter(o => normalizeStatus(o.status) === 'pending').length}</p>
+                  <p className="text-[11px] text-[#7A846F]">Needs follow-up</p>
+                </div>
+                <div className="bg-green-50 rounded-xl p-3">
+                  <p className="text-[10px] uppercase font-black text-green-600 tracking-wider mb-1">Completed</p>
+                  <p className="text-[22px] font-black text-[#2C392A]">{analytics.onlineRequestOrders.filter(o => isCompletedStatus(o.status)).length}</p>
+                  <p className="text-[11px] text-[#7A846F]">Interactions resolved</p>
+                </div>
+              </div>
+              {analytics.onlineRequestOrders.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[12px] min-w-[520px]">
+                    <thead>
+                      <tr className="text-left text-[#5F6D59] font-bold border-b border-[#EAD7B7]/40">
+                        <th className="pb-2 pr-3">Customer Phone</th>
+                        <th className="pb-2 pr-3">Items</th>
+                        <th className="pb-2 pr-3">Price</th>
+                        <th className="pb-2 pr-3">Date</th>
+                        <th className="pb-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#EAD7B7]/30">
+                      {analytics.onlineRequestOrders.map((order) => {
+                        const orderItemsList = parseOrderItems(order.items)
+                        const itemSummary = orderItemsList.length > 0
+                          ? orderItemsList.slice(0, 2).map(i => String((i as Record<string,unknown>).name || (i as Record<string,unknown>).product_name || 'Item')).join(', ') + (orderItemsList.length > 2 ? ` +${orderItemsList.length - 2}` : '')
+                          : '—'
+                        return (
+                          <tr key={order.id} className="hover:bg-[#F7F6F2]">
+                            <td className="py-2 pr-3 font-bold text-[#2C392A]">{order.phone || order.customer_name || '—'}</td>
+                            <td className="py-2 pr-3 text-[#5F6D59] max-w-[160px] truncate">{itemSummary}</td>
+                            <td className="py-2 pr-3 font-bold text-[#2C392A] whitespace-nowrap">{formatCurrency(toNumber(order.total, 0))}</td>
+                            <td className="py-2 pr-3 text-[#7A846F] whitespace-nowrap">{new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</td>
+                            <td className="py-2">
+                              <select
+                                value={normalizeStatus(order.status)}
+                                onChange={e => void updateOrderStatus(order.id, e.target.value)}
+                                className={`text-[11px] font-black px-2 py-1 rounded-lg border cursor-pointer outline-none ${
+                                  isCompletedStatus(order.status)
+                                    ? 'bg-green-100 text-green-700 border-green-200'
+                                    : 'bg-amber-100 text-amber-700 border-amber-200'
+                                }`}
+                              >
+                                <option value="pending">Pending</option>
+                                <option value="completed">Responded</option>
+                              </select>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-[13px] text-[#5F6D59] text-center py-4">No WhatsApp requests yet</p>
+              )}
+            </div>
+
+            {/* ── POS Revenue Dashboard ── */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <IndianRupee size={18} className="text-emerald-600" />
+                <h3 className="text-base font-black text-[#2C392A]">POS Revenue Dashboard</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 sm:gap-4">
+                {[
+                  {
+                    label: 'Total Revenue',
+                    helper: 'POS + manual combined',
+                    value: formatCurrency(analytics.totalCompletedRevenue),
+                    icon: <IndianRupee size={18} />,
+                    color: 'text-emerald-700',
+                    bg: 'bg-emerald-50',
+                  },
+                  {
+                    label: "Today's Sales",
+                    helper: 'Completed today',
+                    value: formatCurrency(analytics.todaySales),
+                    icon: <TrendingUp size={18} />,
+                    color: 'text-blue-700',
+                    bg: 'bg-blue-50',
+                  },
+                  {
+                    label: 'Completed Bills',
+                    helper: 'POS + manual bills',
+                    value: analytics.completedOrders,
+                    icon: <Trophy size={18} />,
+                    color: 'text-green-700',
+                    bg: 'bg-green-50',
+                  },
+                  {
+                    label: 'Direct POS',
+                    helper: 'From POS terminal',
+                    value: formatCurrency(analytics.posRevenue),
+                    icon: <IndianRupee size={18} />,
+                    color: 'text-cyan-700',
+                    bg: 'bg-cyan-50',
+                  },
+                  {
+                    label: 'Manual Sales',
+                    helper: 'Manual item revenue',
+                    value: formatCurrency(analytics.manualRevenue),
+                    icon: <ShoppingCart size={18} />,
+                    color: 'text-orange-700',
+                    bg: 'bg-orange-50',
+                  },
+                  {
+                    label: 'Monthly Revenue',
+                    helper: 'Current month',
+                    value: formatCurrency(analytics.monthlyRevenue),
+                    icon: <BarChart2 size={18} />,
+                    color: 'text-violet-700',
+                    bg: 'bg-violet-50',
+                  },
+                  {
+                    label: 'Total Items Sold',
+                    helper: 'From completed bills',
+                    value: Math.round(analytics.totalProductsSold),
+                    icon: <Box size={18} />,
+                    color: 'text-indigo-700',
+                    bg: 'bg-indigo-50',
+                  },
+                  {
+                    label: 'Top Category',
+                    helper: 'Most sold category',
+                    value: analytics.bestCategory,
+                    icon: <List size={18} />,
+                    color: 'text-sky-700',
+                    bg: 'bg-sky-50',
+                  },
+                  {
+                    label: 'Top Product',
+                    helper: 'Most sold item',
+                    value: analytics.bestProduct,
+                    icon: <Trophy size={18} />,
+                    color: 'text-pink-700',
+                    bg: 'bg-pink-50',
+                  },
+                ].map((card, index) => (
+                  <div key={index} className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <p className="text-[10px] uppercase font-black text-[#5F6D59] tracking-wider">{card.label}</p>
+                      <div className={`w-8 h-8 rounded-xl ${card.bg} flex items-center justify-center ${card.color}`}>{card.icon}</div>
+                    </div>
+                    <p className="text-[11px] text-[#7A846F] font-semibold mb-2">{card.helper}</p>
+                    <p className="text-[22px] leading-tight font-black text-[#2C392A] break-words">{card.value}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -839,7 +927,7 @@ export default function Dashboard() {
               <h3 className="text-base font-black text-[#2C392A] mb-4">Order Management</h3>
               <form onSubmit={runSearch} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                 {[
-                  { key: 'invoiceNo', placeholder: 'Order Request ID / Bill No' },
+                  { key: 'invoiceNo', placeholder: 'WhatsApp Request ID / Bill No' },
                   { key: 'phone',     placeholder: 'Mobile Number' },
                   { key: 'email',     placeholder: 'Email / User ID' },
                   { key: 'userId',    placeholder: 'Customer Code (CUST-...)' },
@@ -1203,28 +1291,58 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               <form onSubmit={saveCoupon} className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 sm:p-6 shadow-sm space-y-4">
                 <h3 className="text-base font-black text-[#2C392A]">Create Coupon</h3>
-                <input className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold uppercase"
-                  placeholder="WELCOME10"
-                  value={couponForm.code}
-                  onChange={e => setCouponForm(f => ({ ...f, code: e.target.value }))} />
+
+                {couponSaveError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-[12px] font-bold text-red-700">{couponSaveError}</div>
+                )}
+                {couponSaveSuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-[12px] font-bold text-emerald-700">{couponSaveSuccess}</div>
+                )}
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Coupon Code *</label>
+                  <div className="flex gap-2">
+                    <input className="flex-1 px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold uppercase"
+                      placeholder="WELCOME10"
+                      value={couponForm.code}
+                      onChange={e => { setCouponForm(f => ({ ...f, code: e.target.value.toUpperCase() })); setCouponSaveError(''); setCouponSaveSuccess('') }} />
+                    <button type="button" onClick={generateCouponCode}
+                      className="px-3 py-2.5 bg-[#7DAA8F] text-white font-black rounded-xl text-[12px] hover:bg-[#5e8c72] whitespace-nowrap">
+                      Generate
+                    </button>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
-                  <input type="number" min="1" max="100" className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
-                    placeholder="Percent"
-                    value={couponForm.percentage}
-                    onChange={e => setCouponForm(f => ({ ...f, percentage: Number(e.target.value) }))} />
-                  <input type="number" min="0" className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
-                    placeholder="Min order"
-                    value={couponForm.min_order_value}
-                    onChange={e => setCouponForm(f => ({ ...f, min_order_value: e.target.value }))} />
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Discount %</label>
+                    <input type="number" min="1" max="100" className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
+                      placeholder="10"
+                      value={couponForm.percentage}
+                      onChange={e => setCouponForm(f => ({ ...f, percentage: Number(e.target.value) }))} />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Min Order (₹)</label>
+                    <input type="number" min="0" className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
+                      placeholder="0"
+                      value={couponForm.min_order_value}
+                      onChange={e => setCouponForm(f => ({ ...f, min_order_value: e.target.value }))} />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <input type="date" className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
-                    value={couponForm.expiry_date}
-                    onChange={e => setCouponForm(f => ({ ...f, expiry_date: e.target.value }))} />
-                  <input type="number" min="0" className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
-                    placeholder="Usage limit"
-                    value={couponForm.usage_limit}
-                    onChange={e => setCouponForm(f => ({ ...f, usage_limit: e.target.value }))} />
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Expiry Date</label>
+                    <input type="date" className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
+                      value={couponForm.expiry_date}
+                      onChange={e => setCouponForm(f => ({ ...f, expiry_date: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Usage Limit</label>
+                    <input type="number" min="0" className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
+                      placeholder="Unlimited"
+                      value={couponForm.usage_limit}
+                      onChange={e => setCouponForm(f => ({ ...f, usage_limit: e.target.value }))} />
+                  </div>
                 </div>
                 <button type="submit" className="w-full py-3 rounded-xl bg-[#2C392A] text-white font-black text-[13px] hover:bg-[#1e2817]">
                   Save Coupon

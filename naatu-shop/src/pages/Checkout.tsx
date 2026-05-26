@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useCartStore, useAuthStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
-import { ArrowLeft, MessageCircle, CheckCircle, ShoppingBag, Tag, X, Truck } from 'lucide-react'
+import { ArrowLeft, MessageCircle, CheckCircle, ShoppingBag, Tag, X } from 'lucide-react'
 import { createOrderWithStock } from '../services/orderService'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { BRAND_EN, BRAND_WHATSAPP, BRAND_WHATSAPP_LINK } from '../lib/brand'
@@ -29,7 +29,6 @@ interface BookedOrderSnapshot {
   itemCount: number
   subtotal: number
   discountAmount: number
-  deliveryCharge: number
   total: number
   couponCode?: string
 }
@@ -53,12 +52,8 @@ export default function Checkout() {
   const [couponError, setCouponError]   = useState('')
   const [couponLoading, setCouponLoading] = useState(false)
 
-  // Delivery charge (manual entry, optional)
-  const [deliveryInput, setDeliveryInput] = useState('')
-
-  const discountAmount  = appliedCoupon?.discount || 0
-  const deliveryCharge  = Math.max(0, Number(deliveryInput) || 0)
-  const finalTotal      = Math.max(0, subtotal - discountAmount + deliveryCharge)
+  const discountAmount = appliedCoupon?.discount || 0
+  const finalTotal     = Math.max(0, subtotal - discountAmount)
 
   useEffect(() => {
     if (items.length === 0 && !booked) navigate('/cart')
@@ -133,31 +128,33 @@ export default function Checkout() {
     snapshot: BookedOrderSnapshot,
     cartItems: typeof items,
   ) => {
-    const itemLines = cartItems.map(i => {
+    const itemLines = cartItems.map((i, idx) => {
       const pName = lang === 'ta' && i.nameTa ? i.nameTa : i.name
-      return `  • ${pName} (${formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)}) — ${formatCurrency(i.lineTotal)}`
+      return `  ${idx + 1}. ${pName} (${formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)})  →  ${formatCurrency(i.lineTotal)}`
     }).join('\n')
 
     const discountLine = snapshot.discountAmount > 0
       ? `\n🏷️ *Coupon (${snapshot.couponCode}):* −${formatCurrency(snapshot.discountAmount)}`
       : ''
 
-    const deliveryLine = snapshot.deliveryCharge > 0
-      ? `\n🚚 *Delivery:* ${formatCurrency(snapshot.deliveryCharge)}`
-      : '\n🚚 *Delivery:* To be confirmed'
+    const sep = '━━━━━━━━━━━━━━━━━━━━'
 
     return encodeURIComponent(
       `🌿 *${BRAND_EN}*\n` +
-      `📋 *Order Request ID:* ${snapshot.requestId}\n\n` +
+      `${sep}\n` +
+      `📋 *WhatsApp Request:* ${snapshot.requestId}\n` +
       `👤 *Name:* ${snapshot.name}\n` +
       `📞 *Phone:* ${snapshot.phone}\n` +
-      `📍 *Address:* ${snapshot.address || 'To be confirmed'}\n\n` +
-      `📦 *Items:*\n${itemLines}\n\n` +
+      (snapshot.address ? `📍 *Address:* ${snapshot.address}\n` : '') +
+      `${sep}\n` +
+      `📦 *Items:*\n\n` +
+      `${itemLines}\n\n` +
+      `${sep}\n` +
       `💰 *Subtotal:* ${formatCurrency(snapshot.subtotal)}` +
       discountLine +
-      deliveryLine +
-      `\n💵 *Total: ${formatCurrency(snapshot.total)}*\n\n` +
-      `நன்றி! Thank you for your order! 🙏`
+      `\n💵 *Total: ${formatCurrency(snapshot.total)}*\n` +
+      `${sep}\n\n` +
+      `நன்றி! We'll confirm details on WhatsApp. 🙏`
     )
   }
 
@@ -197,32 +194,31 @@ export default function Checkout() {
 
     try {
       const created = await createOrderWithStock({
-        customerName:    form.name.trim(),
-        phone:           phoneDigits,
-        address:         form.address.trim() || '',
-        items:           structuredItems,
-        shipping:        0,
-        status:          'pending',
-        orderMode:       'online',
-        orderType:       'online_request',
-        deliveryCharge,
+        customerName:     form.name.trim(),
+        phone:            phoneDigits,
+        address:          form.address.trim() || '',
+        items:            structuredItems,
+        shipping:         0,
+        status:           'pending',
+        orderMode:        'online',
+        orderType:        'online_request',
+        deliveryCharge:   0,
         discountAmount,
-        couponCode:      appliedCoupon?.code,
+        couponCode:       appliedCoupon?.code,
         couponPercentage: appliedCoupon?.percentage,
       })
 
       const snapshot: BookedOrderSnapshot = {
-        requestId:      created.orderId,
-        orderId:        created.orderId,
-        name:           form.name.trim(),
-        phone:          phoneDigits,
-        address:        form.address.trim(),
-        itemCount:      itemsSnapshot.length,
+        requestId:     created.orderId,
+        orderId:       created.orderId,
+        name:          form.name.trim(),
+        phone:         phoneDigits,
+        address:       form.address.trim(),
+        itemCount:     itemsSnapshot.length,
         subtotal,
         discountAmount,
-        deliveryCharge,
-        total:          finalTotal,
-        couponCode:     appliedCoupon?.code,
+        total:         finalTotal,
+        couponCode:    appliedCoupon?.code,
       }
 
       const waText = buildWhatsAppMessage(snapshot, itemsSnapshot)
@@ -241,26 +237,25 @@ export default function Checkout() {
     }
   }
 
-  // ── Order confirmed screen ───────────────────────────────────
+  // ── Request confirmed screen ─────────────────────────────────
   if (booked) {
+    const sep = '━━━━━━━━━━━━━━━━━━━━'
     const discountLine = booked.discountAmount > 0
       ? `\n🏷️ *Coupon (${booked.couponCode}):* −${formatCurrency(booked.discountAmount)}`
       : ''
-    const deliveryLine = booked.deliveryCharge > 0
-      ? `\n🚚 *Delivery:* ${formatCurrency(booked.deliveryCharge)}`
-      : '\n🚚 *Delivery:* To be confirmed'
-
     const waText = encodeURIComponent(
       `🌿 *${BRAND_EN}*\n` +
-      `📋 *Order Request ID:* ${booked.requestId}\n\n` +
+      `${sep}\n` +
+      `📋 *WhatsApp Request:* ${booked.requestId}\n` +
       `👤 *Name:* ${booked.name}\n` +
       `📞 *Phone:* ${booked.phone}\n` +
-      `📍 *Address:* ${booked.address || 'To be confirmed'}\n\n` +
+      (booked.address ? `📍 *Address:* ${booked.address}\n` : '') +
+      `${sep}\n` +
       `💰 *Subtotal:* ${formatCurrency(booked.subtotal)}` +
       discountLine +
-      deliveryLine +
-      `\n💵 *Total: ${formatCurrency(booked.total)}*\n\n` +
-      `நன்றி! Thank you for your order! 🙏`
+      `\n💵 *Total: ${formatCurrency(booked.total)}*\n` +
+      `${sep}\n\n` +
+      `நன்றி! We'll confirm details on WhatsApp. 🙏`
     )
 
     return (
@@ -270,12 +265,12 @@ export default function Checkout() {
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
               <CheckCircle size={44} className="text-green-500" />
             </div>
-            <h1 className="text-2xl font-bold font-headline text-textMain mb-2">Order Placed!</h1>
-            <p className="text-textMuted text-sm mb-1">Your order has been saved successfully.</p>
-            <p className="font-bold text-sageDark text-base mb-1">Order Request ID: {booked.requestId}</p>
+            <h1 className="text-2xl font-bold font-headline text-textMain mb-2">Request Sent!</h1>
+            <p className="text-textMuted text-sm mb-1">Your WhatsApp request has been saved.</p>
+            <p className="font-bold text-sageDark text-base mb-1">WhatsApp Request: {booked.requestId}</p>
             <p className="text-textMuted text-xs mb-4">{booked.itemCount} item(s)</p>
 
-            {/* Order totals summary */}
+            {/* Summary */}
             <div className="bg-[#F7F6F2] rounded-xl p-4 mb-4 text-sm text-left space-y-1.5">
               <div className="flex justify-between text-textMuted">
                 <span>Subtotal</span><span>{formatCurrency(booked.subtotal)}</span>
@@ -284,11 +279,6 @@ export default function Checkout() {
                 <div className="flex justify-between text-green-700">
                   <span>Discount ({booked.couponCode})</span>
                   <span>−{formatCurrency(booked.discountAmount)}</span>
-                </div>
-              )}
-              {booked.deliveryCharge > 0 && (
-                <div className="flex justify-between text-textMuted">
-                  <span>Delivery</span><span>{formatCurrency(booked.deliveryCharge)}</span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-textMain text-base border-t border-sand pt-2 mt-2">
@@ -302,7 +292,7 @@ export default function Checkout() {
                 <p className="font-bold text-green-800 text-sm">WhatsApp Opened</p>
               </div>
               <p className="text-green-700 text-xs leading-relaxed">
-                A WhatsApp chat with our store ({BRAND_WHATSAPP}) should have opened automatically. Tap the button below if it didn't.
+                A WhatsApp chat with our store ({BRAND_WHATSAPP}) should have opened. Tap below if it didn't.
               </p>
             </div>
 
@@ -318,12 +308,12 @@ export default function Checkout() {
               {user && (
                 <Link to="/profile"
                   className="flex items-center justify-center gap-2 w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3.5 rounded-xl transition-colors">
-                  <ShoppingBag size={18} /> View My Orders
+                  <ShoppingBag size={18} /> View My Interactions
                 </Link>
               )}
               <Link to="/products"
                 className="flex items-center justify-center gap-2 w-full border-2 border-sand hover:border-sageDark text-textMain font-bold py-3.5 rounded-xl transition-colors">
-                Continue Shopping
+                Continue Browsing
               </Link>
             </div>
           </div>
@@ -424,29 +414,12 @@ export default function Checkout() {
                 {couponError && <p className="text-red-500 text-xs mt-1.5 font-medium">{couponError}</p>}
               </div>
 
-              {/* Delivery charge */}
-              <div>
-                <label className="block text-sm font-bold text-textMain mb-1.5 flex items-center gap-1.5">
-                  <Truck size={14} /> Delivery Charge <span className="font-normal text-textMuted">(optional — ₹)</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={deliveryInput}
-                  onChange={e => setDeliveryInput(e.target.value)}
-                  placeholder="0"
-                  className="w-full px-4 py-2.5 border-2 border-sand focus:border-sageDark rounded-xl outline-none transition-colors"
-                />
-                <p className="text-xs text-textMuted mt-1">Leave blank to confirm via WhatsApp after dispatch</p>
-              </div>
-
               <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-xl text-sm">
                 <div className="flex items-center gap-2 mb-1">
                   <MessageCircle size={15} className="shrink-0" />
-                  <strong>Order via WhatsApp</strong>
+                  <strong>Continue on WhatsApp</strong>
                 </div>
-                <p className="text-xs leading-relaxed">After placing your order, you'll be connected to WhatsApp ({BRAND_WHATSAPP}) to confirm delivery and details.</p>
+                <p className="text-xs leading-relaxed">After sending your request, you'll be connected to WhatsApp ({BRAND_WHATSAPP}) to confirm delivery and payment details.</p>
               </div>
 
               {!user && (
@@ -459,17 +432,17 @@ export default function Checkout() {
               <button onClick={handleCheckout} disabled={loading}
                 className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3.5 sm:py-4 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 mt-2">
                 {loading ? (
-                  <><span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving Order…</>
+                  <><span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending…</>
                 ) : (
-                  <><MessageCircle size={18} /> Place Order & Open WhatsApp</>
+                  <><MessageCircle size={18} /> Send via WhatsApp</>
                 )}
               </button>
             </div>
           </div>
 
-          {/* ── Order Summary ── */}
+          {/* ── Your Items ── */}
           <div className="surface-panel p-4 sm:p-6">
-            <h2 className="text-xl font-bold text-textMain mb-5">Order Summary</h2>
+            <h2 className="text-xl font-bold text-textMain mb-5">Your Items</h2>
             <div className="space-y-4 divide-y divide-sand/30">
               {items.map(item => {
                 const pName = lang === 'ta' && item.nameTa ? item.nameTa : item.name
@@ -501,19 +474,12 @@ export default function Checkout() {
                   <span className="font-bold">−{formatCurrency(appliedCoupon.discount)}</span>
                 </div>
               )}
-              {deliveryCharge > 0 && (
-                <div className="flex justify-between text-textMuted">
-                  <span>Delivery</span><span className="font-medium">{formatCurrency(deliveryCharge)}</span>
-                </div>
-              )}
               <div className="flex justify-between font-bold text-textMain text-base border-t border-sand pt-3 mt-2">
                 <span>Total</span><span>{formatCurrency(finalTotal)}</span>
               </div>
-              {deliveryCharge === 0 && (
-                <p className="text-xs text-textMuted bg-bgMain px-3 py-2 rounded-lg">
-                  🚚 Delivery charges will be confirmed via WhatsApp before dispatch.
-                </p>
-              )}
+              <p className="text-xs text-textMuted bg-bgMain px-3 py-2 rounded-lg">
+                🚚 Delivery charges will be confirmed via WhatsApp before dispatch.
+              </p>
             </div>
 
             {/* Phone display near CTA */}
@@ -539,7 +505,7 @@ export default function Checkout() {
               </div>
               <button onClick={handleCheckout} disabled={loading}
                 className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-2xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
-                {loading ? 'Saving…' : 'Place Order'}
+                {loading ? 'Sending…' : 'Send via WhatsApp'}
               </button>
             </div>
           </div>
