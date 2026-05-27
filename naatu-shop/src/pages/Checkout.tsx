@@ -6,6 +6,7 @@ import { ArrowLeft, MessageCircle, CheckCircle, ShoppingBag, Tag, X } from 'luci
 import { createOrderWithStock } from '../services/orderService'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { BRAND_EN, BRAND_WHATSAPP, BRAND_WHATSAPP_LINK } from '../lib/brand'
+import { normalizeIndianPhone, isValidIndianPhone, getSubscriberDigits } from '../lib/phone'
 import { PLACEHOLDER as PRODUCT_PLACEHOLDER } from '../lib/productImages'
 import {
   buildStructuredOrderItem,
@@ -13,7 +14,6 @@ import {
   formatQuantityDisplay,
 } from '../lib/retail'
 
-const PHONE_RE = /^[6-9]\d{9}$/
 
 const toProductId = (value: string | number): string | null => {
   const str = String(value ?? '').trim()
@@ -170,11 +170,12 @@ export default function Checkout() {
       return
     }
 
-    const phoneDigits = form.phone.replace(/\D/g, '')
-    if (!PHONE_RE.test(phoneDigits)) {
-      setError('Please enter a valid 10-digit WhatsApp number (starts with 6–9)')
+    if (!isValidIndianPhone(form.phone)) {
+      setError('Please enter a valid Indian WhatsApp number (e.g. 9876543210 or +91 9876543210)')
       return
     }
+    const normalizedPhone = normalizeIndianPhone(form.phone)!
+    const phoneDigits = getSubscriberDigits(form.phone)!
 
     setLoading(true)
     setError('')
@@ -195,7 +196,7 @@ export default function Checkout() {
     try {
       const created = await createOrderWithStock({
         customerName:     form.name.trim(),
-        phone:            phoneDigits,
+        phone:            normalizedPhone,
         address:          form.address.trim() || '',
         items:            structuredItems,
         shipping:         0,
@@ -212,7 +213,7 @@ export default function Checkout() {
         requestId:     created.orderId,
         orderId:       created.orderId,
         name:          form.name.trim(),
-        phone:         phoneDigits,
+        phone:         phoneDigits,  // 10-digit display form
         address:       form.address.trim(),
         itemCount:     itemsSnapshot.length,
         subtotal,
@@ -351,7 +352,7 @@ export default function Checkout() {
               {/* Phone — prominent mandatory field */}
               <div>
                 <label className="block text-sm font-bold text-textMain mb-1.5">
-                  WhatsApp Number * <span className="text-xs font-normal text-textMuted">(10-digit, starts 6–9)</span>
+                  WhatsApp Number *
                 </label>
                 <div className="flex gap-2">
                   <span className="flex items-center px-3 py-3 bg-[#F7F6F2] border-2 border-sand rounded-xl text-[13px] font-bold text-textMuted shrink-0">
@@ -359,13 +360,24 @@ export default function Checkout() {
                   </span>
                   <input
                     value={form.phone}
-                    onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })}
-                    maxLength={10}
-                    placeholder="9876543210"
-                    className="flex-1 px-4 py-2.5 sm:py-3 border-2 border-sand focus:border-sageDark rounded-xl outline-none transition-colors"
+                    onChange={e => setForm({ ...form, phone: e.target.value })}
+                    placeholder="9876543210 or +91 9876543210"
+                    className={`flex-1 px-4 py-2.5 sm:py-3 border-2 rounded-xl outline-none transition-colors ${
+                      form.phone && !isValidIndianPhone(form.phone)
+                        ? 'border-red-400 focus:border-red-500'
+                        : form.phone && isValidIndianPhone(form.phone)
+                          ? 'border-green-400 focus:border-green-500'
+                          : 'border-sand focus:border-sageDark'
+                    }`}
                     required
                   />
                 </div>
+                {form.phone && !isValidIndianPhone(form.phone) && (
+                  <p className="mt-1 text-xs text-red-500 font-medium">Invalid number — enter 10 digits or full number with +91</p>
+                )}
+                {form.phone && isValidIndianPhone(form.phone) && (
+                  <p className="mt-1 text-xs text-green-600 font-medium">✓ Valid Indian mobile number</p>
+                )}
               </div>
 
               <div>

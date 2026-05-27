@@ -20,6 +20,7 @@ import {
   normalizeSelectedQuantity,
 } from '../lib/retail'
 import { getProductImage, onImgError } from '../lib/productImages'
+import { normalizeIndianPhone, toWhatsAppUrl } from '../lib/phone'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type PosItem = Product & {
@@ -48,6 +49,8 @@ type InvoiceSnap = {
   customerName: string
   phone: string
   address: string
+  amountReceived: number
+  balanceReturned: number
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -297,15 +300,18 @@ export default function Pos() {
   const generateBill = async () => {
     if (!items.length) { setError('Add at least one product.'); return }
     // Validate required phone
-    const phoneDigits = (customer.phone || '').replace(/\D/g, '')
-    if (phoneDigits.length !== 10) { setError('Please enter a valid 10-digit phone number'); return }
+    const normalizedPhone = normalizeIndianPhone(customer.phone || '')
+    if (!normalizedPhone) { setError('Please enter a valid Indian mobile number (e.g. 9876543210 or +91 9876543210)'); return }
+    // Validate payment amount
+    if (!cashReceived.trim()) { setError('Enter the amount received from customer'); return }
+    if (cashReceivedNum < total) { setError(`Insufficient payment. Customer still owes ${formatCurrency(total - cashReceivedNum)}`); return }
     // Validate online mode availability
     if (orderMode === 'online' && !isSupabaseConfigured) { setError('Cannot place online orders while offline'); return }
     setSaving(true); setError('')
     try {
       const created = await createOrderWithStock({
         customerName: customer.name.trim() || 'Walk-in Customer',
-        phone: customer.phone.trim(),
+        phone: normalizedPhone,
         address: customer.address.trim() || 'POS Counter',
         items: items.map(item => buildStructuredOrderItem({
           productId: toProductId(item.id),
@@ -347,8 +353,10 @@ export default function Pos() {
         manualDiscountValue: manualDiscountNumeric,
         total,
         customerName: customer.name.trim() || 'Walk-in Customer',
-        phone: customer.phone.trim() || '',
+        phone: normalizedPhone,
         address: customer.address.trim() || 'POS Counter',
+        amountReceived: cashReceivedNum,
+        balanceReturned: balanceToReturn,
       })
       setItems([])
       setCustomer({ name: '', phone: '', address: '' })
@@ -360,6 +368,9 @@ export default function Pos() {
     }
   }
 
+  const cashReceivedNum = Number(cashReceived) || 0
+  const balanceToReturn = cashReceivedNum > 0 && cashReceivedNum >= total ? cashReceivedNum - total : 0
+  const isInsufficientPayment = cashReceived !== '' && cashReceivedNum > 0 && cashReceivedNum < total
   const change = cashReceived && Number(cashReceived) >= total
     ? Number(cashReceived) - total : null
 
@@ -367,8 +378,7 @@ export default function Pos() {
     const lines = inv.items
       .map((i, idx) => `  ${idx + 1}. ${i.name} × ${formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)}  →  ${formatCurrency(i.lineTotal)}`)
       .join('\n')
-    const targetPhone = (inv.phone || customer.phone || '').replace(/\D/g, '')
-    const waLink = targetPhone ? `https://wa.me/${targetPhone}` : BRAND_WHATSAPP_LINK
+    const waLink = toWhatsAppUrl(inv.phone || customer.phone || '')
     const sep = '━━━━━━━━━━━━━━━━━━━━'
     const text = encodeURIComponent(
       `🌿 *${BRAND_EN}*\n` +
@@ -420,34 +430,26 @@ export default function Pos() {
             </button>
           </div>
 
-          {/* Total summary */}
+          {/* Payment receipt */}
           <div className="surface-panel p-5">
-            <div className="flex justify-between items-center mb-4">
-              <p className="text-lg font-bold text-textMain">Total Amount</p>
-              <p className="text-3xl font-black text-sageDark">{formatCurrency(invoice.total)}</p>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-textMuted uppercase tracking-wide mb-1.5">
-                  Cash Received (₹)
-                </label>
-                <input
-                  type="number"
-                  autoFocus
-                  placeholder="0"
-                  value={cashReceived}
-                  onChange={e => setCashReceived(e.target.value)}
-                  className="w-full text-2xl font-black px-4 py-3 border-2 border-sand focus:border-sageDark rounded-xl outline-none"
-                />
+            <p className="text-xs font-black uppercase tracking-widest text-textMuted mb-3">Payment Receipt</p>
+            <div className="space-y-2.5">
+              <div className="flex justify-between items-center pb-2.5 border-b border-sand">
+                <p className="text-sm font-bold text-textMuted">Grand Total</p>
+                <p className="text-2xl font-black text-textMain">{formatCurrency(invoice.total)}</p>
               </div>
-
-              {change !== null && (
-                <div className={`rounded-xl p-4 ${change === 0 ? 'bg-green-50 border border-green-200' : 'bg-blue-50 border border-blue-200'}`}>
-                  <p className="text-xs font-bold uppercase tracking-wide text-textMuted mb-1">
-                    {change === 0 ? 'Exact Amount ✅' : 'Change to Return'}
-                  </p>
-                  {change > 0 && <p className="text-2xl font-black text-blue-700">{formatCurrency(change)}</p>}
+              <div className="flex justify-between items-center">
+                <p className="text-sm font-bold text-textMuted">Amount Received</p>
+                <p className="text-xl font-black text-textMain">{formatCurrency(invoice.amountReceived)}</p>
+              </div>
+              {invoice.balanceReturned > 0 ? (
+                <div className="flex justify-between items-center rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
+                  <p className="text-sm font-black text-blue-700">Balance Returned</p>
+                  <p className="text-2xl font-black text-blue-700">{formatCurrency(invoice.balanceReturned)}</p>
+                </div>
+              ) : (
+                <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-center">
+                  <p className="text-sm font-black text-green-700">✅ Exact Amount Received</p>
                 </div>
               )}
             </div>
@@ -708,11 +710,19 @@ export default function Pos() {
             />
             <input
               value={customer.phone}
-              onChange={e => setCustomer(c => ({ ...c, phone: e.target.value.replace(/\D/g, '') }))}
-              placeholder="Phone (required)"
-              maxLength={10}
-              className="w-full px-3 py-1.5 bg-[#F0F2EE] rounded-lg text-[12px] outline-none border border-transparent focus:border-[#7DAA8F]"
+              onChange={e => setCustomer(c => ({ ...c, phone: e.target.value }))}
+              placeholder="9876543210 or +91 9876543210"
+              className={`w-full px-3 py-1.5 bg-[#F0F2EE] rounded-lg text-[12px] outline-none border transition-colors ${
+                customer.phone && !normalizeIndianPhone(customer.phone)
+                  ? 'border-red-400 bg-red-50/30'
+                  : customer.phone && normalizeIndianPhone(customer.phone)
+                    ? 'border-green-400 bg-green-50/30'
+                    : 'border-transparent focus:border-[#7DAA8F]'
+              }`}
             />
+            {customer.phone && !normalizeIndianPhone(customer.phone) && (
+              <p className="text-[9px] text-red-500 font-bold mt-0.5">Invalid number — try 9876543210 or +91 9876543210</p>
+            )}
           </div>
 
           {/* Bill header */}
@@ -858,34 +868,95 @@ export default function Pos() {
               </div>
             </div>
 
-            <div className="space-y-1 text-[12px]">
+            {/* Bill breakdown */}
+            <div className="rounded-xl border border-[#E8EDE4] bg-[#F7F8F5] p-3 space-y-1.5 text-[12px]">
               <div className="flex justify-between text-[#5F6D59]">
-                <span>Items</span>
-                <span className="font-bold">{items.length}</span>
+                <span>Subtotal ({items.length} item{items.length !== 1 ? 's' : ''})</span>
+                <span className="font-bold">{formatCurrency(subtotal)}</span>
               </div>
+              {appliedCoupon && (
+                <div className="flex justify-between text-green-700">
+                  <span>{appliedCoupon.code} -{appliedCoupon.percentage}%</span>
+                  <span className="font-bold">-{formatCurrency(couponDiscount)}</span>
+                </div>
+              )}
+              {manualDiscountAmount > 0 && (
+                <div className="flex justify-between text-green-700">
+                  <span>Discount ({manualDiscountType === 'percent' ? `${manualDiscountValue}%` : 'Flat'})</span>
+                  <span className="font-bold">-{formatCurrency(manualDiscountAmount)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-[#5F6D59] items-center">
                 <span>Delivery</span>
                 <input
                   type="number"
                   value={shipping}
                   onChange={e => setShipping(e.target.value.replace(/[^0-9.]/g, ''))}
-                  className="w-24 text-right px-2 py-1 rounded-lg border border-[#D5DAD0] bg-white text-[12px]"
+                  className="w-20 text-right px-2 py-0.5 rounded-lg border border-[#D5DAD0] bg-white text-[12px] outline-none focus:border-[#7DAA8F]"
                 />
               </div>
-              <div className="flex justify-between font-black text-[#2C392A] text-[16px] pt-1 border-t border-[#E8EDE4]">
-                <span>Total</span>
+              <div className="flex justify-between font-black text-[#2C392A] text-[14px] pt-1.5 border-t border-[#D5DAD0]">
+                <span>Grand Total</span>
                 <span>{formatCurrency(total)}</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-[#5F6D59] mb-1">
+            {/* Payment section */}
+            <div className={`rounded-xl border-2 p-3 space-y-2 transition-colors ${
+              isInsufficientPayment ? 'border-red-300 bg-red-50/30' :
+              cashReceivedNum >= total && cashReceivedNum > 0 ? 'border-green-300 bg-green-50/30' :
+              'border-[#2C392A]/20 bg-[#F7F8F5]'
+            }`}>
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#5F6D59]">Cash Payment</p>
+              <div>
+                <label className="block text-[10px] font-bold text-[#5F6D59] mb-1">Amount Received (₹)</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={cashReceived}
+                  onChange={e => { setCashReceived(e.target.value.replace(/[^0-9.]/g, '')); setError('') }}
+                  placeholder="0.00"
+                  className={`w-full text-[20px] font-black px-3 py-2 border-2 rounded-xl outline-none transition-colors ${
+                    isInsufficientPayment
+                      ? 'border-red-400 bg-white text-red-700 focus:border-red-500'
+                      : cashReceivedNum >= total && cashReceivedNum > 0
+                        ? 'border-green-400 bg-white text-green-800 focus:border-green-500'
+                        : 'border-[#D5DAD0] bg-white text-[#2C392A] focus:border-[#2C392A]'
+                  }`}
+                />
+              </div>
+
+              {cashReceivedNum > 0 && (
+                isInsufficientPayment ? (
+                  <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2">
+                    <p className="text-[11px] font-black text-red-600">⚠ Insufficient Payment</p>
+                    <p className="text-[10px] text-red-500 mt-0.5">
+                      Still need: {formatCurrency(total - cashReceivedNum)}
+                    </p>
+                  </div>
+                ) : balanceToReturn === 0 ? (
+                  <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2">
+                    <p className="text-[11px] font-black text-green-700 text-center">✅ Exact Amount</p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2.5">
+                    <div className="flex justify-between items-center">
+                      <p className="text-[11px] font-black text-blue-700">Balance to Return</p>
+                      <p className="text-[18px] font-black text-blue-700">{formatCurrency(balanceToReturn)}</p>
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-[#5F6D59]">
               <span className={`px-2 py-0.5 rounded-full ${orderMode === 'offline' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
                 {orderMode === 'offline' ? 'OFFLINE' : 'ONLINE'}
               </span>
             </div>
             <button
               onClick={generateBill}
-              disabled={saving || items.length === 0}
+              disabled={saving || items.length === 0 || isInsufficientPayment || !cashReceived.trim()}
               className="w-full py-3.5 rounded-xl font-black text-[13px] transition-all
                 bg-[#2C392A] text-white hover:bg-[#1e2817]
                 disabled:opacity-40 disabled:cursor-not-allowed
