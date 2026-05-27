@@ -6,14 +6,13 @@ import { useLocation } from 'react-router-dom'
 import { Leaf, Mail, ArrowLeft, CheckCircle, User, Phone as PhoneIcon } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { BRAND_EN, BRAND_TA } from '../lib/brand'
+import { isValidIndianPhone, getSubscriberDigits } from '../lib/phone'
 
 const SITE_URL =
   (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/$/, '') ||
   window.location.origin
 
 type EmailStep = 'input' | 'sent'
-
-const PHONE_RE = /^[6-9]\d{9}$/
 
 interface FieldError {
   name?: string
@@ -25,9 +24,8 @@ function validate(name: string, phone: string, email: string): FieldError {
   const errs: FieldError = {}
   if (!name.trim() || name.trim().length < 2)
     errs.name = 'Please enter your full name (at least 2 characters).'
-  const digits = phone.replace(/\D/g, '')
-  if (!digits || !PHONE_RE.test(digits))
-    errs.phone = 'Enter a valid 10-digit Indian mobile number (starts with 6–9).'
+  if (!isValidIndianPhone(phone))
+    errs.phone = 'Enter a valid Indian mobile number (e.g. 9876543210 or +91 9876543210).'
   if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
     errs.email = 'Enter a valid email address.'
   return errs
@@ -69,13 +67,13 @@ export default function Login() {
     if (!isSupabaseConfigured) { setError('Authentication not configured.'); return }
 
     setLoading(true); setError(''); setFieldErrs({})
-    const cleanPhone = phone.replace(/\D/g, '')
+    const subscriberDigits = getSubscriberDigits(phone) ?? phone.replace(/\D/g, '')
     const { error: e2 } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
       options: {
         shouldCreateUser: true,
         emailRedirectTo: SITE_URL,
-        data: { name: name.trim(), full_name: name.trim(), mobile: cleanPhone },
+        data: { name: name.trim(), full_name: name.trim(), mobile: subscriberDigits },
       },
     })
     setLoading(false)
@@ -146,11 +144,11 @@ export default function Login() {
                   🇮🇳 +91
                 </span>
                 <input
-                  type="tel" autoComplete="tel-national" maxLength={10}
-                  placeholder="9876543210"
+                  type="tel" autoComplete="tel-national"
+                  placeholder="9876543210 or +91 9876543210"
                   className={`flex-1 ${inputCls(!!fieldErrs.phone)}`}
                   value={phone}
-                  onChange={e => { setPhone(e.target.value.replace(/\D/g, '')); setFieldErrs(f => ({ ...f, phone: '' })) }}
+                  onChange={e => { setPhone(e.target.value); setFieldErrs(f => ({ ...f, phone: '' })) }}
                 />
               </div>
             </FieldGroup>
