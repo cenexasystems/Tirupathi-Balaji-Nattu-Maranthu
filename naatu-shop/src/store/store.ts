@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { isSupabaseConfigured } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
+import { fetchAllProducts } from '../services/productService'
 import {
   calculateLineTotal,
   getDefaultQuantityForProduct,
@@ -286,10 +288,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
 
     set({ loading: true, error: null })
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('sort_order', { ascending: true })
+      const { data, error } = await fetchAllProducts()
 
       if (error) throw error
 

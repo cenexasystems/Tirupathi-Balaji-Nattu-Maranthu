@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useMemo, type FormEvent } from 'react'
+import React, { useCallback, useEffect, useState, useMemo, useRef, type FormEvent } from 'react'
 import {
   BarChart2, Trash2, Edit2, List, ShoppingCart, LayoutDashboard,
   Box, AlertCircle, ArrowUp, ArrowDown, Power, Download, TrendingUp,
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { debounce } from '../lib/debounce'
 import { useAuthStore, useProductStore, type Product } from '../store/store'
 import { uploadProductImage } from '../lib/storage'
 import { formatCurrency, normalizeOrderMode, normalizeUnitType, toNumber, type UnitType } from '../lib/retail'
@@ -301,8 +302,11 @@ export default function Dashboard() {
     setLoading(true)
     try {
       const [cRes, oRes] = await Promise.all([
-        supabase.from('categories').select('*').order('sort_order'),
-        supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(1000),
+        supabase.from('categories').select('id, name_en, name_ta, is_active, sort_order').order('sort_order'),
+        supabase.from('orders')
+          .select('id, invoice_no, customer_name, phone, created_at, total, status, order_mode, order_type, user_id, items, coupon_code, discount_amount')
+          .order('created_at', { ascending: false })
+          .limit(1000),
       ])
       const mappedOrders = (oRes.data || []).map(r => toDashboardOrder(r as Record<string, unknown>))
       setCats((cRes.data || []) as Category[])
@@ -423,14 +427,22 @@ export default function Dashboard() {
     await loadCoupons()
   }
 
+  // Keep a stable ref to the debounced loader so realtime events don't
+  // trigger a full data reload more than once every 4 seconds.
+  const debouncedLoadRef = useRef<(() => void) | null>(null)
+  useEffect(() => {
+    debouncedLoadRef.current = debounce(() => void loadData(), 4000)
+  }, [loadData])
+
   useEffect(() => {
     if (!isAdmin) return
     void loadData()
     if (!isSupabaseConfigured) return
+    const handleChange = () => debouncedLoadRef.current?.()
     const ch = supabase.channel('dashboard-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => void loadData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => void loadData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => void loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, handleChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, handleChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, handleChange)
       .subscribe()
     return () => { void supabase.removeChannel(ch) }
   }, [isAdmin, loadData])
@@ -445,7 +457,10 @@ export default function Dashboard() {
     e?.preventDefault()
     setSearchLoading(true)
     try {
-      let q = supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(500)
+      let q = supabase.from('orders')
+        .select('id, invoice_no, customer_name, phone, created_at, total, status, order_mode, order_type, user_id, items, coupon_code, discount_amount')
+        .order('created_at', { ascending: false })
+        .limit(500)
       if (search.invoiceNo.trim()) q = q.ilike('invoice_no', `%${search.invoiceNo.trim()}%`)
       if (search.phone.trim())    q = q.ilike('phone', `%${search.phone.trim()}%`)
       if (search.dateFrom)        q = q.gte('created_at', `${search.dateFrom}T00:00:00`)
@@ -1195,6 +1210,7 @@ export default function Dashboard() {
                               <div className="w-9 h-9 rounded-xl overflow-hidden bg-[#F7F6F2] border border-[#EAD7B7]/40 shrink-0">
                                 <img src={p.image || p.imageUrl || ''} alt={p.name}
                                   className="w-full h-full object-cover"
+                                  loading="lazy"
                                   onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
                               </div>
                               <div className="min-w-0">

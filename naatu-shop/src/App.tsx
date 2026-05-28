@@ -12,13 +12,14 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Favorites from './pages/Favorites'
 import ProductDetails from './pages/ProductDetails'
-import Checkout from './pages/Checkout'
-import Profile from './pages/Profile'
 import { useAuthStore, useProductModalStore, useProductStore } from './store/store'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { BRAND_EN } from './lib/brand'
 
-// Heavy admin pages — split into separate chunks
+// Protected / heavy pages — split into separate chunks so customers don't
+// download checkout, profile, or admin code on the initial page load.
+const Checkout  = lazy(() => import('./pages/Checkout'))
+const Profile   = lazy(() => import('./pages/Profile'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Pos       = lazy(() => import('./pages/Pos'))
 
@@ -161,9 +162,17 @@ function AppShell() {
           <Route path="/products" element={<Products />} />
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
-          <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
+          <Route path="/checkout" element={
+            <ProtectedRoute>
+              <Suspense fallback={<LoadingSpinner />}><Checkout /></Suspense>
+            </ProtectedRoute>
+          } />
           <Route path="/favorites" element={<Favorites />} />
-          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Suspense fallback={<LoadingSpinner />}><Profile /></Suspense>
+            </ProtectedRoute>
+          } />
 
           {/* Admin-only — lazily loaded to reduce main bundle size */}
           <Route path="/admin" element={

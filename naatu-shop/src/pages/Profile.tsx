@@ -76,6 +76,14 @@ export default function Profile() {
 
   const handleAvatarUpload = async (file: File) => {
     if (!user || !isSupabaseConfigured) return
+    if (file.size > 5_000_000) {
+      console.error('Avatar upload rejected: file exceeds 5 MB')
+      return
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      console.error('Avatar upload rejected: only JPEG, PNG, or WebP images are accepted')
+      return
+    }
     setAvatarUploading(true)
     try {
       const ext = file.name.split('.').pop() || 'jpg'
@@ -160,23 +168,16 @@ export default function Profile() {
 
         const phoneDigits = (user.mobile || '').replace(/\D/g, '')
 
-        const baseQuery = supabase
+        // Fetch orders linked by user_id OR by phone in a single query
+        const orFilter = phoneDigits
+          ? `user_id.eq.${authData.user.id},phone.eq.${phoneDigits}`
+          : `user_id.eq.${authData.user.id}`
+
+        const { data: ordersData, error: ordersError } = await supabase
           .from('orders')
           .select('id, invoice_no, customer_name, phone, address, items, subtotal, shipping, total, status, created_at, order_type')
+          .or(orFilter)
           .order('created_at', { ascending: false })
-
-        let ordersData: Array<Record<string, unknown>> | null = null
-        let ordersError: unknown = null
-
-        const linkedOrdersResult = await baseQuery.eq('user_id', authData.user.id)
-        ordersData = linkedOrdersResult.data
-        ordersError = linkedOrdersResult.error
-
-        if ((!ordersData || ordersData.length === 0) && phoneDigits) {
-          const phoneOrdersResult = await baseQuery.eq('phone', phoneDigits)
-          ordersData = phoneOrdersResult.data
-          ordersError = phoneOrdersResult.error
-        }
 
         if (ordersError) {
           throw ordersError
@@ -212,11 +213,15 @@ export default function Profile() {
 
     void loadOrders()
 
+    // Filter the realtime subscription to only this user's orders so other
+    // customers placing orders don't trigger an unnecessary re-fetch here.
     const channel = supabase
       .channel(`profile-orders-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        void loadOrders()
-      })
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders', filter: `user_id=eq.${user.id}` },
+        () => { void loadOrders() },
+      )
       .subscribe()
 
     return () => {

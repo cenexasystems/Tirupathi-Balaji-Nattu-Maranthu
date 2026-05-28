@@ -4,7 +4,7 @@ import { useCartStore, useAuthStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { ArrowLeft, MessageCircle, CheckCircle, ShoppingBag, Tag, X } from 'lucide-react'
 import { createOrderWithStock } from '../services/orderService'
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { validateCoupon } from '../services/couponService'
 import { BRAND_EN, BRAND_WHATSAPP, BRAND_WHATSAPP_LINK } from '../lib/brand'
 import { normalizeIndianPhone, isValidIndianPhone, getSubscriberDigits } from '../lib/phone'
 import { PLACEHOLDER as PRODUCT_PLACEHOLDER } from '../lib/productImages'
@@ -75,46 +75,13 @@ export default function Checkout() {
     setCouponError('')
     setAppliedCoupon(null)
 
-    try {
-      if (!isSupabaseConfigured) {
-        setCouponError('Coupon validation requires a live connection')
-        return
-      }
-
-      const { data, error: dbErr } = await supabase
-        .from('coupons')
-        .select('*')
-        .eq('is_active', true)
-        .ilike('code', code)
-        .single()
-
-      if (dbErr || !data) {
-        setCouponError('Invalid or expired coupon code')
-        return
-      }
-
-      if (data.expiry_date && new Date(data.expiry_date) < new Date()) {
-        setCouponError('This coupon has expired')
-        return
-      }
-
-      if (data.usage_limit && data.usage_count >= data.usage_limit) {
-        setCouponError('Coupon usage limit has been reached')
-        return
-      }
-
-      if (data.min_order_value && subtotal < Number(data.min_order_value)) {
-        setCouponError(`Minimum order of ${formatCurrency(Number(data.min_order_value))} required`)
-        return
-      }
-
-      const discount = Math.round((subtotal * Number(data.percentage) / 100) * 100) / 100
-      setAppliedCoupon({ code: String(data.code), percentage: Number(data.percentage), discount })
-    } catch {
-      setCouponError('Failed to validate coupon. Try again.')
-    } finally {
-      setCouponLoading(false)
+    const { data, error } = await validateCoupon(code, subtotal)
+    if (error) {
+      setCouponError(error)
+    } else if (data) {
+      setAppliedCoupon(data)
     }
+    setCouponLoading(false)
   }
 
   const removeCoupon = () => {
