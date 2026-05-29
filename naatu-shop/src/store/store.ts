@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { isSupabaseConfigured } from '../lib/supabase'
 import { supabase } from '../lib/supabase'
 import { fetchAllProducts } from '../services/productService'
+import { fetchAllVariants, type ProductVariant } from '../services/variantService'
 import {
   calculateLineTotal,
   getDefaultQuantityForProduct,
@@ -12,6 +13,8 @@ import {
   type QuantityOption,
   type UnitType,
 } from '../lib/retail'
+
+export type { ProductVariant }
 
 /**
  * SRI SIDDHA HERBAL STORE - CORE STATE MANAGEMENT
@@ -49,6 +52,7 @@ export interface Product {
   imageUrl?: string
   source?: 'catalogue' | 'manual'
   note?: string | null
+  hasVariants?: boolean
 }
 
 export interface CartItem extends Product {
@@ -56,6 +60,9 @@ export interface CartItem extends Product {
   selectedUnit: string
   basePrice: number
   lineTotal: number
+  variantId?: string      // UUID of the selected variant row
+  variantName?: string    // display name e.g. "Cycle Brand"
+  parentProductId?: string // original products.id when item was created from a variant
 }
 
 interface AuthUser {
@@ -114,6 +121,21 @@ interface ProductModalState {
   open: boolean
   openProduct: (product: Product) => void
   closeProduct: () => void
+}
+
+interface VariantStoreState {
+  variantsMap: Record<string, ProductVariant[]>
+  fetched: boolean
+  fetchVariants: () => Promise<void>
+  getVariants: (productId: string) => ProductVariant[]
+  hasVariants: (productId: string | number) => boolean
+}
+
+interface VariantModalState {
+  product: Product | null
+  open: boolean
+  openVariantModal: (product: Product) => void
+  closeVariantModal: () => void
 }
 
 type SessionFallback = {
@@ -186,6 +208,7 @@ const mapDbProduct = (input: unknown): Product => {
     benefitsTa: readString(p.benefits_ta),
     image,
     imageUrl: image,
+    hasVariants: Boolean(p.has_variants),
   }
 }
 
@@ -408,4 +431,30 @@ export const useProductModalStore = create<ProductModalState>()((set) => ({
   open: false,
   openProduct: (product) => set({ product, open: true }),
   closeProduct: () => set({ open: false, product: null }),
+}))
+
+// --- Variant Store ---
+export const useVariantStore = create<VariantStoreState>()((set, get) => ({
+  variantsMap: {},
+  fetched: false,
+  fetchVariants: async () => {
+    if (get().fetched) return
+    const { data } = await fetchAllVariants()
+    const map: Record<string, ProductVariant[]> = {}
+    for (const v of data) {
+      if (!map[v.productId]) map[v.productId] = []
+      map[v.productId].push(v)
+    }
+    set({ variantsMap: map, fetched: true })
+  },
+  getVariants: (productId) => get().variantsMap[String(productId)] || [],
+  hasVariants: (productId) => (get().variantsMap[String(productId)] || []).length > 0,
+}))
+
+// --- Variant Selector Modal Store ---
+export const useVariantModalStore = create<VariantModalState>()((set) => ({
+  product: null,
+  open: false,
+  openVariantModal: (product) => set({ product, open: true }),
+  closeVariantModal: () => set({ open: false, product: null }),
 }))

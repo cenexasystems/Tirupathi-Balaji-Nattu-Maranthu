@@ -5,6 +5,7 @@ import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import FloatingCart from './components/FloatingCart'
 import ProductDetailModal from './components/ProductDetailModal'
+import VariantSelectorModal from './components/VariantSelectorModal'
 import Home from './pages/Home'
 import Products from './pages/Products'
 import Cart from './pages/Cart'
@@ -12,7 +13,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Favorites from './pages/Favorites'
 import ProductDetails from './pages/ProductDetails'
-import { useAuthStore, useProductModalStore, useProductStore } from './store/store'
+import { useAuthStore, useProductModalStore, useProductStore, useVariantModalStore, useVariantStore } from './store/store'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { BRAND_EN } from './lib/brand'
 
@@ -63,6 +64,10 @@ function AppShell() {
   const modalOpen = useProductModalStore((state) => state.open)
   const openProduct = useProductModalStore((state) => state.openProduct)
   const closeProduct = useProductModalStore((state) => state.closeProduct)
+  const variantModalProduct = useVariantModalStore((state) => state.product)
+  const variantModalOpen = useVariantModalStore((state) => state.open)
+  const closeVariantModal = useVariantModalStore((state) => state.closeVariantModal)
+  const fetchVariants = useVariantStore((state) => state.fetchVariants)
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register'
 
   useEffect(() => {
@@ -120,6 +125,7 @@ function AppShell() {
 
   useEffect(() => {
     void fetchProducts()
+    void fetchVariants()
 
     if (!isSupabaseConfigured) {
       return
@@ -135,7 +141,7 @@ function AppShell() {
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [fetchProducts])
+  }, [fetchProducts, fetchVariants])
 
   const relatedProducts = products.length > 0 && modalProduct
     ? products.filter((item) => item.isActive && item.category === modalProduct.category && item.id !== modalProduct.id).slice(0, 10)
@@ -201,6 +207,11 @@ function AppShell() {
         onClose={handleCloseProduct}
         onSelectProduct={openProduct}
         relatedProducts={relatedProducts}
+      />
+      <VariantSelectorModal
+        product={variantModalProduct}
+        open={variantModalOpen}
+        onClose={closeVariantModal}
       />
       <FloatingCart />
       {!isAuthPage && <div className="print-hidden"><Footer /></div>}

@@ -27,8 +27,9 @@ import {
 
 type Category = { id: string | number; name_en: string; name_ta: string; is_active?: boolean; sort_order?: number }
 type DashboardOrder = {
-  id: string; invoice_no: string; customer_name: string; phone: string
+  id: string; invoice_no: string; customer_name: string; phone: string; address: string
   created_at: string; total: number; status: string; order_mode: string; order_type: string; user_id: string | null; items: unknown
+  coupon_code: string; discount_amount: number; delivery_charge: number
 }
 type DashboardOrderItem = { order_id: string; product_name: string; quantity: number; line_total: number; is_manual?: boolean | null }
 type DashboardCoupon = {
@@ -113,11 +114,24 @@ export default function Dashboard() {
   const [couponForm, setCouponForm] = useState({ code: '', percentage: 10, expiry_date: '', usage_limit: '', min_order_value: '' })
   const [couponSaveError, setCouponSaveError] = useState('')
   const [couponSaveSuccess, setCouponSaveSuccess] = useState('')
+  const [editingCouponId, setEditingCouponId] = useState<number | null>(null)
+
+  // WA detail expansion
+  const [waExpandedId, setWaExpandedId] = useState<string | null>(null)
 
   // Search & date filter
-  const [search, setSearch] = useState({ invoiceNo: '', phone: '', email: '', userId: '', dateFrom: '', dateTo: '' })
+  const [search, setSearch] = useState({ invoiceNo: '', phone: '', customerName: '', dateFrom: '', dateTo: '' })
+  const [datePreset, setDatePreset] = useState<'today' | 'week' | 'month' | 'custom' | ''>('')
   const [searchResults, setSearchResults] = useState<DashboardOrder[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
+
+  // Analytics global date filter
+  const [analyticsDatePreset, setAnalyticsDatePreset] = useState<'all' | 'today' | 'week' | 'month' | 'year' | 'custom'>('all')
+  const [analyticsDateFrom, setAnalyticsDateFrom] = useState('')
+  const [analyticsDateTo, setAnalyticsDateTo] = useState('')
+
+  // Order Management bill type filter
+  const [billTypeFilter, setBillTypeFilter] = useState<'all' | 'offline' | 'online' | 'manual'>('all')
 
   // Users tab
   const [allUsers, setAllUsers] = useState<ProfileUser[]>([])
@@ -135,153 +149,170 @@ export default function Dashboard() {
   const toDashboardOrder = (row: Record<string, unknown>): DashboardOrder => ({
     id: String(row.id || ''), invoice_no: String(row.invoice_no || ''),
     customer_name: String(row.customer_name || ''), phone: String(row.phone || ''),
+    address: String(row.address || ''),
     created_at: String(row.created_at || ''), total: toNumber(row.total, 0),
     status: String(row.status || 'pending'),
     order_mode: normalizeOrderMode(row.order_mode),
     order_type: normalizeOrderType(row.order_type),
     user_id: typeof row.user_id === 'string' ? row.user_id : null,
     items: row.items,
+    coupon_code: String(row.coupon_code || ''),
+    discount_amount: toNumber(row.discount_amount, 0),
+    delivery_charge: toNumber(row.delivery_charge, 0),
   })
 
-  // ΓöÇΓöÇ Analytics ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-    // Analytics
+  // Analytics (date-aware)
   const analytics = useMemo(() => {
-    const nonCancelledOrders = orders.filter((order) => normalizeStatus(order.status) !== 'cancelled')
-    const completedOrders = nonCancelledOrders.filter((order) => isCompletedStatus(order.status))
-    const pendingOrders = nonCancelledOrders.filter((order) => normalizeStatus(order.status) === 'pending')
-    const onlineRequests = pendingOrders.filter((order) => normalizeOrderType(order.order_type) === 'online_request' || normalizeOrderMode(order.order_mode) === 'online')
-    const billableCompletedOrders = completedOrders.filter((order) => normalizeOrderType(order.order_type) !== 'online_request')
-    const posSales = completedOrders.filter((order) => normalizeOrderType(order.order_type) === 'pos_sale')
-    const manualSalesOrders = completedOrders.filter((order) => normalizeOrderType(order.order_type) === 'manual_sale')
+    // Apply global date filter
+    let dated = orders
+    if (analyticsDateFrom) dated = dated.filter(o => o.created_at >= `${analyticsDateFrom}T00:00:00`)
+    if (analyticsDateTo)   dated = dated.filter(o => o.created_at <= `${analyticsDateTo}T23:59:59`)
 
-    const completedRevenue = billableCompletedOrders.reduce((sum, order) => sum + toNumber(order.total, 0), 0)
-    const todayKey = new Date().toISOString().slice(0, 10)
-    const monthKey = todayKey.slice(0, 7)
+    // Classify
+    const nonCancelled = dated.filter(o => normalizeStatus(o.status) !== 'cancelled')
+    const completedOrders = nonCancelled.filter(o => isCompletedStatus(o.status))
+    const pendingOrders   = nonCancelled.filter(o => normalizeStatus(o.status) === 'pending')
 
-    const todaySales = billableCompletedOrders
-      .filter((order) => order.created_at.startsWith(todayKey))
-      .reduce((sum, order) => sum + toNumber(order.total, 0), 0)
+    // WhatsApp = online_request type (all statuses, no revenue)
+    const waOrders = dated.filter(o => normalizeOrderType(o.order_type) === 'online_request')
 
-    const monthlyRevenue = billableCompletedOrders
-      .filter((order) => order.created_at.startsWith(monthKey))
-      .reduce((sum, order) => sum + toNumber(order.total, 0), 0)
+    // Billable = completed and NOT online_request
+    const billableCompleted = completedOrders.filter(o => normalizeOrderType(o.order_type) !== 'online_request')
+    const offlinePOS  = billableCompleted.filter(o => normalizeOrderType(o.order_type) === 'pos_sale' && normalizeOrderMode(o.order_mode) !== 'online')
+    const onlinePOS   = billableCompleted.filter(o => normalizeOrderType(o.order_type) === 'pos_sale' && normalizeOrderMode(o.order_mode) === 'online')
+    const manualSales = billableCompleted.filter(o => normalizeOrderType(o.order_type) === 'manual_sale')
 
-    const posRevenue = posSales.reduce((sum, order) => sum + toNumber(order.total, 0), 0)
-    const manualRevenue = manualSalesOrders.reduce((sum, order) => sum + toNumber(order.total, 0), 0)
+    // Revenue (WhatsApp never included)
+    const completedRevenue   = billableCompleted.reduce((s, o) => s + toNumber(o.total, 0), 0)
+    const posRevenue         = offlinePOS.reduce((s, o) => s + toNumber(o.total, 0), 0)
+    const onlinePosRevenue   = onlinePOS.reduce((s, o) => s + toNumber(o.total, 0), 0)
+    const manualRevenue      = manualSales.reduce((s, o) => s + toNumber(o.total, 0), 0)
 
-    const completedOrderIds = new Set(billableCompletedOrders.map((order) => order.id))
+    const todayKey  = new Date().toISOString().slice(0, 10)
+    const monthKey  = todayKey.slice(0, 7)
+    const todaySales   = billableCompleted.filter(o => o.created_at.startsWith(todayKey)).reduce((s, o) => s + toNumber(o.total, 0), 0)
+    const monthlyRevenue = billableCompleted.filter(o => o.created_at.startsWith(monthKey)).reduce((s, o) => s + toNumber(o.total, 0), 0)
+
+    // Item-level analytics
+    const completedIds = new Set(billableCompleted.map(o => o.id))
     const completedItems = orderItems.length > 0
-      ? orderItems.filter((item) => completedOrderIds.has(item.order_id))
-      : completedOrders.flatMap((order) => parseOrderItems(order.items).map((row) => ({
+      ? orderItems.filter(item => completedIds.has(item.order_id))
+      : completedOrders.flatMap(order => parseOrderItems(order.items).map(row => ({
           order_id: order.id,
-          product_name: String(row.product_name || row.name || 'Product'),
-          quantity: toNumber(row.quantity ?? row.qty, 0),
-          line_total: toNumber(row.line_total ?? row.lineTotal, 0),
-          is_manual: row.is_manual === true || row.source === 'manual',
+          product_name: String((row as Record<string,unknown>).product_name || (row as Record<string,unknown>).name || 'Product'),
+          quantity: toNumber((row as Record<string,unknown>).quantity ?? (row as Record<string,unknown>).qty, 0),
+          line_total: toNumber((row as Record<string,unknown>).line_total ?? (row as Record<string,unknown>).lineTotal, 0),
+          is_manual: (row as Record<string,unknown>).is_manual === true || (row as Record<string,unknown>).source === 'manual',
         })))
 
-    const productMap = new Map<string, { name: string; qty: number; revenue: number }>()
-    const categoryMap = new Map<string, { name: string; qty: number; revenue: number }>()
-    const productCategoryLookup = new Map(
-      products.map((product) => [String(product.name || '').trim().toLowerCase(), product.category || 'Uncategorized'])
-    )
+    const productMap    = new Map<string, { name: string; variant: string; qty: number; revenue: number; billCount: number }>()
+    const productOrders = new Map<string, Set<string>>()
+    const categoryMap   = new Map<string, { name: string; qty: number; revenue: number }>()
+    const prodCatLookup = new Map(products.map(p => [String(p.name || '').trim().toLowerCase(), p.category || 'Uncategorized']))
 
     let totalProductsSold = 0
     let totalManualRevenue = 0
-    completedItems.forEach(({ product_name, quantity, line_total }) => {
+
+    completedItems.forEach(({ product_name, quantity, line_total, order_id, is_manual }) => {
       const qty = toNumber(quantity, 0)
-      const lineRevenue = toNumber(line_total, 0)
+      const rev = toNumber(line_total, 0)
       totalProductsSold += qty
 
-      const productKey = String(product_name || 'Product').trim() || 'Product'
-      const productCur = productMap.get(productKey) || { name: productKey, qty: 0, revenue: 0 }
-      productCur.qty += qty
-      productCur.revenue += lineRevenue
-      productMap.set(productKey, productCur)
+      const rawKey  = String(product_name || 'Product').trim() || 'Product'
+      const dashIdx = rawKey.indexOf(' - ')
+      const mainName   = dashIdx > 0 ? rawKey.slice(0, dashIdx) : rawKey
+      const variantName = dashIdx > 0 ? rawKey.slice(dashIdx + 3) : ''
 
-      const categoryName = productCategoryLookup.get(productKey.toLowerCase()) || 'Uncategorized'
-      const catCur = categoryMap.get(categoryName) || { name: categoryName, qty: 0, revenue: 0 }
-      catCur.qty += qty
-      catCur.revenue += lineRevenue
-      categoryMap.set(categoryName, catCur)
+      const pc = productMap.get(rawKey) || { name: mainName, variant: variantName, qty: 0, revenue: 0, billCount: 0 }
+      pc.qty += qty; pc.revenue += rev; productMap.set(rawKey, pc)
+
+      if (!productOrders.has(rawKey)) productOrders.set(rawKey, new Set())
+      productOrders.get(rawKey)!.add(order_id)
+
+      const catName = prodCatLookup.get(mainName.toLowerCase()) || 'Uncategorized'
+      const cc = categoryMap.get(catName) || { name: catName, qty: 0, revenue: 0 }
+      cc.qty += qty; cc.revenue += rev; categoryMap.set(catName, cc)
+
+      if (is_manual) totalManualRevenue += rev
     })
 
-    completedItems.forEach((item) => {
-      if (item.is_manual) {
-        totalManualRevenue += toNumber(item.line_total, 0)
-      }
-    })
+    for (const [key, orderSet] of productOrders) {
+      const p = productMap.get(key); if (p) { p.billCount = orderSet.size; productMap.set(key, p) }
+    }
 
-    const topProducts = Array.from(productMap.values()).sort((a, b) => b.qty - a.qty)
-    const topCategories = Array.from(categoryMap.values()).sort((a, b) => b.qty - a.qty)
-    const bestProduct = topProducts[0]?.name || 'No sales yet'
-    const bestCategory = topCategories[0]?.name || 'No sales yet'
+    const topProducts   = Array.from(productMap.values()).sort((a, b) => b.qty - a.qty)
+    const topCategories = Array.from(categoryMap.values()).sort((a, b) => b.revenue - a.revenue)
+    const bestProduct   = topProducts[0]?.name || 'No sales yet'
+    const bestCategory  = topCategories[0]?.name || 'No sales yet'
 
+    // Trend charts
     const monthlyRevenueMap = new Map<string, number>()
-    billableCompletedOrders.forEach((order) => {
-      const key = order.created_at.slice(0, 7)
-      monthlyRevenueMap.set(key, (monthlyRevenueMap.get(key) || 0) + toNumber(order.total, 0))
+    billableCompleted.forEach(o => {
+      const k = o.created_at.slice(0, 7)
+      monthlyRevenueMap.set(k, (monthlyRevenueMap.get(k) || 0) + toNumber(o.total, 0))
+    })
+    const monthlyTrend = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(); d.setMonth(d.getMonth() - (5 - i))
+      const k = d.toISOString().slice(0, 7)
+      return { key: k, month: d.toLocaleDateString('en-IN', { month: 'short' }), revenue: monthlyRevenueMap.get(k) || 0 }
     })
 
-    const monthlyTrend = Array.from({ length: 6 }, (_, index) => {
-      const date = new Date()
-      date.setMonth(date.getMonth() - (5 - index))
-      const key = date.toISOString().slice(0, 7)
-      return {
-        key,
-        month: date.toLocaleDateString('en-IN', { month: 'short' }),
-        revenue: monthlyRevenueMap.get(key) || 0,
-      }
+    const weeklyRevenueMap = new Map<string, number>()
+    billableCompleted.forEach(o => {
+      const k = o.created_at.slice(0, 10)
+      weeklyRevenueMap.set(k, (weeklyRevenueMap.get(k) || 0) + toNumber(o.total, 0))
+    })
+    const weeklySales = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(); d.setDate(d.getDate() - (6 - i))
+      const k = d.toISOString().slice(0, 10)
+      return { day: d.toLocaleDateString('en-IN', { weekday: 'short' }), date: k, revenue: weeklyRevenueMap.get(k) || 0 }
     })
 
     const statusDistribution = [
-      { name: 'Requests', value: onlineRequests.length, color: '#3b82f6' },
-      { name: 'Pending', value: pendingOrders.length - onlineRequests.length, color: '#f59e0b' },
-      { name: 'Completed', value: billableCompletedOrders.length, color: '#10b981' },
+      { name: 'WA Requests', value: waOrders.length, color: '#3b82f6' },
+      { name: 'POS Pending', value: pendingOrders.filter(o => normalizeOrderType(o.order_type) !== 'online_request').length, color: '#f59e0b' },
+      { name: 'Completed',   value: billableCompleted.length, color: '#10b981' },
     ]
-
     const channelDistribution = [
-      { name: 'POS Revenue', value: posRevenue, color: '#f97316' },
-      { name: 'Manual Sales', value: manualRevenue || totalManualRevenue, color: '#8b5cf6' },
+      { name: 'Offline Bills', value: posRevenue, color: '#f97316' },
+      { name: 'Online Bills',  value: onlinePosRevenue, color: '#3b82f6' },
+      { name: 'Manual Sales',  value: manualRevenue || totalManualRevenue, color: '#8b5cf6' },
     ]
 
     const couponMap = new Map<string, { code: string; usage: number; discounts: number }>()
-    billableCompletedOrders.forEach((order) => {
-      const code = String((order as Record<string, unknown>).coupon_code || '').trim()
-      if (!code) return
-      const usage = couponMap.get(code) || { code, usage: 0, discounts: 0 }
-      usage.usage += 1
-      usage.discounts += toNumber((order as Record<string, unknown>).discount_amount, 0)
-      couponMap.set(code, usage)
+    billableCompleted.forEach(order => {
+      const code = String((order as Record<string,unknown>).coupon_code || '').trim(); if (!code) return
+      const u = couponMap.get(code) || { code, usage: 0, discounts: 0 }
+      u.usage += 1; u.discounts += toNumber((order as Record<string,unknown>).discount_amount, 0)
+      couponMap.set(code, u)
     })
-
     const topCoupons = Array.from(couponMap.values()).sort((a, b) => b.usage - a.usage)
 
-    const weeklyRevenueMap = new Map<string, number>()
-    billableCompletedOrders.forEach((order) => {
-      const key = order.created_at.slice(0, 10)
-      weeklyRevenueMap.set(key, (weeklyRevenueMap.get(key) || 0) + toNumber(order.total, 0))
-    })
+    // WhatsApp analytics (zero revenue — status changes never affect revenue)
+    const waRequests  = waOrders.length
+    const waPending   = waOrders.filter(o => normalizeStatus(o.status) === 'pending').length
+    const waContacted = waOrders.filter(o => normalizeStatus(o.status) === 'contacted').length
+    const waCompleted = waOrders.filter(o => isCompletedStatus(o.status)).length
 
-    const weeklySales = Array.from({ length: 7 }, (_, index) => {
-      const date = new Date()
-      date.setDate(date.getDate() - (6 - index))
-      const key = date.toISOString().slice(0, 10)
-      return {
-        day: date.toLocaleDateString('en-IN', { weekday: 'short' }),
-        date: key,
-        revenue: weeklyRevenueMap.get(key) || 0,
-      }
+    const waProductMap = new Map<string, number>()
+    waOrders.forEach(order => {
+      parseOrderItems(order.items).forEach(item => {
+        const n = String((item as Record<string,unknown>).name || (item as Record<string,unknown>).product_name || '').trim()
+        if (n) waProductMap.set(n, (waProductMap.get(n) || 0) + 1)
+      })
     })
+    const topWAProducts = Array.from(waProductMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8)
+      .map(([name, count]) => ({ name, count }))
 
     return {
       totalCompletedRevenue: completedRevenue,
       todaySales,
       pendingOrders: pendingOrders.length,
-      onlineRequests: onlineRequests.length,
-      onlineRequestOrders: onlineRequests.slice(0, 15),
-      completedOrders: billableCompletedOrders.length,
+      onlineRequests: waRequests,
+      onlineRequestOrders: waOrders.slice(0, 15),
+      completedOrders: billableCompleted.length,
       posRevenue,
+      onlinePosRevenue,
       manualRevenue: manualRevenue || totalManualRevenue,
       monthlyRevenue,
       totalProductsSold,
@@ -291,10 +322,29 @@ export default function Dashboard() {
       channelDistribution,
       statusDistribution,
       topCoupons,
-      topCategories: topCategories.slice(0, 6),
+      topCategories,
       weeklySales,
+      topProducts,
+      waRequests,
+      waPending,
+      waContacted,
+      waCompleted,
+      topWAProducts,
     }
-  }, [orders, orderItems, products])
+  }, [orders, orderItems, products, analyticsDateFrom, analyticsDateTo])
+
+  // Bill-type filtered results for Order Management table (client-side, instant)
+  const filteredSearchResults = useMemo(() => {
+    if (billTypeFilter === 'all') return searchResults
+    return searchResults.filter(o => {
+      const type = normalizeOrderType(o.order_type)
+      const mode = normalizeOrderMode(o.order_mode)
+      if (billTypeFilter === 'manual')  return type === 'manual_sale'
+      if (billTypeFilter === 'offline') return type === 'pos_sale' && mode !== 'online'
+      if (billTypeFilter === 'online')  return type === 'pos_sale' && mode === 'online'
+      return true
+    })
+  }, [searchResults, billTypeFilter])
 
   // Load dashboard data
   const loadData = useCallback(async () => {
@@ -304,14 +354,14 @@ export default function Dashboard() {
       const [cRes, oRes] = await Promise.all([
         supabase.from('categories').select('id, name_en, name_ta, is_active, sort_order').order('sort_order'),
         supabase.from('orders')
-          .select('id, invoice_no, customer_name, phone, created_at, total, status, order_mode, order_type, user_id, items, coupon_code, discount_amount')
+          .select('id, invoice_no, customer_name, phone, address, created_at, total, status, order_mode, order_type, user_id, items, coupon_code, discount_amount, delivery_charge')
           .order('created_at', { ascending: false })
           .limit(1000),
       ])
       const mappedOrders = (oRes.data || []).map(r => toDashboardOrder(r as Record<string, unknown>))
       setCats((cRes.data || []) as Category[])
       setOrders(mappedOrders)
-      setSearchResults(mappedOrders.slice(0, 100))
+      setSearchResults(mappedOrders.filter(o => normalizeOrderType(o.order_type) !== 'online_request').slice(0, 100))
       await fetchProducts(true)
 
       const orderIds = mappedOrders.map(o => o.id).filter(Boolean)
@@ -404,22 +454,63 @@ export default function Dashboard() {
     setCouponSaveError('')
     setCouponSaveSuccess('')
     if (!couponForm.code.trim()) { setCouponSaveError('Coupon code is required'); return }
+    if (!(toNumber(couponForm.percentage, 0) > 0 && toNumber(couponForm.percentage, 0) <= 100)) {
+      setCouponSaveError('Discount must be between 1% and 100%'); return
+    }
+    const code = couponForm.code.trim().toUpperCase()
     const payload = {
-      code: couponForm.code.trim().toUpperCase(),
+      code,
       percentage: toNumber(couponForm.percentage, 0),
       is_active: true,
       expiry_date: couponForm.expiry_date || null,
       usage_limit: couponForm.usage_limit ? toNumber(couponForm.usage_limit, 0) : null,
       min_order_value: toNumber(couponForm.min_order_value, 0),
     }
-    const { error } = await supabase.from('coupons').upsert(payload, { onConflict: 'code' })
+    let error: unknown = null
+    if (editingCouponId !== null) {
+      // Update existing — don't change code (it's the PK equivalent)
+      const res = await supabase.from('coupons').update({ ...payload }).eq('id', editingCouponId)
+      error = res.error
+    } else {
+      // Insert new coupon — UNIQUE constraint on code catches duplicates
+      const res = await supabase.from('coupons').insert(payload)
+      error = res.error
+    }
     if (error) {
-      setCouponSaveError(error.message || 'Failed to save coupon')
+      const msg = (error as { message?: string }).message || 'Failed to save coupon'
+      setCouponSaveError(msg.includes('unique') || msg.includes('duplicate') ? `Coupon code "${code}" already exists` : msg)
     } else {
       setCouponForm({ code: '', percentage: 10, expiry_date: '', usage_limit: '', min_order_value: '' })
-      setCouponSaveSuccess('Coupon saved successfully!')
+      setEditingCouponId(null)
+      setCouponSaveSuccess(editingCouponId !== null ? 'Coupon updated!' : 'Coupon created!')
       await loadCoupons()
     }
+  }
+
+  const startEditCoupon = (coupon: DashboardCoupon) => {
+    setEditingCouponId(coupon.id)
+    setCouponForm({
+      code: coupon.code,
+      percentage: coupon.percentage,
+      expiry_date: coupon.expiry_date ? coupon.expiry_date.slice(0, 10) : '',
+      usage_limit: coupon.usage_limit !== null ? String(coupon.usage_limit) : '',
+      min_order_value: coupon.min_order_value ? String(coupon.min_order_value) : '',
+    })
+    setCouponSaveError('')
+    setCouponSaveSuccess('')
+  }
+
+  const cancelEditCoupon = () => {
+    setEditingCouponId(null)
+    setCouponForm({ code: '', percentage: 10, expiry_date: '', usage_limit: '', min_order_value: '' })
+    setCouponSaveError('')
+    setCouponSaveSuccess('')
+  }
+
+  const deleteCoupon = async (coupon: DashboardCoupon) => {
+    if (!window.confirm(`Delete coupon "${coupon.code}"? This cannot be undone.`)) return
+    await supabase.from('coupons').delete().eq('id', coupon.id)
+    await loadCoupons()
   }
 
   const toggleCoupon = async (coupon: DashboardCoupon) => {
@@ -452,30 +543,58 @@ export default function Dashboard() {
     if (tab === 'coupons') void loadCoupons()
   }, [tab, loadUsers, loadCoupons])
 
-  // Order search
+  const applyAnalyticsPreset = (preset: 'all' | 'today' | 'week' | 'month' | 'year' | 'custom') => {
+    setAnalyticsDatePreset(preset)
+    if (preset === 'all')    { setAnalyticsDateFrom(''); setAnalyticsDateTo(''); return }
+    if (preset === 'custom') return
+    const today = new Date()
+    const todayStr = today.toISOString().slice(0, 10)
+    if (preset === 'today') {
+      setAnalyticsDateFrom(todayStr); setAnalyticsDateTo(todayStr)
+    } else if (preset === 'week') {
+      const d = new Date(today); d.setDate(today.getDate() - 6)
+      setAnalyticsDateFrom(d.toISOString().slice(0, 10)); setAnalyticsDateTo(todayStr)
+    } else if (preset === 'month') {
+      setAnalyticsDateFrom(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`)
+      setAnalyticsDateTo(todayStr)
+    } else if (preset === 'year') {
+      setAnalyticsDateFrom(`${today.getFullYear()}-01-01`); setAnalyticsDateTo(todayStr)
+    }
+  }
+
+  const applyDatePreset = (preset: 'today' | 'week' | 'month' | 'custom') => {
+    setDatePreset(preset)
+    if (preset === 'custom') { setSearch(s => ({ ...s, dateFrom: '', dateTo: '' })); return }
+    const today = new Date()
+    const todayStr = today.toISOString().slice(0, 10)
+    if (preset === 'today') {
+      setSearch(s => ({ ...s, dateFrom: todayStr, dateTo: todayStr }))
+    } else if (preset === 'week') {
+      const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 6)
+      setSearch(s => ({ ...s, dateFrom: weekAgo.toISOString().slice(0, 10), dateTo: todayStr }))
+    } else if (preset === 'month') {
+      setSearch(s => ({ ...s, dateFrom: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`, dateTo: todayStr }))
+    }
+  }
+
+  // Order search — POS bills only (online_request excluded)
   const runSearch = async (e?: FormEvent) => {
     e?.preventDefault()
     setSearchLoading(true)
     try {
       let q = supabase.from('orders')
-        .select('id, invoice_no, customer_name, phone, created_at, total, status, order_mode, order_type, user_id, items, coupon_code, discount_amount')
+        .select('id, invoice_no, customer_name, phone, address, created_at, total, status, order_mode, order_type, items, coupon_code, discount_amount, delivery_charge')
+        .neq('order_type', 'online_request')
         .order('created_at', { ascending: false })
         .limit(500)
-      if (search.invoiceNo.trim()) q = q.ilike('invoice_no', `%${search.invoiceNo.trim()}%`)
-      if (search.phone.trim())    q = q.ilike('phone', `%${search.phone.trim()}%`)
+      if (search.invoiceNo.trim())    q = q.ilike('invoice_no', `%${search.invoiceNo.trim()}%`)
+      if (search.phone.trim())        q = q.ilike('phone', `%${search.phone.trim()}%`)
+      if (search.customerName.trim()) q = q.ilike('customer_name', `%${search.customerName.trim()}%`)
       if (search.dateFrom)        q = q.gte('created_at', `${search.dateFrom}T00:00:00`)
       if (search.dateTo)          q = q.lte('created_at', `${search.dateTo}T23:59:59`)
-
-      if (search.userId.trim() || search.email.trim()) {
-        const term = (search.userId || search.email).trim()
-        const isUuid = /^[0-9a-f-]{36}$/i.test(term)
-        const pRes = await supabase.from('profiles').select('id')
-          .or(isUuid ? `id.eq.${term},customer_code.eq.${term}` : `email.ilike.%${term}%,mobile.ilike.%${term}%`)
-          .limit(10)
-        const ids = (pRes.data || []).map(p => (p as {id: string}).id)
-        if (ids.length > 0) q = q.in('user_id', ids)
-        else { setSearchResults([]); return }
-      }
+      if (billTypeFilter === 'manual')  q = q.eq('order_type', 'manual_sale')
+      else if (billTypeFilter === 'offline') q = q.eq('order_type', 'pos_sale').eq('order_mode', 'offline')
+      else if (billTypeFilter === 'online')  q = q.eq('order_type', 'pos_sale').eq('order_mode', 'online')
 
       const { data, error } = await q
       if (error) throw error
@@ -663,75 +782,214 @@ export default function Dashboard() {
                 </button>
               </div>
             </div>
-            {/* ── WhatsApp Customer Interactions ── */}
+            {/* ── Global Analytics Date Filter ── */}
+            <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-4 shadow-sm">
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-[11px] font-black uppercase tracking-wider text-[#5F6D59] mr-1">Period:</span>
+                {(['all', 'today', 'week', 'month', 'year', 'custom'] as const).map(preset => (
+                  <button key={preset} type="button" onClick={() => applyAnalyticsPreset(preset)}
+                    className={`px-3 py-1.5 rounded-xl text-[12px] font-black transition-colors ${
+                      analyticsDatePreset === preset ? 'bg-[#2C392A] text-white' : 'bg-[#F7F6F2] text-[#5F6D59] hover:bg-[#EAD7B7]/40'
+                    }`}>
+                    {preset === 'all' ? 'All Time' : preset === 'today' ? 'Today' : preset === 'week' ? 'This Week' : preset === 'month' ? 'This Month' : preset === 'year' ? 'This Year' : 'Custom'}
+                  </button>
+                ))}
+                {analyticsDatePreset === 'custom' && (
+                  <>
+                    <input type="date" value={analyticsDateFrom} onChange={e => setAnalyticsDateFrom(e.target.value)}
+                      className="px-3 py-1.5 bg-[#F7F6F2] rounded-xl text-[12px] font-semibold" />
+                    <span className="text-[#5F6D59] text-[12px] font-bold">→</span>
+                    <input type="date" value={analyticsDateTo} onChange={e => setAnalyticsDateTo(e.target.value)}
+                      className="px-3 py-1.5 bg-[#F7F6F2] rounded-xl text-[12px] font-semibold" />
+                  </>
+                )}
+                {analyticsDatePreset !== 'all' && analyticsDateFrom && (
+                  <span className="text-[11px] text-emerald-700 font-black ml-1">
+                    {new Date(analyticsDateFrom + 'T12:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {analyticsDateTo && analyticsDateFrom !== analyticsDateTo && ` – ${new Date(analyticsDateTo + 'T12:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* ── WhatsApp Analytics (₹0 revenue impact always) ── */}
             <div className="bg-white rounded-2xl border border-blue-200 p-5 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-1">
                 <Package size={18} className="text-blue-600" />
-                <h3 className="text-base font-black text-[#2C392A]">WhatsApp Customer Interactions</h3>
+                <h3 className="text-base font-black text-[#2C392A]">WhatsApp Analytics</h3>
+                <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-black bg-red-50 text-red-600">Revenue Impact: ₹0 Always</span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-                <div className="bg-blue-50 rounded-xl p-3">
-                  <p className="text-[10px] uppercase font-black text-blue-600 tracking-wider mb-1">Total Requests</p>
-                  <p className="text-[22px] font-black text-[#2C392A]">{analytics.onlineRequests}</p>
-                  <p className="text-[11px] text-[#7A846F]">Pending WA interactions</p>
-                </div>
-                <div className="bg-amber-50 rounded-xl p-3">
-                  <p className="text-[10px] uppercase font-black text-amber-600 tracking-wider mb-1">Awaiting Response</p>
-                  <p className="text-[22px] font-black text-[#2C392A]">{analytics.onlineRequestOrders.filter(o => normalizeStatus(o.status) === 'pending').length}</p>
-                  <p className="text-[11px] text-[#7A846F]">Needs follow-up</p>
-                </div>
-                <div className="bg-green-50 rounded-xl p-3">
-                  <p className="text-[10px] uppercase font-black text-green-600 tracking-wider mb-1">Completed</p>
-                  <p className="text-[22px] font-black text-[#2C392A]">{analytics.onlineRequestOrders.filter(o => isCompletedStatus(o.status)).length}</p>
-                  <p className="text-[11px] text-[#7A846F]">Interactions resolved</p>
-                </div>
+              <p className="text-[11px] text-[#7A846F] mb-4">
+                Status changes (Pending → Contacted → Completed) never affect revenue, KPI cards, or financial analytics.
+              </p>
+
+              {/* Summary stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                {[
+                  { label: 'Total Requests', val: analytics.waRequests, bg: 'bg-blue-50',   color: 'text-blue-600' },
+                  { label: 'Pending',        val: analytics.waPending,  bg: 'bg-amber-50',  color: 'text-amber-600' },
+                  { label: 'Contacted',      val: analytics.waContacted,bg: 'bg-orange-50', color: 'text-orange-600' },
+                  { label: 'Completed',      val: analytics.waCompleted,bg: 'bg-green-50',  color: 'text-green-600' },
+                ].map(({ label, val, bg, color }) => (
+                  <div key={label} className={`${bg} rounded-xl p-3`}>
+                    <p className={`text-[10px] uppercase font-black ${color} tracking-wider mb-1`}>{label}</p>
+                    <p className="text-[22px] font-black text-[#2C392A]">{val}</p>
+                  </div>
+                ))}
               </div>
+
+              {/* Request detail table */}
               {analytics.onlineRequestOrders.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-[12px] min-w-[520px]">
-                    <thead>
-                      <tr className="text-left text-[#5F6D59] font-bold border-b border-[#EAD7B7]/40">
-                        <th className="pb-2 pr-3">Customer Phone</th>
-                        <th className="pb-2 pr-3">Items</th>
-                        <th className="pb-2 pr-3">Price</th>
-                        <th className="pb-2 pr-3">Date</th>
-                        <th className="pb-2">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#EAD7B7]/30">
-                      {analytics.onlineRequestOrders.map((order) => {
-                        const orderItemsList = parseOrderItems(order.items)
-                        const itemSummary = orderItemsList.length > 0
-                          ? orderItemsList.slice(0, 2).map(i => String((i as Record<string,unknown>).name || (i as Record<string,unknown>).product_name || 'Item')).join(', ') + (orderItemsList.length > 2 ? ` +${orderItemsList.length - 2}` : '')
-                          : '—'
-                        return (
-                          <tr key={order.id} className="hover:bg-[#F7F6F2]">
-                            <td className="py-2 pr-3 font-bold text-[#2C392A]">{order.phone || order.customer_name || '—'}</td>
-                            <td className="py-2 pr-3 text-[#5F6D59] max-w-[160px] truncate">{itemSummary}</td>
-                            <td className="py-2 pr-3 font-bold text-[#2C392A] whitespace-nowrap">{formatCurrency(toNumber(order.total, 0))}</td>
-                            <td className="py-2 pr-3 text-[#7A846F] whitespace-nowrap">{new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</td>
-                            <td className="py-2">
-                              <select
-                                value={normalizeStatus(order.status)}
-                                onChange={e => void updateOrderStatus(order.id, e.target.value)}
-                                className={`text-[11px] font-black px-2 py-1 rounded-lg border cursor-pointer outline-none ${
-                                  isCompletedStatus(order.status)
-                                    ? 'bg-green-100 text-green-700 border-green-200'
-                                    : 'bg-amber-100 text-amber-700 border-amber-200'
-                                }`}
-                              >
-                                <option value="pending">Pending</option>
-                                <option value="completed">Responded</option>
-                              </select>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+                <div>
+                  <p className="text-[11px] font-black uppercase text-[#5F6D59] mb-2">Customer Requests</p>
+                  <div className="overflow-x-auto rounded-xl border border-blue-100">
+                    <table className="w-full text-[12px] min-w-[640px]">
+                      <thead className="bg-blue-50">
+                        <tr className="text-left text-[#5F6D59] font-bold">
+                          <th className="px-3 py-2.5">Customer</th>
+                          <th className="px-3 py-2.5">Phone</th>
+                          <th className="px-3 py-2.5">Date & Time</th>
+                          <th className="px-3 py-2.5">Items</th>
+                          <th className="px-3 py-2.5">Est. Total</th>
+                          <th className="px-3 py-2.5">Status</th>
+                          <th className="px-3 py-2.5">Details</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-blue-50">
+                        {analytics.onlineRequestOrders.map(order => {
+                          const its = parseOrderItems(order.items)
+                          const isExpanded = waExpandedId === order.id
+                          return (
+                            <>
+                              <tr key={order.id} className="hover:bg-[#F7F6F2] align-top">
+                                <td className="px-3 py-2.5 font-bold text-[#2C392A]">{order.customer_name || '—'}</td>
+                                <td className="px-3 py-2.5 text-[#5F6D59]">{order.phone || '—'}</td>
+                                <td className="px-3 py-2.5 text-[#7A846F] whitespace-nowrap">
+                                  {new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
+                                  {' '}
+                                  <span className="text-[10px]">{new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                                </td>
+                                <td className="px-3 py-2.5 text-[#5F6D59]">{its.length} item{its.length !== 1 ? 's' : ''}</td>
+                                <td className="px-3 py-2.5 font-bold text-[#2C392A]">{formatCurrency(toNumber(order.total, 0))}</td>
+                                <td className="px-3 py-2.5">
+                                  <select value={normalizeStatus(order.status)}
+                                    onChange={e => void updateOrderStatus(order.id, e.target.value)}
+                                    className={`text-[11px] font-black px-2 py-1 rounded-lg border cursor-pointer outline-none ${
+                                      isCompletedStatus(order.status) ? 'bg-green-100 text-green-700 border-green-200'
+                                      : normalizeStatus(order.status) === 'contacted' ? 'bg-orange-100 text-orange-700 border-orange-200'
+                                      : 'bg-amber-100 text-amber-700 border-amber-200'
+                                    }`}>
+                                    <option value="pending">Pending</option>
+                                    <option value="contacted">Contacted</option>
+                                    <option value="completed">Completed</option>
+                                  </select>
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <button type="button"
+                                    onClick={() => setWaExpandedId(isExpanded ? null : order.id)}
+                                    className="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-700 text-[11px] font-black hover:bg-blue-200 transition-colors whitespace-nowrap">
+                                    {isExpanded ? 'Hide' : 'View Details'}
+                                  </button>
+                                </td>
+                              </tr>
+                              {isExpanded && (
+                                <tr key={`${order.id}-detail`}>
+                                  <td colSpan={7} className="px-3 pb-3">
+                                    <div className="bg-blue-50 rounded-xl p-4 space-y-3">
+                                      {/* Customer info */}
+                                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[12px]">
+                                        <div><span className="font-black text-[#5F6D59]">Name: </span><span className="text-[#2C392A]">{order.customer_name || '—'}</span></div>
+                                        <div><span className="font-black text-[#5F6D59]">Phone: </span><span className="text-[#2C392A]">{order.phone || '—'}</span></div>
+                                        <div className="sm:col-span-2"><span className="font-black text-[#5F6D59]">Address: </span><span className="text-[#2C392A]">{order.address || '—'}</span></div>
+                                        <div className="sm:col-span-2"><span className="font-black text-[#5F6D59]">Date/Time: </span><span className="text-[#2C392A]">{new Date(order.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></div>
+                                      </div>
+                                      {/* Product table */}
+                                      {its.length > 0 && (
+                                        <div className="overflow-x-auto">
+                                          <table className="w-full text-[12px] min-w-[480px] bg-white rounded-xl overflow-hidden">
+                                            <thead className="bg-[#F7F6F2]">
+                                              <tr className="text-left text-[#5F6D59] font-bold">
+                                                <th className="px-3 py-2">Product</th>
+                                                <th className="px-3 py-2">Variant</th>
+                                                <th className="px-3 py-2">Size / Unit</th>
+                                                <th className="px-3 py-2">Qty</th>
+                                                <th className="px-3 py-2">Unit Price</th>
+                                                <th className="px-3 py-2 text-right">Line Total</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[#EAD7B7]/20">
+                                              {its.map((raw, idx) => {
+                                                const item = raw as Record<string, unknown>
+                                                const fullName   = String(item.name || item.product_name || 'Product')
+                                                const dashIdx    = fullName.indexOf(' - ')
+                                                const prodName   = dashIdx > 0 ? fullName.slice(0, dashIdx) : fullName
+                                                const variant    = dashIdx > 0 ? fullName.slice(dashIdx + 3) : '—'
+                                                const qty        = toNumber(item.quantity ?? item.qty, 0)
+                                                const baseQty    = toNumber(item.base_quantity ?? item.baseQuantity, 1)
+                                                const basePrice  = toNumber(item.base_price ?? item.basePrice ?? item.price, 0)
+                                                const lineTotal  = toNumber(item.line_total ?? item.lineTotal, 0)
+                                                const unit       = String(item.unit || 'pc')
+                                                const unitType   = String(item.unit_type || item.unitType || 'unit')
+                                                const sizeLabel  = unitType === 'weight'
+                                                  ? qty >= 1000 ? `${qty / 1000}kg` : `${qty}g`
+                                                  : unitType === 'volume'
+                                                    ? qty >= 1000 ? `${qty / 1000}L` : `${qty}ml`
+                                                    : `${qty} ${unit}`
+                                                const priceLabel = unitType === 'weight' || unitType === 'volume'
+                                                  ? `${formatCurrency(basePrice)}/${baseQty}${unit}`
+                                                  : formatCurrency(basePrice)
+                                                return (
+                                                  <tr key={idx} className="hover:bg-blue-50/30">
+                                                    <td className="px-3 py-2 font-bold text-[#2C392A]">{prodName}</td>
+                                                    <td className="px-3 py-2 text-[#5F6D59]">{variant}</td>
+                                                    <td className="px-3 py-2 text-[#5F6D59]">{sizeLabel}</td>
+                                                    <td className="px-3 py-2 font-bold">{qty}</td>
+                                                    <td className="px-3 py-2 text-[#5F6D59]">{priceLabel}</td>
+                                                    <td className="px-3 py-2 font-black text-[#2C392A] text-right">{formatCurrency(lineTotal)}</td>
+                                                  </tr>
+                                                )
+                                              })}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      )}
+                                      {/* Grand total */}
+                                      <div className="flex justify-end items-center gap-3 pt-1 border-t border-blue-200">
+                                        <span className="text-[12px] font-black text-[#5F6D59] uppercase tracking-wider">Estimated Grand Total</span>
+                                        <span className="text-[18px] font-black text-[#2C392A]">{formatCurrency(toNumber(order.total, 0))}</span>
+                                        <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">₹0 Revenue</span>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ) : (
-                <p className="text-[13px] text-[#5F6D59] text-center py-4">No WhatsApp requests yet</p>
+                <p className="text-[13px] text-[#5F6D59] text-center py-4">No WhatsApp requests in selected period</p>
+              )}
+
+              {/* Top requested products */}
+              {analytics.topWAProducts.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-[11px] font-black uppercase text-[#5F6D59] mb-2">Top Requested Products</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {analytics.topWAProducts.map((item, i) => (
+                      <div key={item.name} className="flex items-center gap-2 p-2.5 bg-[#F7F6F2] rounded-xl">
+                        <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-black flex items-center justify-center shrink-0">{i + 1}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-bold text-[#2C392A] truncate">{item.name}</p>
+                          <p className="text-[10px] text-blue-600 font-black">{item.count}×</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 
@@ -768,15 +1026,23 @@ export default function Dashboard() {
                     bg: 'bg-green-50',
                   },
                   {
-                    label: 'Direct POS',
-                    helper: 'From POS terminal',
+                    label: 'Offline Bills',
+                    helper: 'Walk-in POS sales',
                     value: formatCurrency(analytics.posRevenue),
                     icon: <IndianRupee size={18} />,
                     color: 'text-cyan-700',
                     bg: 'bg-cyan-50',
                   },
                   {
-                    label: 'Manual Sales',
+                    label: 'Online Bills',
+                    helper: 'Online POS sales',
+                    value: formatCurrency(analytics.onlinePosRevenue),
+                    icon: <IndianRupee size={18} />,
+                    color: 'text-blue-700',
+                    bg: 'bg-blue-50',
+                  },
+                  {
+                    label: 'Manual Bills',
                     helper: 'Manual item revenue',
                     value: formatCurrency(analytics.manualRevenue),
                     icon: <ShoppingCart size={18} />,
@@ -888,18 +1154,33 @@ export default function Dashboard() {
               </div>
 
               <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm">
-                <h3 className="text-base font-black text-[#2C392A] mb-4">Top Categories</h3>
-                <div className="h-56 sm:h-60">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analytics.topCategories} layout="vertical" margin={{ left: 12 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#E8DFD0" />
-                      <XAxis type="number" tick={{ fill: '#6B7661', fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <YAxis type="category" dataKey="name" width={108} tick={{ fill: '#6B7661', fontSize: 10.5 }} axisLine={false} tickLine={false} />
-                      <Tooltip formatter={(value) => toNumber(value as number | string, 0)} />
-                      <Bar dataKey="qty" fill="#7DAA8F" radius={[0, 7, 7, 0]} barSize={12} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <h3 className="text-base font-black text-[#2C392A] mb-4">Category Analytics</h3>
+                {analytics.topCategories.length > 0 ? (
+                  <div className="overflow-x-auto rounded-xl border border-[#EAD7B7]/30">
+                    <table className="w-full text-left text-[13px]">
+                      <thead className="bg-[#F7F6F2] text-[10px] uppercase tracking-wider text-[#5F6D59]">
+                        <tr>
+                          <th className="px-4 py-2.5 font-black">#</th>
+                          <th className="px-4 py-2.5 font-black">Category</th>
+                          <th className="px-4 py-2.5 font-black">Revenue</th>
+                          <th className="px-4 py-2.5 font-black">Qty Sold</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#EAD7B7]/20">
+                        {analytics.topCategories.map((c, i) => (
+                          <tr key={c.name} className="hover:bg-[#F7F6F2]/50">
+                            <td className="px-4 py-2 text-[11px] text-[#9BAB9A] font-bold">{i + 1}</td>
+                            <td className="px-4 py-2 font-bold text-[#2C392A]">{c.name}</td>
+                            <td className="px-4 py-2 font-bold text-emerald-700">{formatCurrency(c.revenue)}</td>
+                            <td className="px-4 py-2 text-[#5F6D59]">{Math.round(c.qty)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-center text-[13px] text-[#5F6D59] py-6">No data in selected period</p>
+                )}
               </div>
 
               <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm xl:col-span-2">
@@ -915,6 +1196,41 @@ export default function Dashboard() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
+              </div>
+
+              {/* Product Analytics table */}
+              <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm xl:col-span-2">
+                <h3 className="text-base font-black text-[#2C392A] mb-4">Product Analytics</h3>
+                {analytics.topProducts.length > 0 ? (
+                  <div className="overflow-x-auto rounded-xl border border-[#EAD7B7]/30">
+                    <table className="w-full min-w-[580px] text-left text-[13px]">
+                      <thead className="bg-[#F7F6F2] text-[10px] uppercase tracking-wider text-[#5F6D59]">
+                        <tr>
+                          <th className="px-4 py-2.5 font-black">#</th>
+                          <th className="px-4 py-2.5 font-black">Product</th>
+                          <th className="px-4 py-2.5 font-black">Variant</th>
+                          <th className="px-4 py-2.5 font-black">Qty Sold</th>
+                          <th className="px-4 py-2.5 font-black">Revenue</th>
+                          <th className="px-4 py-2.5 font-black">Bills</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#EAD7B7]/20">
+                        {analytics.topProducts.slice(0, 20).map((p, i) => (
+                          <tr key={`${p.name}-${p.variant || i}`} className="hover:bg-[#F7F6F2]/50">
+                            <td className="px-4 py-2 text-[11px] text-[#9BAB9A] font-bold">{i + 1}</td>
+                            <td className="px-4 py-2 font-bold text-[#2C392A]">{p.name}</td>
+                            <td className="px-4 py-2 text-[#5F6D59]">{p.variant || '—'}</td>
+                            <td className="px-4 py-2 font-bold">{Math.round(p.qty)}</td>
+                            <td className="px-4 py-2 font-bold text-emerald-700">{formatCurrency(p.revenue)}</td>
+                            <td className="px-4 py-2 text-[#5F6D59]">{p.billCount}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-center text-[13px] text-[#5F6D59] py-6">No product sales in selected period</p>
+                )}
               </div>
 
               <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm xl:col-span-2">
@@ -939,33 +1255,81 @@ export default function Dashboard() {
             </div>
 
             <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 sm:p-6 shadow-sm">
-              <h3 className="text-base font-black text-[#2C392A] mb-4">Order Management</h3>
-              <form onSubmit={runSearch} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                {[
-                  { key: 'invoiceNo', placeholder: 'WhatsApp Request ID / Bill No' },
-                  { key: 'phone',     placeholder: 'Mobile Number' },
-                  { key: 'email',     placeholder: 'Email / User ID' },
-                  { key: 'userId',    placeholder: 'Customer Code (CUST-...)' },
-                ].map(({ key, placeholder }) => (
-                  <input key={key} className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-semibold"
-                    placeholder={placeholder}
-                    value={(search as Record<string,string>)[key]}
-                    onChange={e => setSearch(s => ({ ...s, [key]: e.target.value }))} />
+              <h3 className="text-base font-black text-[#2C392A] mb-3">Order Management <span className="text-[11px] text-[#7A846F] font-semibold">(POS Bills only)</span></h3>
+              {/* Bill type filter */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {([
+                  { v: 'all',     l: 'All Bills' },
+                  { v: 'offline', l: 'Offline' },
+                  { v: 'online',  l: 'Online' },
+                  { v: 'manual',  l: 'Manual' },
+                ] as const).map(({ v, l }) => (
+                  <button key={v} type="button" onClick={() => setBillTypeFilter(v)}
+                    className={`px-3 py-1.5 rounded-xl text-[12px] font-black transition-colors ${
+                      billTypeFilter === v ? 'bg-[#2C392A] text-white' : 'bg-[#F7F6F2] text-[#5F6D59] hover:bg-[#EAD7B7]/40'
+                    }`}>
+                    {l}
+                  </button>
                 ))}
-                <input type="date" className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-semibold"
-                  value={search.dateFrom} onChange={e => setSearch(s => ({ ...s, dateFrom: e.target.value }))} />
-                <input type="date" className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-semibold"
-                  value={search.dateTo} onChange={e => setSearch(s => ({ ...s, dateTo: e.target.value }))} />
-                <button type="submit" disabled={searchLoading}
-                  className="sm:col-span-2 lg:col-span-2 flex items-center justify-center gap-2 py-2.5 bg-[#7DAA8F] text-white rounded-xl font-bold text-[13px] hover:bg-[#5e8c72] disabled:opacity-60">
-                  <Search size={14} /> {searchLoading ? 'Searching...' : 'Search Orders'}
-                </button>
+              </div>
+              <form onSubmit={runSearch} className="space-y-3 mb-4">
+                {/* Date presets */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  {(['today', 'week', 'month', 'custom'] as const).map(preset => (
+                    <button key={preset} type="button" onClick={() => applyDatePreset(preset)}
+                      className={`px-3 py-1.5 rounded-xl text-[12px] font-black transition-colors ${
+                        datePreset === preset ? 'bg-[#2C392A] text-white' : 'bg-[#F7F6F2] text-[#5F6D59] hover:bg-[#EAD7B7]/40'
+                      }`}>
+                      {preset === 'today' ? 'Today' : preset === 'week' ? 'This Week' : preset === 'month' ? 'This Month' : 'Custom Range'}
+                    </button>
+                  ))}
+                  {(search.dateFrom || search.dateTo || datePreset) && (
+                    <button type="button"
+                      onClick={() => { setDatePreset(''); setSearch(s => ({ ...s, dateFrom: '', dateTo: '' })) }}
+                      className="px-3 py-1.5 rounded-xl text-[12px] font-black text-red-500 hover:bg-red-50">
+                      Clear Dates
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <input className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-semibold"
+                    placeholder="Invoice / Bill No"
+                    value={search.invoiceNo}
+                    onChange={e => setSearch(s => ({ ...s, invoiceNo: e.target.value }))} />
+                  <input className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-semibold"
+                    placeholder="Customer Name"
+                    value={search.customerName}
+                    onChange={e => setSearch(s => ({ ...s, customerName: e.target.value }))} />
+                  <input className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-semibold"
+                    placeholder="Mobile Number"
+                    value={search.phone}
+                    onChange={e => setSearch(s => ({ ...s, phone: e.target.value }))} />
+                  {datePreset === 'custom' ? (
+                    <>
+                      <input type="date" className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-semibold"
+                        value={search.dateFrom} onChange={e => setSearch(s => ({ ...s, dateFrom: e.target.value }))} />
+                      <input type="date" className="px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-semibold"
+                        value={search.dateTo} onChange={e => setSearch(s => ({ ...s, dateTo: e.target.value }))} />
+                    </>
+                  ) : (
+                    <button type="submit" disabled={searchLoading}
+                      className="sm:col-span-2 flex items-center justify-center gap-2 py-2.5 bg-[#7DAA8F] text-white rounded-xl font-bold text-[13px] hover:bg-[#5e8c72] disabled:opacity-60">
+                      <Search size={14} /> {searchLoading ? 'Searching...' : 'Search Bills'}
+                    </button>
+                  )}
+                  {datePreset === 'custom' && (
+                    <button type="submit" disabled={searchLoading}
+                      className="sm:col-span-2 lg:col-span-4 flex items-center justify-center gap-2 py-2.5 bg-[#7DAA8F] text-white rounded-xl font-bold text-[13px] hover:bg-[#5e8c72] disabled:opacity-60">
+                      <Search size={14} /> {searchLoading ? 'Searching...' : 'Search Bills'}
+                    </button>
+                  )}
+                </div>
               </form>
 
               <div className="flex items-center justify-between mb-2">
-                <p className="text-[11px] text-[#5F6D59]">{searchResults.length} result(s)</p>
-                {searchResults.length > 0 && (
-                  <button onClick={() => exportCSV(searchResults)}
+                <p className="text-[11px] text-[#5F6D59]">{filteredSearchResults.length} result(s)</p>
+                {filteredSearchResults.length > 0 && (
+                  <button onClick={() => exportCSV(filteredSearchResults)}
                     className="flex items-center gap-1 text-[11px] font-bold text-[#7DAA8F] hover:underline">
                     <Download size={11} /> Export results
                   </button>
@@ -973,52 +1337,65 @@ export default function Dashboard() {
               </div>
 
               <div className="overflow-x-auto rounded-xl border border-[#EAD7B7]/30">
-                <table className="w-full min-w-[600px] text-left text-[13px]">
+                <table className="w-full min-w-[960px] text-left text-[13px]">
                   <thead className="bg-[#F7F6F2] text-[10px] uppercase tracking-wider text-[#5F6D59]">
                     <tr>
-                      {['Order Ref','Customer','Phone','Date','Total','Order Type','Status Badge','Change Status'].map(h => (
-                        <th key={h} className="px-4 py-3 font-black">{h}</th>
+                      {['Invoice No','Customer','Phone','Bill Type','Products','Discount','Coupon','Delivery','Grand Total','Date','Status'].map(h => (
+                        <th key={h} className="px-3 py-3 font-black">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#EAD7B7]/20">
-                    {searchResults.slice(0, 50).map(o => (
-                      <tr key={o.id} className="hover:bg-[#F7F6F2]/50">
-                        <td className="px-4 py-3 font-bold text-[#7DAA8F] text-[12px]">{normalizeOrderType(o.order_type) === 'online_request' ? o.id : o.invoice_no}</td>
-                        <td className="px-4 py-3 font-semibold text-[13px]">{o.customer_name}</td>
-                        <td className="px-4 py-3 text-[13px]">{o.phone}</td>
-                        <td className="px-4 py-3 text-[12px]">{new Date(o.created_at).toLocaleDateString('en-IN')}</td>
-                        <td className="px-4 py-3 font-bold text-[13px]">{formatCurrency(toNumber(o.total, 0))}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                            normalizeOrderMode(o.order_mode) === 'offline' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
-                          }`}>{normalizeOrderType(o.order_type) === 'online_request' ? 'REQUEST' : normalizeOrderType(o.order_type) === 'manual_sale' ? 'MANUAL' : 'POS'}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                            normalizeStatus(o.status) === 'completed'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-amber-100 text-amber-700'
-                          }`}>{normalizeStatus(o.status) === 'completed' ? 'Completed' : 'Pending'}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <select
-                            value={normalizeStatus(o.status)}
-                            onChange={e => void updateOrderStatus(o.id, e.target.value)}
-                            className={`text-[11px] font-black px-2 py-1 rounded-lg border cursor-pointer outline-none ${
-                              normalizeStatus(o.status) === 'completed'
-                                ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
-                                : 'bg-amber-100 text-amber-700 border-amber-200'
-                            }`}
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="completed">Completed</option>
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
-                    {searchResults.length === 0 && (
-                      <tr><td colSpan={8} className="px-4 py-8 text-center text-[#5F6D59]">No matching orders</td></tr>
+                    {filteredSearchResults.slice(0, 50).map(o => {
+                      const orderItemsList = parseOrderItems(o.items)
+                      const itemSummary = orderItemsList.length === 0 ? '—'
+                        : orderItemsList.length === 1
+                          ? String((orderItemsList[0] as Record<string,unknown>).product_name || (orderItemsList[0] as Record<string,unknown>).name || 'Item')
+                          : `${String((orderItemsList[0] as Record<string,unknown>).product_name || (orderItemsList[0] as Record<string,unknown>).name || 'Item')} +${orderItemsList.length - 1}`
+                      const billTypeLabel = normalizeOrderType(o.order_type) === 'manual_sale' ? 'MANUAL'
+                        : normalizeOrderMode(o.order_mode) === 'online' ? 'ONLINE' : 'OFFLINE'
+                      const billTypeClass = normalizeOrderType(o.order_type) === 'manual_sale'
+                        ? 'bg-purple-100 text-purple-700'
+                        : normalizeOrderMode(o.order_mode) === 'online' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                      return (
+                        <tr key={o.id} className="hover:bg-[#F7F6F2]/50">
+                          <td className="px-3 py-3 font-bold text-[#7DAA8F] text-[12px] whitespace-nowrap">{o.invoice_no || '—'}</td>
+                          <td className="px-3 py-3 font-semibold text-[12px] max-w-[110px] truncate">{o.customer_name}</td>
+                          <td className="px-3 py-3 text-[12px] whitespace-nowrap">{o.phone}</td>
+                          <td className="px-3 py-3">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${billTypeClass}`}>{billTypeLabel}</span>
+                          </td>
+                          <td className="px-3 py-3 text-[12px] text-[#5F6D59] max-w-[120px] truncate" title={itemSummary}>{itemSummary}</td>
+                          <td className="px-3 py-3 text-[12px]">
+                            {o.discount_amount > 0 ? <span className="text-green-700 font-bold">-{formatCurrency(o.discount_amount)}</span> : <span className="text-[#9BAB9A]">—</span>}
+                          </td>
+                          <td className="px-3 py-3 text-[12px]">
+                            {o.coupon_code ? <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded font-bold text-[10px]">{o.coupon_code}</span> : <span className="text-[#9BAB9A]">—</span>}
+                          </td>
+                          <td className="px-3 py-3 text-[12px]">
+                            {o.delivery_charge > 0 ? <span className="font-bold">{formatCurrency(o.delivery_charge)}</span> : <span className="text-[#9BAB9A]">—</span>}
+                          </td>
+                          <td className="px-3 py-3 font-bold text-[13px] whitespace-nowrap">{formatCurrency(toNumber(o.total, 0))}</td>
+                          <td className="px-3 py-3 text-[12px] whitespace-nowrap">{new Date(o.created_at).toLocaleDateString('en-IN')}</td>
+                          <td className="px-3 py-3">
+                            <select
+                              value={normalizeStatus(o.status)}
+                              onChange={e => void updateOrderStatus(o.id, e.target.value)}
+                              className={`text-[11px] font-black px-2 py-1 rounded-lg border cursor-pointer outline-none ${
+                                normalizeStatus(o.status) === 'completed'
+                                  ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                  : 'bg-amber-100 text-amber-700 border-amber-200'
+                              }`}
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="completed">Completed</option>
+                            </select>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {filteredSearchResults.length === 0 && (
+                      <tr><td colSpan={11} className="px-4 py-8 text-center text-[#5F6D59]">No matching bills</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -1293,7 +1670,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ΓöÇΓöÇ COUPONS TAB ΓöÇΓöÇ */}
+        {/* ── COUPONS TAB ── */}
         {tab === 'coupons' && (
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1304,9 +1681,25 @@ export default function Dashboard() {
               </button>
             </div>
 
+            {/* Info banner */}
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-[12px] font-bold text-blue-700">
+              Coupon discount applies to product subtotal only — not delivery charge.
+            </div>
+
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {/* Create / Edit form */}
               <form onSubmit={saveCoupon} className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 sm:p-6 shadow-sm space-y-4">
-                <h3 className="text-base font-black text-[#2C392A]">Create Coupon</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-black text-[#2C392A]">
+                    {editingCouponId !== null ? '✎ Edit Coupon' : '+ New Coupon'}
+                  </h3>
+                  {editingCouponId !== null && (
+                    <button type="button" onClick={cancelEditCoupon}
+                      className="text-[12px] font-bold text-red-500 hover:underline">
+                      Cancel
+                    </button>
+                  )}
+                </div>
 
                 {couponSaveError && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-[12px] font-bold text-red-700">{couponSaveError}</div>
@@ -1318,20 +1711,26 @@ export default function Dashboard() {
                 <div>
                   <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Coupon Code *</label>
                   <div className="flex gap-2">
-                    <input className="flex-1 px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold uppercase"
+                    <input className="flex-1 px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold uppercase tracking-widest"
                       placeholder="WELCOME10"
                       value={couponForm.code}
+                      disabled={editingCouponId !== null}
                       onChange={e => { setCouponForm(f => ({ ...f, code: e.target.value.toUpperCase() })); setCouponSaveError(''); setCouponSaveSuccess('') }} />
-                    <button type="button" onClick={generateCouponCode}
-                      className="px-3 py-2.5 bg-[#7DAA8F] text-white font-black rounded-xl text-[12px] hover:bg-[#5e8c72] whitespace-nowrap">
-                      Generate
-                    </button>
+                    {editingCouponId === null && (
+                      <button type="button" onClick={generateCouponCode}
+                        className="px-3 py-2.5 bg-[#7DAA8F] text-white font-black rounded-xl text-[12px] hover:bg-[#5e8c72] whitespace-nowrap">
+                        Generate
+                      </button>
+                    )}
                   </div>
+                  {editingCouponId !== null && (
+                    <p className="text-[10px] text-[#9BAB9A] mt-1">Code cannot be changed when editing</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Discount %</label>
+                    <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Discount % *</label>
                     <input type="number" min="1" max="100" className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
                       placeholder="10"
                       value={couponForm.percentage}
@@ -1340,11 +1739,12 @@ export default function Dashboard() {
                   <div>
                     <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Min Order (₹)</label>
                     <input type="number" min="0" className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
-                      placeholder="0"
+                      placeholder="0 = no minimum"
                       value={couponForm.min_order_value}
                       onChange={e => setCouponForm(f => ({ ...f, min_order_value: e.target.value }))} />
                   </div>
                 </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Expiry Date</label>
@@ -1354,36 +1754,64 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">Usage Limit</label>
-                    <input type="number" min="0" className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
+                    <input type="number" min="1" className="w-full px-3 py-2.5 bg-[#F7F6F2] rounded-xl text-[13px] font-bold"
                       placeholder="Unlimited"
                       value={couponForm.usage_limit}
                       onChange={e => setCouponForm(f => ({ ...f, usage_limit: e.target.value }))} />
                   </div>
                 </div>
+
                 <button type="submit" className="w-full py-3 rounded-xl bg-[#2C392A] text-white font-black text-[13px] hover:bg-[#1e2817]">
-                  Save Coupon
+                  {editingCouponId !== null ? 'Update Coupon' : 'Create Coupon'}
                 </button>
               </form>
 
+              {/* Coupon list */}
               <div className="bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 sm:p-6 shadow-sm">
-                <h3 className="text-base font-black text-[#2C392A] mb-4">Existing Coupons</h3>
-                <div className="space-y-3 max-h-[32rem] overflow-y-auto pr-1">
-                  {coupons.map((coupon) => (
-                    <div key={coupon.id} className="flex items-center justify-between gap-3 p-3 bg-[#F7F6F2] rounded-xl">
-                      <div>
-                        <p className="font-black text-[#2C392A]">{coupon.code}</p>
-                        <p className="text-[11px] text-[#5F6D59]">
-                          {coupon.percentage}% off · Used {coupon.usage_count} time(s)
-                        </p>
+                <h3 className="text-base font-black text-[#2C392A] mb-4">All Coupons ({coupons.length})</h3>
+                <div className="space-y-3 max-h-[36rem] overflow-y-auto pr-1">
+                  {coupons.map((coupon) => {
+                    const isExpired = coupon.expiry_date ? new Date(coupon.expiry_date) < new Date() : false
+                    const isExhausted = coupon.usage_limit !== null && coupon.usage_count >= coupon.usage_limit
+                    return (
+                      <div key={coupon.id} className={`p-3 rounded-xl border ${editingCouponId === coupon.id ? 'border-[#2C392A] bg-[#2C392A]/5' : 'bg-[#F7F6F2] border-transparent'}`}>
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div>
+                            <p className="font-black text-[#2C392A] tracking-wider">{coupon.code}</p>
+                            <p className="text-[11px] text-[#5F6D59] mt-0.5">
+                              <span className="font-bold text-emerald-700">{coupon.percentage}% off</span>
+                              {coupon.min_order_value > 0 && ` · min ₹${coupon.min_order_value}`}
+                            </p>
+                            <p className="text-[10px] text-[#9BAB9A] mt-0.5">
+                              Used {coupon.usage_count}{coupon.usage_limit ? `/${coupon.usage_limit}` : ''} times
+                              {coupon.expiry_date && ` · expires ${new Date(coupon.expiry_date).toLocaleDateString('en-IN')}`}
+                            </p>
+                            {(isExpired || isExhausted) && (
+                              <p className="text-[10px] font-black text-red-500 mt-0.5">
+                                {isExpired ? 'Expired' : 'Limit reached'}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button onClick={() => void toggleCoupon(coupon)}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${coupon.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                              {coupon.is_active ? 'Active' : 'Off'}
+                            </button>
+                            <button onClick={() => startEditCoupon(coupon)}
+                              className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-blue-50 text-blue-700 hover:bg-blue-100">
+                              Edit
+                            </button>
+                            <button onClick={() => void deleteCoupon(coupon)}
+                              className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-red-50 text-red-600 hover:bg-red-100">
+                              Del
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <button onClick={() => void toggleCoupon(coupon)}
-                        className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase ${coupon.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {coupon.is_active ? 'Active' : 'Disabled'}
-                      </button>
-                    </div>
-                  ))}
+                    )
+                  })}
                   {coupons.length === 0 && (
-                    <div className="text-center text-[13px] text-[#5F6D59] py-8">No coupons yet</div>
+                    <div className="text-center text-[13px] text-[#5F6D59] py-8">No coupons yet. Create your first coupon!</div>
                   )}
                 </div>
               </div>

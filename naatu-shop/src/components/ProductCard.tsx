@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Heart, ShoppingCart, Plus, Minus } from 'lucide-react'
-import { useCartStore, useFavStore, useProductModalStore, type Product } from '../store/store'
+import { Heart, ShoppingCart, Plus, Minus, Layers } from 'lucide-react'
+import { useCartStore, useFavStore, useProductModalStore, useVariantModalStore, type Product } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { formatCurrency, calculateLineTotal, type QuantityOption } from '../lib/retail'
 import { getProductImage, onImgError } from '../lib/productImages'
@@ -33,6 +33,7 @@ export default function ProductCard({
   const { addItem, removeItem, updateQuantity } = useCartStore()
   const { toggle, isFav } = useFavStore()
   const openProduct = useProductModalStore((state) => state.openProduct)
+  const openVariantModal = useVariantModalStore((state) => state.openVariantModal)
   const { lang } = useLangStore()
   const fav = isFav(product.id)
 
@@ -65,10 +66,18 @@ export default function ProductCard({
     : product.name
 
   const handleOpen = () => {
-    openProduct(product)
+    if (product.hasVariants) {
+      openVariantModal(product)
+    } else {
+      openProduct(product)
+    }
   }
 
   const handleMobileAdd = () => {
+    if (product.hasVariants) {
+      openVariantModal(product)
+      return
+    }
     if (hasOptions && selectedOpt) {
       addItem(product, selectedOpt.quantity, selectedOpt.unit)
     } else {
@@ -180,8 +189,8 @@ export default function ProductCard({
                 type="button"
                 className="mt-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-[#2C392A] px-4 py-2.5 text-[12px] font-black text-white shadow-[0_10px_20px_rgba(44,57,42,0.16)]"
               >
-                <ShoppingCart size={13} />
-                Add
+                {product.hasVariants ? <Layers size={13} /> : <ShoppingCart size={13} />}
+                {product.hasVariants ? 'Select' : 'Add'}
               </motion.button>
             ) : (
               <motion.div

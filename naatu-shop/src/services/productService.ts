@@ -10,7 +10,7 @@ const PRODUCT_COLUMNS = [
   'base_quantity', 'stock_quantity', 'stock_unit', 'allow_decimal_quantity',
   'predefined_options', 'is_active', 'sort_order', 'unit', 'rating',
   'description', 'description_ta', 'benefits', 'benefits_ta',
-  'image_url', 'image',
+  'image_url', 'image', 'has_variants',
 ].join(', ')
 
 export function fetchAllProducts() {

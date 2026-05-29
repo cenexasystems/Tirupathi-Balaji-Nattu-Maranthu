@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom'
 import {
   Search, Trash2, Plus, Minus, Receipt, Printer,
   RefreshCw, ChevronLeft, ShoppingBag, MessageCircle,
-  Wifi, WifiOff,
+  Wifi, WifiOff, Layers, X,
 } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
-import { useProductStore, type Product } from '../store/store'
+import { useProductStore, useVariantStore, type Product } from '../store/store'
 import { Invoice } from '../components/Invoice'
 import { BRAND_EN, BRAND_TA, BRAND_WHATSAPP_LINK } from '../lib/brand'
 import { createOrderWithStock } from '../services/orderService'
@@ -21,6 +21,7 @@ import {
 } from '../lib/retail'
 import { getProductImage, onImgError } from '../lib/productImages'
 import { normalizeIndianPhone, toWhatsAppUrl } from '../lib/phone'
+import type { ProductVariant } from '../services/variantService'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type PosItem = Product & {
@@ -94,6 +95,7 @@ const CAT_COLOR: Record<string, string> = {
 // ══════════════════════════════════════════════════════════════════════════
 export default function Pos() {
   const { products, fetchProducts, error: productError } = useProductStore()
+  const { getVariants, fetchVariants } = useVariantStore()
 
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('All')
@@ -112,16 +114,19 @@ export default function Pos() {
   const [cashReceived, setCashReceived] = useState<string>('')
   const [mobilePanelView, setMobilePanelView] = useState<'catalogue' | 'bill'>('catalogue')
   const [orderMode, setOrderMode] = useState<'online' | 'offline'>('offline')
+  const [variantPickerProduct, setVariantPickerProduct] = useState<Product | null>(null)
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     void fetchProducts()
+    void fetchVariants()
     if (!isSupabaseConfigured) return
     const ch = supabase.channel('pos-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => void fetchProducts())
       .subscribe()
     return () => { void supabase.removeChannel(ch) }
-  }, [fetchProducts])
+  }, [fetchProducts, fetchVariants])
 
   // ── Derived data ──────────────────────────────────────────────────────
   const categories = useMemo(() => {
@@ -157,6 +162,15 @@ export default function Pos() {
 
   // ── Cart actions ──────────────────────────────────────────────────────
   const addItem = (product: Product) => {
+    // For variant products, open variant picker instead of adding directly
+    if (product.hasVariants) {
+      const variants = getVariants(String(product.id))
+      if (variants.length > 0) {
+        setVariantPickerProduct(product)
+        setSelectedVariant(variants[0])
+        return
+      }
+    }
     setError('')
     setMobilePanelView('catalogue')
     setItems(cur => {
@@ -165,6 +179,29 @@ export default function Pos() {
       const inc = ex.unitType === 'unit' || ex.unitType === 'bundle' ? 1 : ex.baseQuantity
       return cur.map(i => i.id === product.id ? recalc(i, i.qty + inc) : i)
     })
+  }
+
+  const addVariantToItems = () => {
+    if (!variantPickerProduct || !selectedVariant) return
+    setError('')
+    const variantProduct: Product = {
+      ...variantPickerProduct,
+      id: selectedVariant.id,
+      name: `${variantPickerProduct.name} - ${selectedVariant.variantName}`,
+      price: selectedVariant.price,
+      offerPrice: null,
+      stock: selectedVariant.stock,
+      stockQuantity: selectedVariant.stock,
+      hasVariants: false,
+    }
+    setItems(cur => {
+      const ex = cur.find(i => i.id === variantProduct.id)
+      if (!ex) return [...cur, makePosItem(variantProduct)]
+      return cur.map(i => i.id === variantProduct.id ? recalc(i, i.qty + 1) : i)
+    })
+    setVariantPickerProduct(null)
+    setSelectedVariant(null)
+    setMobilePanelView('catalogue')
   }
 
   // Manual product addition (minimal, non-destructive)
@@ -569,7 +606,7 @@ export default function Pos() {
       <div className="flex flex-1 overflow-hidden gap-0">
 
         {/* ════ LEFT: Product catalogue ════════════════════════════════ */}
-        <div className={`flex flex-col flex-1 overflow-hidden border-r border-[#D5DAD0] ${mobilePanelView === 'bill' ? 'hidden md:flex' : ''}`}>
+        <div className={`relative flex flex-col flex-1 overflow-hidden border-r border-[#D5DAD0] ${mobilePanelView === 'bill' ? 'hidden md:flex' : ''}`}>
 
           {/* Search */}
           <div className="bg-white px-3 py-2.5 border-b border-[#D5DAD0] shrink-0">
@@ -654,6 +691,13 @@ export default function Pos() {
                         </span>
                       )}
 
+                      {/* Variants badge */}
+                      {product.hasVariants && (
+                        <span className="absolute top-1 left-1 z-10 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-purple-600 text-white text-[8px] font-black">
+                          <Layers size={8} /> Variants
+                        </span>
+                      )}
+
                       {/* Category colour strip */}
                       <div className="h-1 w-full shrink-0" style={{ backgroundColor: CAT_COLOR[product.category] || '#7DAA8F' }} />
 
@@ -680,10 +724,16 @@ export default function Pos() {
                           </p>
                         )}
                         <p className="text-[11px] font-black text-[#2C392A] mt-1">
-                          {formatCurrency(price)}
-                          <span className="text-[9px] font-medium text-[#5F6D59] ml-0.5">
-                            /{product.unitType === 'unit' ? 'pc' : product.unitType === 'bundle' ? 'bundle' : product.unitLabel}
-                          </span>
+                          {product.hasVariants ? (
+                            <span className="text-purple-700">Select ▸</span>
+                          ) : (
+                            <>
+                              {formatCurrency(price)}
+                              <span className="text-[9px] font-medium text-[#5F6D59] ml-0.5">
+                                /{product.unitType === 'unit' ? 'pc' : product.unitType === 'bundle' ? 'bundle' : product.unitLabel}
+                              </span>
+                            </>
+                          )}
                         </p>
                       </div>
                     </button>
@@ -692,6 +742,69 @@ export default function Pos() {
               </div>
             )}
           </div>
+
+          {/* ── Variant Picker Overlay (inline, within catalogue panel) ── */}
+          {variantPickerProduct && (
+            <div className="absolute inset-0 z-20 flex items-end bg-black/30 backdrop-blur-sm">
+              <div className="w-full bg-white rounded-t-2xl shadow-2xl border-t border-[#D5DAD0] p-4 space-y-3">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-[#E8EDE4]">
+                      <img
+                        src={getProductImage(variantPickerProduct.name, variantPickerProduct.category, variantPickerProduct.imageUrl, 'tile')}
+                        alt={variantPickerProduct.name}
+                        onError={onImgError}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-black text-[#2C392A]">{variantPickerProduct.name}</p>
+                      <p className="text-[11px] text-[#5F6D59]">Select a variant</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setVariantPickerProduct(null); setSelectedVariant(null) }}
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F0F2EE]"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+
+                {/* Variant chips */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {getVariants(String(variantPickerProduct.id)).map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setSelectedVariant(v)}
+                      className={`flex flex-col items-start rounded-xl border-2 px-3 py-2 text-left transition-all ${
+                        selectedVariant?.id === v.id
+                          ? 'border-[#2C392A] bg-[#2C392A] text-white'
+                          : 'border-[#D5DAD0] bg-[#F0F2EE] text-[#2C392A]'
+                      }`}
+                    >
+                      <span className="text-[12px] font-black">{v.variantName}</span>
+                      <span className={`text-[11px] font-bold ${selectedVariant?.id === v.id ? 'text-white/80' : 'text-[#5F6D59]'}`}>
+                        {formatCurrency(v.price)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Add button */}
+                <button
+                  type="button"
+                  onClick={addVariantToItems}
+                  disabled={!selectedVariant}
+                  className="w-full py-3 bg-[#2C392A] text-white rounded-xl font-black text-[13px] disabled:opacity-40"
+                >
+                  Add to Bill — {selectedVariant ? formatCurrency(selectedVariant.price) : '—'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ════ RIGHT: Bill panel ══════════════════════════════════════ */}
@@ -738,7 +851,7 @@ export default function Pos() {
           </div>
 
           {/* Items list */}
-          <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
+          <div className="flex-1 min-h-[60px] overflow-y-auto px-2 py-2 space-y-1">
             {items.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-8 text-[#5F6D59]">
                 <ShoppingBag size={32} className="opacity-20 mb-2" />
@@ -808,7 +921,7 @@ export default function Pos() {
           </div>
 
           {/* Totals + Generate bill */}
-          <div className="border-t border-[#E8EDE4] px-3 py-3 shrink-0 space-y-2.5">
+          <div className="border-t border-[#E8EDE4] px-3 py-3 shrink-0 space-y-2 overflow-y-auto max-h-[56vh] md:max-h-none md:overflow-visible">
             {error && (
               <p className="text-[11px] text-red-500 font-bold bg-red-50 px-3 py-2 rounded-lg">{error}</p>
             )}
@@ -816,18 +929,18 @@ export default function Pos() {
             <div className="space-y-2 rounded-xl border border-[#E8EDE4] bg-[#F7F8F5] p-3">
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-[#5F6D59] mb-1">Coupon</label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 min-w-0">
                   <input
                     value={couponInput}
                     onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponError('') }}
                     placeholder="WELCOME10"
-                    className="flex-1 px-3 py-2 rounded-lg border border-[#D5DAD0] bg-white text-[12px] font-bold uppercase outline-none"
+                    className="min-w-0 flex-1 px-3 py-2 rounded-lg border border-[#D5DAD0] bg-white text-[12px] font-bold uppercase outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => void applyCoupon()}
                     disabled={couponLoading || !couponInput.trim()}
-                    className="px-3 py-2 rounded-lg bg-[#2C392A] text-white font-black text-[11px] disabled:opacity-50"
+                    className="shrink-0 px-3 py-2 rounded-lg bg-[#2C392A] text-white font-black text-[11px] disabled:opacity-50"
                   >
                     {couponLoading ? '...' : 'Apply'}
                   </button>
@@ -835,22 +948,22 @@ export default function Pos() {
                 {couponError && <p className="mt-1 text-[10px] font-bold text-red-500">{couponError}</p>}
                 {appliedCoupon && (
                   <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2">
-                    <div>
-                      <p className="text-[11px] font-black text-green-800">{appliedCoupon.code} · {appliedCoupon.percentage}% off</p>
-                      <p className="text-[10px] text-green-700">{formatCurrency(appliedCoupon.discount)} coupon discount</p>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-black text-green-800 truncate">{appliedCoupon.code} · {appliedCoupon.percentage}% off</p>
+                      <p className="text-[10px] text-green-700">{formatCurrency(appliedCoupon.discount)} off</p>
                     </div>
-                    <button type="button" onClick={removeCoupon} className="text-[10px] font-black text-green-700 hover:text-red-500 uppercase">Clear</button>
+                    <button type="button" onClick={removeCoupon} className="shrink-0 text-[10px] font-black text-green-700 hover:text-red-500 uppercase">Clear</button>
                   </div>
                 )}
               </div>
 
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-[#5F6D59] mb-1">Manual Discount</label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 min-w-0">
                   <select
                     value={manualDiscountType}
                     onChange={e => setManualDiscountType(e.target.value === 'percent' ? 'percent' : 'flat')}
-                    className="w-24 px-2 py-2 rounded-lg border border-[#D5DAD0] bg-white text-[11px] font-bold"
+                    className="shrink-0 w-20 px-2 py-2 rounded-lg border border-[#D5DAD0] bg-white text-[11px] font-bold"
                   >
                     <option value="flat">Flat ₹</option>
                     <option value="percent">%</option>
@@ -859,12 +972,12 @@ export default function Pos() {
                     value={manualDiscountValue}
                     onChange={e => setManualDiscountValue(e.target.value.replace(/[^0-9.]/g, ''))}
                     placeholder={manualDiscountType === 'percent' ? '10' : '50'}
-                    className="flex-1 px-3 py-2 rounded-lg border border-[#D5DAD0] bg-white text-[12px] font-bold outline-none text-right"
+                    className="min-w-0 flex-1 px-3 py-2 rounded-lg border border-[#D5DAD0] bg-white text-[12px] font-bold outline-none text-right"
                   />
                 </div>
-                <p className="mt-1 text-[10px] text-[#5F6D59] font-medium">
-                  {manualDiscountAmount > 0 ? `Manual discount: ${formatCurrency(manualDiscountAmount)}` : 'No manual discount applied'}
-                </p>
+                {manualDiscountAmount > 0 && (
+                  <p className="mt-1 text-[10px] text-green-700 font-bold">Discount: {formatCurrency(manualDiscountAmount)}</p>
+                )}
               </div>
             </div>
 
