@@ -34,7 +34,7 @@ export default function Navbar() {
     <>
       <div className="flex items-center justify-center gap-3 overflow-x-auto bg-forestDark/95 px-3 py-2 text-center text-[11px] sm:text-xs font-medium tracking-wide text-sage shadow-soft">
         <span className="whitespace-nowrap">🌿 {t('nav.free_shipping')} &nbsp;·&nbsp; WhatsApp: {BRAND_PHONE_DISPLAY}</span>
-        <button onClick={() => setLang(lang === 'en' ? 'ta' : 'en')} className="inline-flex items-center rounded-full bg-white/8 p-0.5 text-[10px] font-bold text-white transition-colors shadow-soft">
+        <button onClick={() => setLang(lang === 'en' ? 'ta' : 'en')} className="hidden sm:inline-flex items-center rounded-full bg-white/8 p-0.5 text-[10px] font-bold text-white transition-colors shadow-soft">
           <span className={`px-2 py-0.5 rounded-full transition-colors ${lang === 'en' ? 'bg-white text-forestDark' : 'text-white/70'}`}>EN</span>
           <span className={`px-2 py-0.5 rounded-full transition-colors ${lang === 'ta' ? 'bg-white text-forestDark' : 'text-white/70'}`}>தமிழ்</span>
         </button>
@@ -85,6 +85,15 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-1">
+            {/* Language toggle — always accessible on all screen sizes */}
+            <button
+              onClick={() => setLang(lang === 'en' ? 'ta' : 'en')}
+              title="Switch language / மொழி மாற்று"
+              className="flex items-center rounded-full bg-[#F7F6F2] border border-sand/60 px-1 py-0.5 text-[10px] font-black text-[#2C392A] shrink-0 mr-0.5"
+            >
+              <span className={`px-1.5 py-0.5 rounded-full transition-colors ${lang === 'en' ? 'bg-[#2C392A] text-white' : 'text-[#5F6D59]'}`}>EN</span>
+              <span className={`px-1.5 py-0.5 rounded-full transition-colors ${lang === 'ta' ? 'bg-[#2C392A] text-white' : 'text-[#5F6D59]'}`}>த</span>
+            </button>
             <motion.button whileTap={{ scale: 0.88 }} onClick={() => setShowFav(true)} className="relative rounded-full hover:bg-sage/20 transition-colors touch-target">
               <Heart size={18} className="text-textMuted sm:size-[20px]" />
               {favCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-rose-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{favCount}</span>}

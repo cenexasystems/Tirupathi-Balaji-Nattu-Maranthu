@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   Search, Trash2, Plus, Minus, Receipt, Printer,
   RefreshCw, ChevronLeft, ShoppingBag, MessageCircle,
-  Wifi, WifiOff, Layers, X,
+  Wifi, WifiOff, Layers, X, ChevronDown,
 } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { useProductStore, useVariantStore, type Product } from '../store/store'
@@ -21,6 +21,7 @@ import {
 } from '../lib/retail'
 import { getProductImage, onImgError } from '../lib/productImages'
 import { normalizeIndianPhone, toWhatsAppUrl } from '../lib/phone'
+import { useLangStore } from '../store/langStore'
 import type { ProductVariant } from '../services/variantService'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -96,6 +97,9 @@ const CAT_COLOR: Record<string, string> = {
 export default function Pos() {
   const { products, fetchProducts, error: productError } = useProductStore()
   const { getVariants, fetchVariants } = useVariantStore()
+  const { lang } = useLangStore()
+  const l = (en: string, ta: string) => lang === 'ta' ? ta : en
+  const [billingAdjOpen, setBillingAdjOpen] = useState(false)
 
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('All')
@@ -211,8 +215,8 @@ export default function Pos() {
     setError('')
     const name = manualName.trim()
     const price = Number(manualPrice || 0)
-    if (!name) { setError('Enter product name'); return }
-    if (!(price > 0)) { setError('Enter valid price'); return }
+    if (!name) { setError(l('Enter product name', 'பொருள் பெயர் உள்ளிடவும்')); return }
+    if (!(price > 0)) { setError(l('Enter valid price', 'சரியான விலை உள்ளிடவும்')); return }
     const prod: Product = {
       id: `manual-${Date.now()}`,
       name,
@@ -458,7 +462,7 @@ export default function Pos() {
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold text-textMain">Bill Generated</h1>
+              <h1 className="text-xl font-bold text-textMain">{l('Bill Generated', 'பில் உருவாக்கப்பட்டது')}</h1>
               <p className="text-sm text-textMuted">{invoice.invoiceNo}</p>
             </div>
             <button onClick={clearAll}
@@ -469,24 +473,24 @@ export default function Pos() {
 
           {/* Payment receipt */}
           <div className="surface-panel p-5">
-            <p className="text-xs font-black uppercase tracking-widest text-textMuted mb-3">Payment Receipt</p>
+            <p className="text-xs font-black uppercase tracking-widest text-textMuted mb-3">{l('Payment Receipt', 'பண ரசீது')}</p>
             <div className="space-y-2.5">
               <div className="flex justify-between items-center pb-2.5 border-b border-sand">
-                <p className="text-sm font-bold text-textMuted">Grand Total</p>
+                <p className="text-sm font-bold text-textMuted">{l('Grand Total', 'மொத்த தொகை')}</p>
                 <p className="text-2xl font-black text-textMain">{formatCurrency(invoice.total)}</p>
               </div>
               <div className="flex justify-between items-center">
-                <p className="text-sm font-bold text-textMuted">Amount Received</p>
+                <p className="text-sm font-bold text-textMuted">{l('Amount Received', 'பெற்ற தொகை')}</p>
                 <p className="text-xl font-black text-textMain">{formatCurrency(invoice.amountReceived)}</p>
               </div>
               {invoice.balanceReturned > 0 ? (
                 <div className="flex justify-between items-center rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
-                  <p className="text-sm font-black text-blue-700">Balance Returned</p>
+                  <p className="text-sm font-black text-blue-700">{l('Balance Returned', 'திரும்பிய பணம்')}</p>
                   <p className="text-2xl font-black text-blue-700">{formatCurrency(invoice.balanceReturned)}</p>
                 </div>
               ) : (
                 <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-center">
-                  <p className="text-sm font-black text-green-700">✅ Exact Amount Received</p>
+                  <p className="text-sm font-black text-green-700">✅ {l('Exact Amount Received', 'சரியான தொகை')}</p>
                 </div>
               )}
             </div>
@@ -500,7 +504,7 @@ export default function Pos() {
             </button>
             <button onClick={() => window.print()}
               className="flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-sand hover:border-sageDark text-textMain font-bold text-sm transition-colors">
-              <Printer size={16} /> Print
+              <Printer size={16} /> {l('Print', 'அச்சிடு')}
             </button>
             <button onClick={clearAll}
               className="flex items-center justify-center gap-2 py-3 rounded-xl bg-sageDark hover:bg-sageDeep text-white font-bold text-sm transition-colors">
@@ -510,7 +514,7 @@ export default function Pos() {
 
           {/* Items summary */}
           <div className="surface-panel p-4">
-            <p className="text-xs font-bold text-textMuted uppercase tracking-wide mb-3">Items Sold</p>
+            <p className="text-xs font-bold text-textMuted uppercase tracking-wide mb-3">{l('Items Sold', 'விற்ற பொருட்கள்')}</p>
             <div className="space-y-1.5">
               {invoice.items.map(item => (
                 <div key={item.id} className="flex justify-between text-sm">
@@ -553,7 +557,7 @@ export default function Pos() {
           </Link>
           <div>
             <p className="font-black text-[13px] leading-tight">{BRAND_EN}</p>
-            <p className="text-[10px] text-white/60">{BRAND_TA} · POS Terminal</p>
+            <p className="text-[10px] text-white/60">{BRAND_TA} · {l('POS Terminal', 'POS மேடை')}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -573,7 +577,7 @@ export default function Pos() {
             </button>
           </div>
           <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${isSupabaseConfigured ? 'bg-green-500/20 text-green-300' : 'bg-amber-500/20 text-amber-300'}`}>
-            {isSupabaseConfigured ? '● Live' : '● Local'}
+            {isSupabaseConfigured ? l('● Live', '● நேரடி') : l('● Local', '● உள்ளூர்')}
           </span>
           <button onClick={() => void fetchProducts()} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
             <RefreshCw size={14} />
@@ -587,13 +591,13 @@ export default function Pos() {
           onClick={() => setMobilePanelView('catalogue')}
           className={`flex-1 py-2.5 text-[12px] font-black transition-colors ${mobilePanelView === 'catalogue' ? 'text-[#2C392A] border-b-2 border-[#2C392A]' : 'text-[#5F6D59]'}`}
         >
-          Products
+          {l('Products', 'பொருட்கள்')}
         </button>
         <button
           onClick={() => setMobilePanelView('bill')}
           className={`flex-1 py-2.5 text-[12px] font-black transition-colors flex items-center justify-center gap-1.5 ${mobilePanelView === 'bill' ? 'text-[#2C392A] border-b-2 border-[#2C392A]' : 'text-[#5F6D59]'}`}
         >
-          Bill
+          {l('Bill', 'பில்')}
           {items.length > 0 && (
             <span className="w-5 h-5 rounded-full bg-[#2C392A] text-white text-[9px] font-black flex items-center justify-center">
               {items.length}
@@ -616,7 +620,7 @@ export default function Pos() {
                 ref={searchRef}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search products..."
+                placeholder={l('Search products...', 'பொருட்கள் தேடுக...')}
                 className="w-full pl-9 pr-4 py-2 bg-[#F0F2EE] rounded-lg text-[13px] outline-none border border-transparent focus:border-[#7DAA8F]"
               />
             </div>
@@ -648,16 +652,16 @@ export default function Pos() {
                 <input
                   value={manualName}
                   onChange={e => setManualName(e.target.value)}
-                  placeholder="Manual item name"
+                  placeholder={l('Manual item name', 'பொருள் பெயர்')}
                   className="flex-1 px-3 py-1.5 bg-[#F0F2EE] rounded-lg text-[12px] outline-none border border-transparent focus:border-[#7DAA8F]"
                 />
                 <input
                   value={manualPrice}
                   onChange={e => setManualPrice(e.target.value.replace(/[^0-9.]/g, ''))}
-                  placeholder="Price"
+                  placeholder={l('Price', 'விலை')}
                   className="w-24 px-3 py-1.5 bg-[#F0F2EE] rounded-lg text-[12px] outline-none border border-transparent focus:border-[#7DAA8F] text-right"
                 />
-                <button onClick={addManualItem} className="px-3 py-1.5 bg-[#2C392A] text-white rounded-lg font-black text-[12px]">Add</button>
+                <button onClick={addManualItem} className="px-3 py-1.5 bg-[#2C392A] text-white rounded-lg font-black text-[12px]">{l('Add', 'சேர்')}</button>
               </div>
             </div>
 
@@ -669,7 +673,7 @@ export default function Pos() {
           <div className="flex-1 overflow-y-auto p-3">
             {filtered.length === 0 ? (
               <div className="text-center py-16 text-textMuted text-sm">
-                {products.length === 0 ? 'No products loaded.' : 'No products match your search.'}
+                {products.length === 0 ? l('No products loaded.', 'பொருட்கள் ஏற்றவில்லை.') : l('No products match your search.', 'பொருட்கள் கிடைக்கவில்லை.')}
               </div>
             ) : (
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-5 gap-2">
@@ -760,7 +764,7 @@ export default function Pos() {
                     </div>
                     <div>
                       <p className="text-[13px] font-black text-[#2C392A]">{variantPickerProduct.name}</p>
-                      <p className="text-[11px] text-[#5F6D59]">Select a variant</p>
+                      <p className="text-[11px] text-[#5F6D59]">{l('Select a variant', 'வகை தேர்வு செய்யுங்கள்')}</p>
                     </div>
                   </div>
                   <button
@@ -800,7 +804,7 @@ export default function Pos() {
                   disabled={!selectedVariant}
                   className="w-full py-3 bg-[#2C392A] text-white rounded-xl font-black text-[13px] disabled:opacity-40"
                 >
-                  Add to Bill — {selectedVariant ? formatCurrency(selectedVariant.price) : '—'}
+                  {l('Add to Bill', 'பில்லில் சேர்')} — {selectedVariant ? formatCurrency(selectedVariant.price) : '—'}
                 </button>
               </div>
             </div>
@@ -814,11 +818,11 @@ export default function Pos() {
 
           {/* Customer fields */}
           <div className="px-3 py-2.5 border-b border-[#E8EDE4] shrink-0 space-y-1.5">
-            <p className="text-[10px] font-black uppercase tracking-widest text-[#5F6D59]">Customer</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#5F6D59]">{l('Customer', 'வாடிக்கையாளர்')}</p>
             <input
               value={customer.name}
               onChange={e => setCustomer(c => ({ ...c, name: e.target.value }))}
-              placeholder="Name (optional)"
+              placeholder={l('Name (optional)', 'பெயர் (விரும்பினால்)')}
               className="w-full px-3 py-1.5 bg-[#F0F2EE] rounded-lg text-[12px] outline-none border border-transparent focus:border-[#7DAA8F]"
             />
             <input
@@ -841,11 +845,11 @@ export default function Pos() {
           {/* Bill header */}
           <div className="px-3 py-2 border-b border-[#E8EDE4] flex items-center justify-between shrink-0">
             <p className="text-[11px] font-black uppercase tracking-widest text-[#5F6D59] flex items-center gap-1.5">
-              <ShoppingBag size={12} /> Bill Items
+              <ShoppingBag size={12} /> {l('Bill Items', 'பில் பொருட்கள்')}
             </p>
             {items.length > 0 && (
               <button onClick={() => setItems([])} className="text-[10px] font-bold text-red-400 hover:text-red-600 flex items-center gap-1">
-                <Trash2 size={10} /> Clear
+                <Trash2 size={10} /> {l('Clear', 'அழி')}
               </button>
             )}
           </div>
@@ -855,8 +859,8 @@ export default function Pos() {
             {items.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-8 text-[#5F6D59]">
                 <ShoppingBag size={32} className="opacity-20 mb-2" />
-                <p className="text-[12px] font-bold">No items yet</p>
-                <p className="text-[11px] opacity-60 mt-0.5">Click products to add</p>
+                <p className="text-[12px] font-bold">{l('No items yet', 'பொருட்கள் இல்லை')}</p>
+                <p className="text-[11px] opacity-60 mt-0.5">{l('Click products to add', 'கிளிக் செய்து சேர்க்கவும்')}</p>
               </div>
             ) : (
               items.map(item => {
@@ -926,9 +930,27 @@ export default function Pos() {
               <p className="text-[11px] text-red-500 font-bold bg-red-50 px-3 py-2 rounded-lg">{error}</p>
             )}
 
-            <div className="space-y-2 rounded-xl border border-[#E8EDE4] bg-[#F7F8F5] p-3">
+            {/* Mobile: collapsible Billing Adjustments toggle */}
+            <button
+              type="button"
+              onClick={() => setBillingAdjOpen(o => !o)}
+              className="md:hidden w-full flex items-center justify-between py-2 text-[11px] font-black text-[#5F6D59] uppercase tracking-wider border-y border-[#E8EDE4]"
+            >
+              <span className="flex items-center gap-1.5">
+                <ChevronDown size={12} className={`transition-transform duration-200 ${billingAdjOpen ? 'rotate-180' : ''}`} />
+                {l('Billing Adjustments', 'பில் சரிசெய்தல்')}
+              </span>
+              {(appliedCoupon || manualDiscountAmount > 0) && (
+                <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full normal-case">
+                  {l('Applied', 'பயன்படுத்தப்பட்டது')}
+                </span>
+              )}
+            </button>
+
+            {/* Coupon + Discount: always shown desktop, toggle on mobile */}
+            <div className={`space-y-2 rounded-xl border border-[#E8EDE4] bg-[#F7F8F5] p-3 md:block ${billingAdjOpen ? 'block' : 'hidden'}`}>
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-[#5F6D59] mb-1">Coupon</label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-[#5F6D59] mb-1">{l('Coupon', 'கூப்பன்')}</label>
                 <div className="flex gap-2 min-w-0">
                   <input
                     value={couponInput}
@@ -942,7 +964,7 @@ export default function Pos() {
                     disabled={couponLoading || !couponInput.trim()}
                     className="shrink-0 px-3 py-2 rounded-lg bg-[#2C392A] text-white font-black text-[11px] disabled:opacity-50"
                   >
-                    {couponLoading ? '...' : 'Apply'}
+                    {couponLoading ? '...' : l('Apply', 'பயன்படுத்து')}
                   </button>
                 </div>
                 {couponError && <p className="mt-1 text-[10px] font-bold text-red-500">{couponError}</p>}
@@ -952,20 +974,20 @@ export default function Pos() {
                       <p className="text-[11px] font-black text-green-800 truncate">{appliedCoupon.code} · {appliedCoupon.percentage}% off</p>
                       <p className="text-[10px] text-green-700">{formatCurrency(appliedCoupon.discount)} off</p>
                     </div>
-                    <button type="button" onClick={removeCoupon} className="shrink-0 text-[10px] font-black text-green-700 hover:text-red-500 uppercase">Clear</button>
+                    <button type="button" onClick={removeCoupon} className="shrink-0 text-[10px] font-black text-green-700 hover:text-red-500 uppercase">{l('Clear', 'அழி')}</button>
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-[#5F6D59] mb-1">Manual Discount</label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-[#5F6D59] mb-1">{l('Manual Discount', 'கைமுறை தள்ளுபடி')}</label>
                 <div className="flex gap-2 min-w-0">
                   <select
                     value={manualDiscountType}
                     onChange={e => setManualDiscountType(e.target.value === 'percent' ? 'percent' : 'flat')}
                     className="shrink-0 w-20 px-2 py-2 rounded-lg border border-[#D5DAD0] bg-white text-[11px] font-bold"
                   >
-                    <option value="flat">Flat ₹</option>
+                    <option value="flat">{l('Flat ₹', 'தட்டை ₹')}</option>
                     <option value="percent">%</option>
                   </select>
                   <input
@@ -976,7 +998,7 @@ export default function Pos() {
                   />
                 </div>
                 {manualDiscountAmount > 0 && (
-                  <p className="mt-1 text-[10px] text-green-700 font-bold">Discount: {formatCurrency(manualDiscountAmount)}</p>
+                  <p className="mt-1 text-[10px] text-green-700 font-bold">{l('Discount', 'தள்ளுபடி')}: {formatCurrency(manualDiscountAmount)}</p>
                 )}
               </div>
             </div>
@@ -984,7 +1006,7 @@ export default function Pos() {
             {/* Bill breakdown */}
             <div className="rounded-xl border border-[#E8EDE4] bg-[#F7F8F5] p-3 space-y-1.5 text-[12px]">
               <div className="flex justify-between text-[#5F6D59]">
-                <span>Subtotal ({items.length} item{items.length !== 1 ? 's' : ''})</span>
+                <span>{l('Subtotal', 'கூட்டுத்தொகை')} ({items.length} {l('item', 'பொருள்')}{items.length !== 1 ? 's' : ''})</span>
                 <span className="font-bold">{formatCurrency(subtotal)}</span>
               </div>
               {appliedCoupon && (
@@ -995,12 +1017,12 @@ export default function Pos() {
               )}
               {manualDiscountAmount > 0 && (
                 <div className="flex justify-between text-green-700">
-                  <span>Discount ({manualDiscountType === 'percent' ? `${manualDiscountValue}%` : 'Flat'})</span>
+                  <span>{l('Discount', 'தள்ளுபடி')} ({manualDiscountType === 'percent' ? `${manualDiscountValue}%` : l('Flat', 'தட்டை')})</span>
                   <span className="font-bold">-{formatCurrency(manualDiscountAmount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-[#5F6D59] items-center">
-                <span>Delivery</span>
+                <span>{l('Delivery', 'டெலிவரி')}</span>
                 <input
                   type="number"
                   value={shipping}
@@ -1009,7 +1031,7 @@ export default function Pos() {
                 />
               </div>
               <div className="flex justify-between font-black text-[#2C392A] text-[14px] pt-1.5 border-t border-[#D5DAD0]">
-                <span>Grand Total</span>
+                <span>{l('Grand Total', 'மொத்த தொகை')}</span>
                 <span>{formatCurrency(total)}</span>
               </div>
             </div>
@@ -1020,9 +1042,9 @@ export default function Pos() {
               cashReceivedNum >= total && cashReceivedNum > 0 ? 'border-green-300 bg-green-50/30' :
               'border-[#2C392A]/20 bg-[#F7F8F5]'
             }`}>
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#5F6D59]">Cash Payment</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#5F6D59]">{l('Cash Payment', 'பண செலுத்து')}</p>
               <div>
-                <label className="block text-[10px] font-bold text-[#5F6D59] mb-1">Amount Received (₹)</label>
+                <label className="block text-[10px] font-bold text-[#5F6D59] mb-1">{l('Amount Received (₹)', 'பெற்ற தொகை (₹)')}</label>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -1042,19 +1064,19 @@ export default function Pos() {
               {cashReceivedNum > 0 && (
                 isInsufficientPayment ? (
                   <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2">
-                    <p className="text-[11px] font-black text-red-600">⚠ Insufficient Payment</p>
+                    <p className="text-[11px] font-black text-red-600">⚠ {l('Insufficient Payment', 'போதுமான பணம் இல்லை')}</p>
                     <p className="text-[10px] text-red-500 mt-0.5">
-                      Still need: {formatCurrency(total - cashReceivedNum)}
+                      {l('Still need', 'இன்னும் தேவை')}: {formatCurrency(total - cashReceivedNum)}
                     </p>
                   </div>
                 ) : balanceToReturn === 0 ? (
                   <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2">
-                    <p className="text-[11px] font-black text-green-700 text-center">✅ Exact Amount</p>
+                    <p className="text-[11px] font-black text-green-700 text-center">✅ {l('Exact Amount', 'சரியான தொகை')}</p>
                   </div>
                 ) : (
                   <div className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2.5">
                     <div className="flex justify-between items-center">
-                      <p className="text-[11px] font-black text-blue-700">Balance to Return</p>
+                      <p className="text-[11px] font-black text-blue-700">{l('Balance to Return', 'திரும்பவும் கொடுக்க')}</p>
                       <p className="text-[18px] font-black text-blue-700">{formatCurrency(balanceToReturn)}</p>
                     </div>
                   </div>
@@ -1076,8 +1098,8 @@ export default function Pos() {
                 flex items-center justify-center gap-2 shadow-md"
             >
               {saving
-                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
-                : <><Receipt size={16} /> Generate Bill</>
+                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {l('Saving...', 'சேமிக்கிறது...')}</>
+                : <><Receipt size={16} /> {l('Generate Bill', 'பில் உருவாக்கு')}</>
               }
             </button>
           </div>

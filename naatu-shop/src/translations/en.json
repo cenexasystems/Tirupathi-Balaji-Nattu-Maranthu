@@ -200,5 +200,21 @@
     "start_shopping": "Start shopping to see your orders here",
     "browse_products": "Browse Products",
     "items_label": "items"
-  }
+  },
+  "admin.nav.control_center": "Control Center",
+  "admin.nav.whatsapp": "WhatsApp",
+  "admin.nav.pos_analytics": "POS Analytics",
+  "admin.nav.orders": "Orders",
+  "admin.nav.inventory": "Inventory",
+  "admin.nav.categories": "Categories",
+  "admin.nav.coupons": "Coupons",
+  "admin.nav.users": "Users",
+  "admin.period.all": "All Time",
+  "admin.period.today": "Today",
+  "admin.period.week": "This Week",
+  "admin.period.month": "This Month",
+  "admin.period.year": "This Year",
+  "admin.period.custom": "Custom",
+  "admin.erp_title": "Business ERP",
+  "admin.logged_in": "Logged in as"
 }

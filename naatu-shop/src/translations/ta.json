@@ -200,5 +200,21 @@
     "start_shopping": "உங்கள் ஆர்டர்களை இங்கே காண ஷாப்பிங்கைத் தொடங்குங்கள்",
     "browse_products": "தயாரிப்புகளைப் பார்க்கவும்",
     "items_label": "பொருட்கள்"
-  }
+  },
+  "admin.nav.control_center": "கட்டுப்பு",
+  "admin.nav.whatsapp": "வாட்ஸ் அப்",
+  "admin.nav.pos_analytics": "POS பகுப்பு",
+  "admin.nav.orders": "ஆர்டர்கள்",
+  "admin.nav.inventory": "சரக்கு",
+  "admin.nav.categories": "வகைகள்",
+  "admin.nav.coupons": "கூப்பன்",
+  "admin.nav.users": "பயனர்",
+  "admin.period.all": "எல்லாம்",
+  "admin.period.today": "இன்று",
+  "admin.period.week": "இந்த வாரம்",
+  "admin.period.month": "இந்த மாதம்",
+  "admin.period.year": "இந்த ஆண்டு",
+  "admin.period.custom": "தேர்வு",
+  "admin.erp_title": "ERP அமைப்பு",
+  "admin.logged_in": "உள்நுழைந்தவர்"
 }

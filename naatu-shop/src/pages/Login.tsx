@@ -7,6 +7,7 @@ import { Leaf, Mail, ArrowLeft, CheckCircle, User, Phone as PhoneIcon } from 'lu
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { BRAND_EN, BRAND_TA } from '../lib/brand'
 import { isValidIndianPhone, getSubscriberDigits } from '../lib/phone'
+import { useLangStore } from '../store/langStore'
 
 const SITE_URL =
   (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/$/, '') ||
@@ -33,6 +34,8 @@ function validate(name: string, phone: string, email: string): FieldError {
 
 export default function Login() {
   const location   = useLocation()
+  const { lang } = useLangStore()
+  const l = (en: string, ta: string) => lang === 'ta' ? ta : en
   const redirectPath = new URLSearchParams(location.search).get('redirect') || '/'
 
   const [loading,   setLoading]   = useState(false)
@@ -62,8 +65,15 @@ export default function Login() {
   /* ── Email: send magic link ──────────────────────────────────── */
   const handleSendLink = async (e: React.FormEvent) => {
     e.preventDefault()
-    const errs = validate(name, phone, email)
-    if (Object.keys(errs).length > 0) { setFieldErrs(errs); return }
+    const rawErrs = validate(name, phone, email)
+    if (Object.keys(rawErrs).length > 0) {
+      setFieldErrs({
+        name:  rawErrs.name  ? l('Please enter your full name (at least 2 characters).', 'உங்கள் முழு பெயரை உள்ளிடவும் (குறைந்தது 2 எழுத்துக்கள்).') : undefined,
+        phone: rawErrs.phone ? l('Enter a valid Indian mobile number (e.g. 9876543210).', 'சரியான இந்திய மொபைல் எண் உள்ளிடவும்.') : undefined,
+        email: rawErrs.email ? l('Enter a valid email address.', 'சரியான மின்னஞ்சல் உள்ளிடவும்.') : undefined,
+      })
+      return
+    }
     if (!isSupabaseConfigured) { setError('Authentication not configured.'); return }
 
     setLoading(true); setError(''); setFieldErrs({})
@@ -124,10 +134,10 @@ export default function Login() {
         {/* ═══ EMAIL — step 1: form ══════════════════════════════ */}
         {emailStep === 'input' && (
           <form onSubmit={handleSendLink} noValidate className="space-y-4">
-            <p className="text-[13px] font-bold text-textMain">Sign in with Email</p>
+            <p className="text-[13px] font-bold text-textMain">{l('Sign in with Email', 'மின்னஞ்சல் மூலம் உள்நுழைவு')}</p>
 
             {/* Full Name */}
-            <FieldGroup label="Full Name" icon={<User size={14} />} required error={fieldErrs.name}>
+            <FieldGroup label={l('Full Name', 'முழு பெயர்')} icon={<User size={14} />} required error={fieldErrs.name}>
               <input
                 type="text" autoComplete="name"
                 placeholder="e.g. Priya Krishnamurthy"
@@ -138,7 +148,7 @@ export default function Login() {
             </FieldGroup>
 
             {/* Mobile Number */}
-            <FieldGroup label="Mobile Number" icon={<PhoneIcon size={14} />} required error={fieldErrs.phone} hint="10-digit Indian mobile">
+            <FieldGroup label={l('Mobile Number', 'மொபைல் எண்')} icon={<PhoneIcon size={14} />} required error={fieldErrs.phone} hint={l('10-digit Indian mobile', '10 இலக்க மொபைல்')}>
               <div className="flex gap-2">
                 <span className="flex items-center px-3 py-3 bg-[#F7F6F2] border-2 border-sand rounded-xl text-[13px] font-bold text-textMuted shrink-0 select-none">
                   🇮🇳 +91
@@ -154,7 +164,7 @@ export default function Login() {
             </FieldGroup>
 
             {/* Email */}
-            <FieldGroup label="Email Address" icon={<Mail size={14} />} required error={fieldErrs.email}>
+            <FieldGroup label={l('Email Address', 'மின்னஞ்சல் முகவரி')} icon={<Mail size={14} />} required error={fieldErrs.email}>
               <input
                 type="email" autoComplete="email"
                 placeholder="you@example.com"
@@ -167,8 +177,8 @@ export default function Login() {
             <button type="submit" disabled={loading}
               className="w-full bg-sageDark hover:bg-sageDeep text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
               {loading
-                ? <><Spinner /> Sending link…</>
-                : <><Mail size={15} /> Send Magic Link</>
+                ? <><Spinner /> {l('Sending link…', 'அனுப்புகிறது...')}</>
+                : <><Mail size={15} /> {l('Send Magic Link', 'இணைப்பு அனுப்பு')}</>
               }
             </button>
 
@@ -180,7 +190,7 @@ export default function Login() {
             {/* Divider */}
             <div className="relative flex items-center gap-3 py-1">
               <div className="flex-1 h-px bg-sand/60" />
-              <span className="text-[11px] text-textMuted font-medium shrink-0">or</span>
+              <span className="text-[11px] text-textMuted font-medium shrink-0">{l('or', 'அல்லது')}</span>
               <div className="flex-1 h-px bg-sand/60" />
             </div>
 
@@ -192,7 +202,7 @@ export default function Login() {
               className="w-full flex items-center justify-center gap-3 bg-white border-2 border-[#EAD7B7] hover:border-sageDark text-textMain font-bold py-3.5 rounded-xl transition-all disabled:opacity-60 shadow-sm hover:shadow-md active:scale-[0.98]"
             >
               {googleLoading ? <Spinner /> : <GoogleIcon size={20} />}
-              {googleLoading ? 'Redirecting to Google…' : 'Continue with Google'}
+              {googleLoading ? l('Redirecting to Google…','Google க்கு செல்கிறது...') : l('Continue with Google','Google மூலம் தொடர')}
             </button>
 
             <p className="text-center text-[11px] text-gray-400 leading-relaxed">
@@ -209,7 +219,7 @@ export default function Login() {
               <CheckCircle size={32} className="text-green-500" />
             </div>
             <div>
-              <h3 className="font-bold text-textMain text-[15px] mb-1">Check your inbox!</h3>
+              <h3 className="font-bold text-textMain text-[15px] mb-1">{l('Check your inbox!', 'உங்கள் inbox பாருங்கள்!')}</h3>
               <p className="text-[13px] text-textMuted leading-relaxed">
                 A magic sign-in link was sent to<br />
                 <strong className="text-sageDark">{email}</strong>
@@ -222,7 +232,7 @@ export default function Login() {
 
             <details className="text-left border border-sand/60 rounded-xl p-4">
               <summary className="text-[11px] text-sageDark font-bold cursor-pointer select-none list-none flex items-center gap-1.5">
-                <span>›</span> Received a 6-digit code instead?
+                <span>›</span> {l('Received a 6-digit code instead?', '6 இலக்க குறியீடு கிடைத்ததா?')}
               </summary>
               <form onSubmit={handleVerifyOtp} className="mt-3 space-y-3">
                 <input type="text" inputMode="numeric" maxLength={6} placeholder="000000"
@@ -230,7 +240,7 @@ export default function Login() {
                   value={otp} onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); setError('') }} />
                 <button type="submit" disabled={loading || otp.length < 6}
                   className="w-full bg-sageDark text-white font-bold py-3 rounded-xl disabled:opacity-60 flex items-center justify-center gap-2">
-                  {loading ? <><Spinner /> Verifying…</> : 'Verify & Sign In'}
+                  {loading ? <><Spinner /> {l('Verifying…', 'சரிபார்க்கிறது...')}</> : l('Verify & Sign In', 'சரிபார்த்து உள்நுழைவு')}
                 </button>
               </form>
             </details>
@@ -238,7 +248,7 @@ export default function Login() {
             <button type="button"
               onClick={() => { setEmailStep('input'); setError(''); setOtp('') }}
               className="flex items-center justify-center gap-1.5 text-[12px] text-textMuted hover:text-textMain mx-auto">
-              <ArrowLeft size={13} /> Use a different email
+              <ArrowLeft size={13} /> {l('Use a different email', 'வேறு மின்னஞ்சல்')}
             </button>
           </div>
         )}
@@ -246,7 +256,7 @@ export default function Login() {
         {/* Footer */}
         <div className="mt-6 pt-5 border-t border-sand/50 text-center">
           <p className="text-[11px] text-gray-400">
-            First time here? Your account is created automatically on sign-in.
+            {l('First time here? Your account is created automatically on sign-in.', 'முதல் முறையா? உள்நுழைவில் கணக்கு தானாக உருவாகும்.')}
           </p>
         </div>
       </div>

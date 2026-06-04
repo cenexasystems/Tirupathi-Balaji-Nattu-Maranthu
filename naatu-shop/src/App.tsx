@@ -191,6 +191,16 @@ function AppShell() {
               <Suspense fallback={<LoadingSpinner />}><Dashboard /></Suspense>
             </AdminRoute></ProtectedRoute>
           } />
+          <Route path="/whatsapp-center" element={
+            <ProtectedRoute><AdminRoute>
+              <Suspense fallback={<LoadingSpinner />}><Dashboard /></Suspense>
+            </AdminRoute></ProtectedRoute>
+          } />
+          <Route path="/pos-analytics" element={
+            <ProtectedRoute><AdminRoute>
+              <Suspense fallback={<LoadingSpinner />}><Dashboard /></Suspense>
+            </AdminRoute></ProtectedRoute>
+          } />
           <Route path="/pos" element={
             <ProtectedRoute><AdminRoute>
               <Suspense fallback={<LoadingSpinner />}><Pos /></Suspense>
