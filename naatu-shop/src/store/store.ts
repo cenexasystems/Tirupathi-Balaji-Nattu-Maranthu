@@ -94,7 +94,7 @@ interface ProductState {
 
 interface CartState {
   items: CartItem[]
-  addItem: (product: Product, quantity: number, unit: string) => void
+  addItem: (product: Product, quantity: number, unit: string, variantId?: string, variantName?: string, parentProductId?: string) => void
   removeItem: (productId: string | number) => void
   updateQuantity: (productId: string | number, quantity: number) => void
   clearCart: () => void
@@ -127,7 +127,9 @@ interface VariantStoreState {
   variantsMap: Record<string, ProductVariant[]>
   fetched: boolean
   fetchVariants: () => Promise<void>
+  refetchVariants: () => Promise<void>
   getVariants: (productId: string) => ProductVariant[]
+  getDefaultVariant: (productId: string) => ProductVariant | null
   hasVariants: (productId: string | number) => boolean
 }
 
@@ -332,10 +334,10 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
-      addItem: (product, qty, unit) => {
+      addItem: (product, qty, unit, variantId, variantName, parentProductId) => {
         const items = [...get().items]
         const existing = items.find(i => i.id === product.id)
-        
+
         const basePrice = product.offerPrice || product.price
         const lineTotal = calculateLineTotal(qty, product.unitType, product.baseQuantity, basePrice)
 
@@ -355,7 +357,11 @@ export const useCartStore = create<CartState>()(
             qty,
             selectedUnit: unit,
             basePrice,
-            lineTotal
+            lineTotal,
+            // Variant identity — only set for variant items
+            variantId:       variantId       ?? undefined,
+            variantName:     variantName     ?? undefined,
+            parentProductId: parentProductId ?? undefined,
           })
         }
         set({ items })
@@ -447,7 +453,21 @@ export const useVariantStore = create<VariantStoreState>()((set, get) => ({
     }
     set({ variantsMap: map, fetched: true })
   },
+  refetchVariants: async () => {
+    set({ fetched: false })
+    const { data } = await fetchAllVariants()
+    const map: Record<string, ProductVariant[]> = {}
+    for (const v of data) {
+      if (!map[v.productId]) map[v.productId] = []
+      map[v.productId].push(v)
+    }
+    set({ variantsMap: map, fetched: true })
+  },
   getVariants: (productId) => get().variantsMap[String(productId)] || [],
+  getDefaultVariant: (productId) => {
+    const variants = get().variantsMap[String(productId)] || []
+    return variants.find(v => v.isDefault) || variants[0] || null
+  },
   hasVariants: (productId) => (get().variantsMap[String(productId)] || []).length > 0,
 }))
 

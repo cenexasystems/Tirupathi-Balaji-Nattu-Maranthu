@@ -12,6 +12,8 @@ import { useAuthStore, useProductStore, type Product } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { uploadProductImage } from '../lib/storage'
 import { formatCurrency, normalizeOrderMode, normalizeUnitType, toNumber, type UnitType } from '../lib/retail'
+import { createVariant, updateVariant, deleteVariant, setDefaultVariant, type ProductVariant } from '../services/variantService'
+import { useVariantStore } from '../store/store'
 import {
   ResponsiveContainer,
   LineChart,
@@ -67,6 +69,7 @@ const emptyForm = {
   stockQuantity: 100, stockUnit: 'piece', allowDecimalQuantity: false,
   predefinedOptionsText: '', isActive: true, sortOrder: 0, stock: 100,
   description: '', descriptionTa: '', benefits: '', benefitsTa: '', image: '',
+  hasVariants: false,
 }
 
 const exportCSV = (orders: DashboardOrder[]) => {
@@ -124,6 +127,13 @@ export default function Dashboard() {
   const [couponSaveError, setCouponSaveError] = useState('')
   const [couponSaveSuccess, setCouponSaveSuccess] = useState('')
   const [editingCouponId, setEditingCouponId] = useState<number | null>(null)
+
+  // Variant management state
+  const { getVariants, refetchVariants } = useVariantStore()
+  const [variantForm, setVariantForm] = useState({ name: '', sizeLabel: '', price: '', stock: '50', weightValue: '', weightUnit: '', isDefault: false })
+  const [editingVariantId, setEditingVariantId] = useState<string | null>(null)
+  const [variantNotice, setVariantNotice] = useState('')
+  const [variantLoading, setVariantLoading] = useState(false)
 
   // WA detail expansion
   const [waExpandedId, setWaExpandedId] = useState<string | null>(null)
@@ -667,6 +677,7 @@ export default function Dashboard() {
         allow_decimal_quantity: prodForm.allowDecimalQuantity,
         predefined_options: predefined_options.length > 0 ? predefined_options : [],
         is_active: prodForm.isActive, sort_order: toNumber(prodForm.sortOrder, 0),
+        has_variants: !!(prodForm as Record<string, unknown>).hasVariants,
         description: prodForm.description, benefits: prodForm.benefits,
         image_url: prodForm.image || '/assets/images/default-herb.jpg',
         image:     prodForm.image || '/assets/images/default-herb.jpg',
@@ -697,7 +708,11 @@ export default function Dashboard() {
       description: p.description, descriptionTa: p.descriptionTa || '',
       benefits: p.benefits || '', benefitsTa: p.benefitsTa || '',
       image: p.image || p.imageUrl || '',
-    })
+      hasVariants: p.hasVariants ?? false,
+    } as typeof prodForm)
+    setVariantNotice('')
+    setEditingVariantId(null)
+    setVariantForm({ name: '', sizeLabel: '', price: '', stock: '50', weightValue: '', weightUnit: '', isDefault: false })
     setTab('products')
   }
 
@@ -713,6 +728,75 @@ export default function Dashboard() {
     const { error } = await supabase.from('products').update({ is_active: false }).eq('id', id)
     if (error) { setProductNotice(error.message); return }
     setProductNotice('Product deactivated'); await loadData()
+  }
+
+  const handleSaveVariant = async (e: import('react').FormEvent) => {
+    e.preventDefault()
+    if (!editingProd) return
+    setVariantLoading(true)
+    setVariantNotice('')
+    const price = Number(variantForm.price)
+    const stock = Number(variantForm.stock)
+    if (!variantForm.name.trim()) { setVariantNotice('Variant name required'); setVariantLoading(false); return }
+    if (!(price > 0)) { setVariantNotice('Enter valid price'); setVariantLoading(false); return }
+    try {
+      const payload = {
+        productId:   String(editingProd.id),
+        variantName: variantForm.name.trim(),
+        sizeLabel:   variantForm.sizeLabel.trim() || null,
+        price,
+        stock,
+        weightValue: variantForm.weightValue ? Number(variantForm.weightValue) : null,
+        weightUnit:  variantForm.weightUnit.trim() || null,
+        isDefault:   variantForm.isDefault,
+        sortOrder:   getVariants(String(editingProd.id)).length,
+      }
+      if (editingVariantId) {
+        const { error } = await updateVariant(editingVariantId, payload)
+        if (error) throw new Error(error)
+        setVariantNotice('Variant updated!')
+      } else {
+        const { error } = await createVariant(payload)
+        if (error) throw new Error(error)
+        setVariantNotice('Variant added!')
+        // Ensure product has_variants = true
+        if (!editingProd.hasVariants) {
+          await supabase.from('products').update({ has_variants: true }).eq('id', editingProd.id)
+        }
+      }
+      setVariantForm({ name: '', sizeLabel: '', price: '', stock: '50', weightValue: '', weightUnit: '', isDefault: false })
+      setEditingVariantId(null)
+      await refetchVariants()
+    } catch (err) { setVariantNotice(toErr(err, 'Error saving variant')) }
+    finally { setVariantLoading(false) }
+  }
+
+  const handleDeleteVariant = async (variantId: string) => {
+    if (!window.confirm('Remove this variant?')) return
+    const { error } = await deleteVariant(variantId)
+    if (error) { setVariantNotice(error); return }
+    setVariantNotice('Variant removed')
+    await refetchVariants()
+  }
+
+  const handleSetDefault = async (variantId: string) => {
+    if (!editingProd) return
+    const { error } = await setDefaultVariant(variantId, String(editingProd.id))
+    if (!error) { setVariantNotice('Default updated'); await refetchVariants() }
+  }
+
+  const startEditVariant = (v: ProductVariant) => {
+    setEditingVariantId(v.id)
+    setVariantForm({
+      name: v.variantName,
+      sizeLabel: v.sizeLabel || '',
+      price: String(v.price),
+      stock: String(v.stock),
+      weightValue: v.weightValue ? String(v.weightValue) : '',
+      weightUnit: v.weightUnit || '',
+      isDefault: v.isDefault,
+    })
+    setVariantNotice('')
   }
 
   const handleUploadImage = async (file?: File) => {
@@ -1678,6 +1762,14 @@ export default function Dashboard() {
                     onChange={e => setProdForm(f => ({...f, isActive: e.target.checked}))} />
                   <label htmlFor="isActive" className="text-[13px] font-bold text-[#2C392A]">{l('Active (visible in store)', 'கடையில் காட்டு')}</label>
                 </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="hasVariants"
+                    checked={!!prodForm.hasVariants}
+                    onChange={e => setProdForm(f => ({...f, hasVariants: e.target.checked} as typeof f))} />
+                  <label htmlFor="hasVariants" className="text-[13px] font-bold text-[#2C392A]">
+                    {l('Has Variants (brands/sizes)', 'வகைகள் உள்ளன')}
+                  </label>
+                </div>
 
                 <div className="flex gap-2 pt-1">
                   <button type="submit" disabled={loading}
@@ -1761,6 +1853,159 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+
+            {/* Variant Management Panel — shown when editing a variant product */}
+            {editingProd && (
+              <div className="xl:col-span-5 bg-white rounded-2xl border border-[#EAD7B7]/30 p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-black text-[#2C392A]">
+                    {l('Variants', 'வகைகள்')} — {editingProd.name}
+                    {!editingProd.hasVariants && (
+                      <span className="ml-2 text-[11px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                        {l('Enable "Has Variants" above to manage variants', '"வகைகள் உள்ளன" இயக்கவும்')}
+                      </span>
+                    )}
+                  </h3>
+                  {variantNotice && (
+                    <span className={`text-[12px] font-bold px-3 py-1 rounded-xl ${variantNotice.toLowerCase().includes('error') || variantNotice.toLowerCase().includes('required') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                      {variantNotice}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  {/* Add / Edit variant form */}
+                  <form onSubmit={handleSaveVariant} className="space-y-3 bg-[#F7F8F5] rounded-xl p-4 border border-[#EAD7B7]/30">
+                    <h4 className="text-[12px] font-black uppercase tracking-wider text-[#5F6D59]">
+                      {editingVariantId ? l('Edit Variant', 'வகை திருத்து') : l('Add Variant', 'வகை சேர்')}
+                    </h4>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="col-span-2">
+                        <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">{l('Variant Name *', 'வகை பெயர் *')}</label>
+                        <input required
+                          className="w-full px-3 py-2 bg-white rounded-lg border border-[#D5DAD0] text-[13px] font-bold outline-none focus:border-[#7DAA8F]"
+                          placeholder={l('e.g. Cycle Brand / 25g', 'e.g. Cycle Brand / 25g')}
+                          value={variantForm.name}
+                          onChange={e => setVariantForm(f => ({...f, name: e.target.value}))} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">{l('Size Label', 'அளவு பட்டை')}</label>
+                        <input
+                          className="w-full px-3 py-2 bg-white rounded-lg border border-[#D5DAD0] text-[13px] font-bold outline-none focus:border-[#7DAA8F]"
+                          placeholder="25g / 250ml / 1 pack"
+                          value={variantForm.sizeLabel}
+                          onChange={e => setVariantForm(f => ({...f, sizeLabel: e.target.value}))} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">{l('Price (₹) *', 'விலை *')}</label>
+                        <input required type="number" min="0" step="0.01"
+                          className="w-full px-3 py-2 bg-white rounded-lg border border-[#D5DAD0] text-[13px] font-bold outline-none focus:border-[#7DAA8F]"
+                          placeholder="40"
+                          value={variantForm.price}
+                          onChange={e => setVariantForm(f => ({...f, price: e.target.value}))} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">{l('Stock *', 'இருப்பு *')}</label>
+                        <input required type="number" min="0"
+                          className="w-full px-3 py-2 bg-white rounded-lg border border-[#D5DAD0] text-[13px] font-bold outline-none focus:border-[#7DAA8F]"
+                          placeholder="50"
+                          value={variantForm.stock}
+                          onChange={e => setVariantForm(f => ({...f, stock: e.target.value}))} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">{l('Weight/Vol Value', 'எடை மதிப்பு')}</label>
+                        <input type="number" min="0" step="0.001"
+                          className="w-full px-3 py-2 bg-white rounded-lg border border-[#D5DAD0] text-[13px] font-bold outline-none focus:border-[#7DAA8F]"
+                          placeholder="250"
+                          value={variantForm.weightValue}
+                          onChange={e => setVariantForm(f => ({...f, weightValue: e.target.value}))} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-[#5F6D59] mb-1">{l('Unit', 'அலகு')}</label>
+                        <select
+                          className="w-full px-3 py-2 bg-white rounded-lg border border-[#D5DAD0] text-[13px] font-bold outline-none focus:border-[#7DAA8F]"
+                          value={variantForm.weightUnit}
+                          onChange={e => setVariantForm(f => ({...f, weightUnit: e.target.value}))}>
+                          <option value="">—</option>
+                          <option value="g">g (grams)</option>
+                          <option value="kg">kg</option>
+                          <option value="ml">ml</option>
+                          <option value="L">L (litres)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id="varIsDefault" checked={variantForm.isDefault}
+                        onChange={e => setVariantForm(f => ({...f, isDefault: e.target.checked}))} />
+                      <label htmlFor="varIsDefault" className="text-[12px] font-bold text-[#2C392A]">{l('Default variant (shown first)', 'முதல் வகை (முதலில் காட்டு)')}</label>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button type="submit" disabled={variantLoading}
+                        className="flex-grow py-2.5 bg-[#7DAA8F] hover:bg-[#5e8c72] text-white font-black text-[12px] rounded-xl disabled:opacity-60">
+                        {variantLoading ? l('Saving…', 'சேமிக்கிறது…') : editingVariantId ? l('Update Variant', 'புதுப்பி') : l('Add Variant', 'சேர்')}
+                      </button>
+                      {editingVariantId && (
+                        <button type="button"
+                          onClick={() => { setEditingVariantId(null); setVariantForm({ name: '', sizeLabel: '', price: '', stock: '50', weightValue: '', weightUnit: '', isDefault: false }); setVariantNotice('') }}
+                          className="px-4 py-2.5 bg-[#F7F6F2] text-[#5F6D59] font-bold text-[12px] rounded-xl">
+                          {l('Cancel', 'ரத்து')}
+                        </button>
+                      )}
+                    </div>
+                  </form>
+
+                  {/* Current variants list */}
+                  <div>
+                    <h4 className="text-[12px] font-black uppercase tracking-wider text-[#5F6D59] mb-3">
+                      {l('Current Variants', 'தற்போதைய வகைகள்')} ({getVariants(String(editingProd.id)).length})
+                    </h4>
+                    {getVariants(String(editingProd.id)).length === 0 ? (
+                      <p className="text-[12px] text-[#9BAB9A] text-center py-6 bg-[#F7F8F5] rounded-xl">
+                        {l('No variants yet — add one using the form.', 'வகைகள் இல்லை — படிவத்தில் சேர்க்கவும்.')}
+                      </p>
+                    ) : (
+                      <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                        {getVariants(String(editingProd.id)).map((v: ProductVariant) => (
+                          <div key={v.id}
+                            className={`flex items-center justify-between gap-2 p-3 rounded-xl border ${editingVariantId === v.id ? 'border-[#2C392A] bg-[#2C392A]/5' : 'bg-[#F7F8F5] border-transparent'}`}>
+                            <div className="flex items-center gap-2 min-w-0">
+                              {v.isDefault && (
+                                <span className="w-4 h-4 rounded-full bg-[#2C392A] text-white text-[8px] font-black flex items-center justify-center shrink-0">★</span>
+                              )}
+                              <div className="min-w-0">
+                                <p className="text-[12px] font-bold text-[#2C392A] truncate">{v.variantName}</p>
+                                <p className="text-[10px] text-[#5F6D59]">
+                                  {formatCurrency(v.price)}{v.sizeLabel ? ` · ${v.sizeLabel}` : ''} · {l('Stock', 'இருப்பு')}: {v.stock}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {!v.isDefault && (
+                                <button onClick={() => void handleSetDefault(v.id)}
+                                  className="p-1.5 text-[#5F6D59] hover:text-[#2C392A] rounded-lg hover:bg-white text-[9px] font-black uppercase">
+                                  {l('Default', 'முதல்')}
+                                </button>
+                              )}
+                              <button onClick={() => startEditVariant(v)}
+                                className="p-1.5 text-[#7DAA8F] hover:bg-[#7DAA8F]/10 rounded-lg">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              </button>
+                              <button onClick={() => void handleDeleteVariant(v.id)}
+                                className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

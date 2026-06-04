@@ -149,7 +149,9 @@ export default function Checkout() {
 
     const itemsSnapshot   = [...items]
     const structuredItems = itemsSnapshot.map((item) => buildStructuredOrderItem({
-      productId:    toProductId(item.id),
+      productId:    item.parentProductId ? item.parentProductId : toProductId(item.id),
+      variantId:    item.variantId   ?? null,
+      variantName:  item.variantName ?? null,
       name:         item.name,
       tamilName:    item.tamilName || item.nameTa || null,
       quantity:     item.qty,

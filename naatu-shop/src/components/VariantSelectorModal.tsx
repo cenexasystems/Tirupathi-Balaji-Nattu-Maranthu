@@ -1,10 +1,25 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Minus, Plus, ShoppingCart, X } from 'lucide-react'
+import { Minus, Plus, X, Check, ShoppingCart } from 'lucide-react'
 import { useCartStore, useVariantStore, type Product } from '../store/store'
 import { formatCurrency } from '../lib/retail'
 import { getProductImage, onImgError } from '../lib/productImages'
+import { useLangStore } from '../store/langStore'
 import type { ProductVariant } from '../services/variantService'
+
+// Helper: build a synthetic Product from a base product + selected variant
+function variantToProduct(base: Product, v: ProductVariant): Product {
+  return {
+    ...base,
+    id: v.id,
+    name: `${base.name}${v.sizeLabel || v.variantName !== base.name ? ` - ${v.variantName}` : ''}`,
+    price: v.price,
+    offerPrice: null,
+    stock: v.stock,
+    stockQuantity: v.stock,
+    hasVariants: false,
+  }
+}
 
 export default function VariantSelectorModal({
   product,
@@ -16,25 +31,24 @@ export default function VariantSelectorModal({
   onClose: () => void
 }) {
   const { addItem } = useCartStore()
-  const { getVariants, fetchVariants } = useVariantStore()
-  const [selected, setSelected] = useState<ProductVariant | null>(null)
-  const [qty, setQty] = useState(1)
-  const [toast, setToast] = useState(false)
+  const { getVariants, getDefaultVariant, fetchVariants } = useVariantStore()
+  const { lang } = useLangStore()
+  const l = (en: string, ta: string) => lang === 'ta' ? ta : en
 
-  // Fetch variants on first open
-  useEffect(() => {
-    void fetchVariants()
-  }, [fetchVariants])
+  const [selected, setSelected]     = useState<ProductVariant | null>(null)
+  const [qty, setQty]               = useState(1)
+  const [added, setAdded]           = useState(false)
 
-  // Reset selection when product changes
+  useEffect(() => { void fetchVariants() }, [fetchVariants])
+
   useEffect(() => {
     if (!open || !product) return
-    const variants = getVariants(String(product.id))
-    setSelected(variants[0] ?? null)
+    const def = getDefaultVariant(String(product.id))
+    setSelected(def)
     setQty(1)
-  }, [open, product, getVariants])
+    setAdded(false)
+  }, [open, product, getDefaultVariant])
 
-  // Keyboard / scroll lock
   useEffect(() => {
     if (!open) return
     const prev = document.body.style.overflow
@@ -47,283 +61,206 @@ export default function VariantSelectorModal({
     }
   }, [open, onClose])
 
-  if (!open || !product) return null
+  const handleAdd = useCallback(() => {
+    if (!product || !selected) return
+    const synthetic = variantToProduct(product, selected)
+    // Pass variant identity so it flows through to order_items
+    addItem(
+      synthetic,
+      qty,
+      synthetic.unitLabel,
+      selected.id,                // variantId  (product_variants.id)
+      selected.variantName,       // variantName (snapshot)
+      String(product.id),         // parentProductId (products.id — before synthetic override)
+    )
+    setAdded(true)
+    setTimeout(() => {
+      setAdded(false)
+      onClose()
+    }, 700)
+  }, [product, selected, qty, addItem, onClose])
+
+  if (!product) return null
 
   const variants = getVariants(String(product.id))
-  const price = selected ? selected.price : product.price
-  const lineTotal = price * qty
-
-  const handleAdd = () => {
-    if (!selected) return
-    // Build a synthetic "product" representing this variant
-    const variantProduct: Product = {
-      ...product,
-      id: selected.id,          // variant UUID as cart key
-      name: `${product.name} - ${selected.variantName}`,
-      price: selected.price,
-      offerPrice: null,
-      stock: selected.stock,
-      stockQuantity: selected.stock,
-      hasVariants: false,        // prevent re-opening variant modal from cart
-    }
-    addItem(variantProduct, qty, product.unitLabel)
-    setToast(true)
-    setTimeout(() => setToast(false), 1600)
-  }
-
-  const heroImage = getProductImage(product.name, product.category, product.imageUrl, 'detail')
+  const hasStock = selected ? selected.stock > 0 : false
 
   return (
     <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-[90]"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      >
-        {/* Backdrop */}
-        <button
-          type="button"
-          aria-label="Close"
-          onClick={onClose}
-          className="absolute inset-0 bg-[#0d140f]/50 backdrop-blur-[5px]"
-        />
-
-        {/* Mobile bottom sheet */}
-        <div className="relative z-10 flex h-full items-end justify-center lg:hidden">
+      {open && (
+        <>
+          {/* Backdrop */}
           <motion.div
+            key="vsm-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-50 bg-black/50"
+            onClick={onClose}
+          />
+
+          {/* Bottom sheet */}
+          <motion.div
+            key="vsm-sheet"
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            onClick={(e) => e.stopPropagation()}
-            className="relative flex w-full max-w-xl flex-col overflow-hidden rounded-t-[28px] bg-[#fbfaf6] shadow-[0_-12px_40px_rgba(22,35,20,0.18)]"
+            transition={{ type: 'spring', damping: 28, stiffness: 380 }}
+            className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl"
+            style={{ maxHeight: '90svh' }}
+            onClick={e => e.stopPropagation()}
           >
             {/* Drag handle */}
             <div className="flex justify-center pt-3 pb-1">
-              <div className="h-1 w-10 rounded-full bg-[#d4cfc6]" />
+              <div className="w-10 h-1 rounded-full bg-gray-200" />
             </div>
 
-            {/* Close */}
-            <button
-              type="button"
-              onClick={onClose}
-              className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 border border-gray-100 shadow-sm"
-            >
-              <X size={15} />
-            </button>
-
-            {/* Product header */}
-            <div className="flex gap-4 px-5 pt-3 pb-4 border-b border-[#ead7b7]/40">
-              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-[#ede9df]">
+            {/* Header */}
+            <div className="flex items-start gap-3 px-4 pt-2 pb-4 border-b border-gray-100">
+              {/* Product image */}
+              <div className="w-16 h-16 rounded-xl overflow-hidden bg-[#F0F2EE] shrink-0">
                 <img
-                  src={heroImage}
+                  src={getProductImage(product.name, product.category, product.imageUrl, 'tile')}
                   alt={product.name}
                   onError={onImgError}
-                  className="h-full w-full object-cover"
+                  className="w-full h-full object-cover"
                 />
               </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#7daa8f]">
-                  {product.category}
-                </p>
-                <h2 className="mt-0.5 text-[1.1rem] font-black leading-tight text-[#2c392a]">
-                  {product.name}
-                </h2>
-                {product.description && (
-                  <p className="mt-1 text-[11px] text-[#5f6d59] line-clamp-2">{product.description}</p>
-                )}
-              </div>
-            </div>
 
-            {/* Variant chips */}
-            <div className="px-5 pt-4 pb-2">
-              <p className="mb-3 text-[11px] font-black uppercase tracking-widest text-[#7daa8f]">
-                Select Variant
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {variants.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => setSelected(v)}
-                    className={`flex flex-col items-start rounded-2xl border-2 px-4 py-3 text-left transition-all ${
-                      selected?.id === v.id
-                        ? 'border-[#2c392a] bg-[#2c392a] text-white'
-                        : 'border-[#ead7b7]/60 bg-white text-[#2c392a]'
-                    }`}
-                  >
-                    <span className="text-[13px] font-black">{v.variantName}</span>
-                    <span className={`text-[12px] font-bold ${selected?.id === v.id ? 'text-white/80' : 'text-[#5f6d59]'}`}>
-                      {formatCurrency(v.price)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Quantity + Add */}
-            <div className="flex items-center gap-3 border-t border-[#ead7b7]/40 bg-white px-5 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-              <div className="inline-flex items-center gap-1 rounded-full bg-[#f7f4ed] px-1.5 py-1 ring-1 ring-[#ead7b7]/50">
-                <button
-                  type="button"
-                  onClick={() => setQty((q) => Math.max(1, q - 1))}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#5f6d59] shadow-sm"
-                >
-                  <Minus size={13} />
-                </button>
-                <span className="min-w-[2rem] text-center text-[14px] font-black text-[#2c392a]">{qty}</span>
-                <button
-                  type="button"
-                  onClick={() => setQty((q) => q + 1)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#5f6d59] shadow-sm"
-                >
-                  <Plus size={13} />
-                </button>
-              </div>
-
-              <motion.button
-                whileTap={{ scale: 0.98 }}
-                type="button"
-                onClick={handleAdd}
-                disabled={!selected}
-                className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#2c392a] py-3.5 text-[13px] font-black text-white shadow-[0_8px_24px_rgba(44,57,42,0.22)] disabled:opacity-40"
-              >
-                <ShoppingCart size={15} />
-                Add · {formatCurrency(lineTotal)}
-              </motion.button>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Desktop center dialog */}
-        <div className="hidden lg:flex relative z-10 h-full items-center justify-center p-6">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.97, y: 12 }}
-            transition={{ type: 'spring', stiffness: 200, damping: 24 }}
-            onClick={(e) => e.stopPropagation()}
-            className="relative flex w-full max-w-[520px] flex-col overflow-hidden rounded-[28px] bg-[#fbfaf6] shadow-[0_20px_60px_rgba(22,35,20,0.22)]"
-          >
-            <button
-              type="button"
-              onClick={onClose}
-              className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 border border-gray-100 shadow-sm hover:scale-105 transition-transform"
-            >
-              <X size={15} />
-            </button>
-
-            {/* Product header */}
-            <div className="flex gap-4 p-6 border-b border-[#ead7b7]/40 bg-[#f7f2ea]">
-              <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm">
-                <img
-                  src={heroImage}
-                  alt={product.name}
-                  onError={onImgError}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#7daa8f]">
-                  {product.category}
-                </p>
-                <h2 className="mt-1 text-[1.25rem] font-black leading-tight text-[#2c392a]">
-                  {product.name}
-                </h2>
-                {product.nameTa && (
-                  <p className="mt-0.5 text-[12px] font-bold text-[#5f6d59] ta-text">{product.nameTa}</p>
-                )}
-                {product.description && (
-                  <p className="mt-1.5 text-[11px] text-[#5f6d59] line-clamp-2">{product.description}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Variant grid */}
-            <div className="p-6">
-              <p className="mb-3 text-[11px] font-black uppercase tracking-widest text-[#7daa8f]">
-                Select Variant
-              </p>
-              <div className="grid grid-cols-2 gap-2.5">
-                {variants.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => setSelected(v)}
-                    className={`flex flex-col items-start rounded-2xl border-2 px-4 py-3.5 text-left transition-all hover:scale-[1.01] ${
-                      selected?.id === v.id
-                        ? 'border-[#2c392a] bg-[#2c392a] text-white shadow-[0_8px_20px_rgba(44,57,42,0.18)]'
-                        : 'border-[#ead7b7]/60 bg-white text-[#2c392a] hover:border-[#2c392a]/30'
-                    }`}
-                  >
-                    <span className="text-[14px] font-black">{v.variantName}</span>
-                    <span className={`mt-0.5 text-[13px] font-bold ${selected?.id === v.id ? 'text-white/80' : 'text-[#5f6d59]'}`}>
-                      {formatCurrency(v.price)}
-                    </span>
-                    {v.stock < 10 && v.stock > 0 && (
-                      <span className={`mt-1 text-[10px] font-black ${selected?.id === v.id ? 'text-amber-300' : 'text-amber-600'}`}>
-                        Only {Math.floor(v.stock)} left
+              {/* Product info */}
+              <div className="flex-1 min-w-0">
+                <h3 className="text-[15px] font-black text-[#2C392A] leading-tight">{product.name}</h3>
+                {selected && (
+                  <p className="text-[13px] font-black text-[#2C392A] mt-1">
+                    {formatCurrency(selected.price)}
+                    {selected.sizeLabel && (
+                      <span className="text-[11px] font-semibold text-[#5F6D59] ml-1.5">
+                        / {selected.sizeLabel}
                       </span>
                     )}
-                  </button>
-                ))}
+                  </p>
+                )}
+                {!hasStock && selected && (
+                  <span className="text-[10px] font-black text-red-500 bg-red-50 px-2 py-0.5 rounded-full mt-1 inline-block">
+                    {l('Out of stock', 'இருப்பு இல்லை')}
+                  </span>
+                )}
+              </div>
+
+              <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100 shrink-0">
+                <X size={18} className="text-gray-500" />
+              </button>
+            </div>
+
+            {/* Scrollable variant list */}
+            <div className="overflow-y-auto px-4 py-3" style={{ maxHeight: '45svh' }}>
+              <p className="text-[10px] font-black uppercase tracking-wider text-[#5F6D59] mb-3">
+                {l('Select Variant', 'வகை தேர்வு')}
+              </p>
+
+              <div className="space-y-2">
+                {variants.map(v => {
+                  const isSelected = selected?.id === v.id
+                  const outOfStock = v.stock <= 0
+
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => { if (!outOfStock) { setSelected(v); setQty(1) } }}
+                      disabled={outOfStock}
+                      className={[
+                        'w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl',
+                        'border-2 text-left transition-all',
+                        isSelected
+                          ? 'border-[#2C392A] bg-[#2C392A]/5'
+                          : outOfStock
+                            ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+                            : 'border-gray-100 hover:border-[#7DAA8F] bg-white',
+                      ].join(' ')}
+                    >
+                      {/* Radio indicator */}
+                      <span className={[
+                        'w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0',
+                        isSelected ? 'border-[#2C392A] bg-[#2C392A]' : 'border-gray-300',
+                      ].join(' ')}>
+                        {isSelected && <Check size={11} className="text-white" strokeWidth={3} />}
+                      </span>
+
+                      {/* Variant name + size */}
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-[13px] font-bold leading-tight ${isSelected ? 'text-[#2C392A]' : 'text-[#444]'}`}>
+                          {v.variantName}
+                        </p>
+                        {v.sizeLabel && v.sizeLabel !== v.variantName && (
+                          <p className="text-[11px] text-[#5F6D59]">{v.sizeLabel}</p>
+                        )}
+                        {outOfStock && (
+                          <p className="text-[10px] text-red-500 font-bold">{l('Out of stock', 'இருப்பு இல்லை')}</p>
+                        )}
+                      </div>
+
+                      {/* Price */}
+                      <span className={`text-[14px] font-black shrink-0 ${isSelected ? 'text-[#2C392A]' : 'text-[#333]'}`}>
+                        {formatCurrency(v.price)}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center gap-3 border-t border-[#ead7b7]/40 bg-white px-6 py-4">
-              <div className="inline-flex items-center gap-1 rounded-full bg-[#f7f4ed] px-1.5 py-1 ring-1 ring-[#ead7b7]/50">
+            {/* Footer: quantity + add to cart */}
+            <div className="px-4 py-4 border-t border-gray-100 bg-white">
+              <div className="flex items-center gap-3">
+                {/* Quantity stepper */}
+                <div className="flex items-center gap-0 bg-[#F0F2EE] rounded-xl overflow-hidden border border-[#D5DAD0]">
+                  <button
+                    type="button"
+                    onClick={() => setQty(q => Math.max(1, q - 1))}
+                    className="w-10 h-10 flex items-center justify-center text-[#2C392A] hover:bg-[#E8EDE4] transition-colors"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <span className="w-10 text-center text-[14px] font-black text-[#2C392A]">{qty}</span>
+                  <button
+                    type="button"
+                    onClick={() => setQty(q => q + 1)}
+                    disabled={selected ? qty >= selected.stock : true}
+                    className="w-10 h-10 flex items-center justify-center text-[#2C392A] hover:bg-[#E8EDE4] transition-colors disabled:opacity-40"
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+
+                {/* Add to cart button */}
                 <button
                   type="button"
-                  onClick={() => setQty((q) => Math.max(1, q - 1))}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#5f6d59] shadow-sm"
+                  onClick={handleAdd}
+                  disabled={!selected || !hasStock || added}
+                  className={[
+                    'flex-1 h-10 rounded-xl font-black text-[13px] transition-all flex items-center justify-center gap-2',
+                    added
+                      ? 'bg-green-500 text-white'
+                      : !hasStock
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-[#2C392A] hover:bg-[#1e2817] text-white',
+                  ].join(' ')}
                 >
-                  <Minus size={13} />
-                </button>
-                <span className="min-w-[2rem] text-center text-[14px] font-black text-[#2c392a]">{qty}</span>
-                <button
-                  type="button"
-                  onClick={() => setQty((q) => q + 1)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#5f6d59] shadow-sm"
-                >
-                  <Plus size={13} />
+                  {added ? (
+                    <><Check size={15} /> {l('Added!', 'சேர்க்கப்பட்டது!')}</>
+                  ) : !hasStock ? (
+                    l('Out of Stock', 'இருப்பு இல்லை')
+                  ) : (
+                    <><ShoppingCart size={14} /> {l('Add to Cart', 'கூடையில் சேர்')} · {selected ? formatCurrency(selected.price * qty) : '—'}</>
+                  )}
                 </button>
               </div>
-
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold text-[#7daa8f]">Total</p>
-                <p className="text-[1rem] font-black text-[#2c392a]">{formatCurrency(lineTotal)}</p>
-              </div>
-
-              <motion.button
-                whileTap={{ scale: 0.98 }}
-                type="button"
-                onClick={handleAdd}
-                disabled={!selected}
-                className="ml-auto flex items-center justify-center gap-2 rounded-2xl bg-[#2c392a] px-5 py-3 text-[13px] font-black text-white shadow-[0_8px_24px_rgba(44,57,42,0.22)] hover:-translate-y-0.5 transition-transform disabled:opacity-40"
-              >
-                <ShoppingCart size={15} />
-                Add to Cart
-              </motion.button>
             </div>
           </motion.div>
-        </div>
-
-        {/* Toast */}
-        <AnimatePresence>
-          {toast && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 12 }}
-              className="fixed bottom-24 left-1/2 z-[100] -translate-x-1/2 rounded-full bg-[#2c392a] px-5 py-2.5 text-[12px] font-black text-white shadow-lg"
-            >
-              Added to cart!
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+        </>
+      )}
     </AnimatePresence>
   )
 }

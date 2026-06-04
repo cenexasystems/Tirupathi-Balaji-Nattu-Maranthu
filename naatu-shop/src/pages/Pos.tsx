@@ -32,6 +32,9 @@ type PosItem = Product & {
   lineTotal: number
   source?: 'catalogue' | 'manual'
   note?: string | null
+  variantId?: string         // product_variants.id
+  variantName?: string       // snapshot
+  parentProductId?: string   // products.id (before synthetic override)
 }
 
 type InvoiceSnap = {
@@ -200,7 +203,13 @@ export default function Pos() {
     }
     setItems(cur => {
       const ex = cur.find(i => i.id === variantProduct.id)
-      if (!ex) return [...cur, makePosItem(variantProduct)]
+      if (!ex) {
+        const item = makePosItem(variantProduct)
+        item.variantId       = selectedVariant.id
+        item.variantName     = selectedVariant.variantName
+        item.parentProductId = String(variantPickerProduct.id)
+        return [...cur, item]
+      }
       return cur.map(i => i.id === variantProduct.id ? recalc(i, i.qty + 1) : i)
     })
     setVariantPickerProduct(null)
@@ -355,7 +364,9 @@ export default function Pos() {
         phone: normalizedPhone,
         address: customer.address.trim() || 'POS Counter',
         items: items.map(item => buildStructuredOrderItem({
-          productId: toProductId(item.id),
+          productId:    item.parentProductId ? item.parentProductId : toProductId(item.id),
+          variantId:    item.variantId   ?? null,
+          variantName:  item.variantName ?? null,
           name: item.name,
           tamilName: item.tamilName || item.nameTa || null,
           quantity: item.qty,

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Heart, ShoppingCart, Plus, Minus, Layers } from 'lucide-react'
-import { useCartStore, useFavStore, useProductModalStore, useVariantModalStore, type Product } from '../store/store'
+import { Heart, ShoppingCart, Plus, Minus, ChevronDown } from 'lucide-react'
+import { useCartStore, useFavStore, useProductModalStore, useVariantModalStore, useVariantStore, type Product } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { formatCurrency, calculateLineTotal, type QuantityOption } from '../lib/retail'
 import { getProductImage, onImgError } from '../lib/productImages'
@@ -34,8 +34,15 @@ export default function ProductCard({
   const { toggle, isFav } = useFavStore()
   const openProduct = useProductModalStore((state) => state.openProduct)
   const openVariantModal = useVariantModalStore((state) => state.openVariantModal)
+  const { getDefaultVariant, getVariants } = useVariantStore()
   const { lang } = useLangStore()
+  const l = (en: string, ta: string) => lang === 'ta' ? ta : en
   const fav = isFav(product.id)
+
+  // For variant products: use default variant pricing
+  const defaultVariant = product.hasVariants ? getDefaultVariant(String(product.id)) : null
+  const allVariants = product.hasVariants ? getVariants(String(product.id)) : []
+  const variantMinPrice = allVariants.length > 1 ? Math.min(...allVariants.map(v => v.price)) : null
 
   const hasOptions =
     (product.unitType === 'weight' || product.unitType === 'volume') &&
@@ -165,14 +172,35 @@ export default function ProductCard({
 
           <div className="flex items-end justify-between gap-3">
             <div className="min-w-0">
-              {displayOriginalPrice && (
-                <span className="block text-[10px] text-slate-400 line-through leading-none">
-                  {formatCurrency(displayOriginalPrice)}
-                </span>
+              {/* Variant product: show "from ₹X" with default variant label */}
+              {product.hasVariants && defaultVariant ? (
+                <>
+                  {allVariants.length > 1 && variantMinPrice != null && (
+                    <span className="block text-[9px] font-bold text-[#7A846F] leading-none mb-0.5">
+                      {l('from', 'தொடங்கி')} {formatCurrency(variantMinPrice)}
+                    </span>
+                  )}
+                  <span className="block text-[13px] font-black text-[#2C392A] leading-tight tabular-nums">
+                    {formatCurrency(defaultVariant.price)}
+                  </span>
+                  {defaultVariant.sizeLabel && (
+                    <span className="block text-[10px] text-[#5F6D59] leading-none mt-0.5">
+                      {defaultVariant.sizeLabel}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  {displayOriginalPrice && (
+                    <span className="block text-[10px] text-slate-400 line-through leading-none">
+                      {formatCurrency(displayOriginalPrice)}
+                    </span>
+                  )}
+                  <span className="block text-[13px] font-black text-[#2C392A] leading-tight tabular-nums">
+                    {formatCurrency(displayPrice)}
+                  </span>
+                </>
               )}
-              <span className="block text-[13px] font-black text-[#2C392A] leading-tight tabular-nums">
-                {formatCurrency(displayPrice)}
-              </span>
             </div>
           </div>
 
@@ -189,8 +217,13 @@ export default function ProductCard({
                 type="button"
                 className="mt-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-[#2C392A] px-4 py-2.5 text-[12px] font-black text-white shadow-[0_10px_20px_rgba(44,57,42,0.16)]"
               >
-                {product.hasVariants ? <Layers size={13} /> : <ShoppingCart size={13} />}
-                {product.hasVariants ? 'Select' : 'Add'}
+                {product.hasVariants ? <ChevronDown size={13} /> : <ShoppingCart size={13} />}
+                {product.hasVariants
+                  ? (allVariants.length > 1
+                      ? l('Select', 'தேர்வு')
+                      : l('Add', 'சேர்'))
+                  : l('Add', 'சேர்')
+                }
               </motion.button>
             ) : (
               <motion.div

@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Search, SlidersHorizontal, Filter, CheckCircle2 } from 'lucide-react'
 import ProductCard from '../components/ProductCard'
 import { useLangStore } from '../store/langStore'
-import { useProductStore } from '../store/store'
+import { useProductStore, useVariantStore } from '../store/store'
 
 type FilterSideBlockProps = {
   t: (key: string) => string
@@ -86,6 +86,7 @@ export default function Products() {
   const [showFilters, setShowFilters] = useState(false)
   const { t } = useLangStore()
   const { products, fetchProducts, loading, error } = useProductStore()
+  const variantsMap = useVariantStore(state => state.variantsMap)
 
   useEffect(() => {
     void fetchProducts()
@@ -118,11 +119,22 @@ export default function Products() {
 
     if (search) {
       const q = search.toLowerCase()
-      out = out.filter(p => 
-        p.name.toLowerCase().includes(q) || 
+      // Build set of product IDs whose variants match the query
+      const variantMatchIds = new Set<string>()
+      for (const [productId, variants] of Object.entries(variantsMap)) {
+        if (variants.some(v =>
+          v.variantName.toLowerCase().includes(q) ||
+          (v.sizeLabel && v.sizeLabel.toLowerCase().includes(q))
+        )) {
+          variantMatchIds.add(productId)
+        }
+      }
+      out = out.filter(p =>
+        p.name.toLowerCase().includes(q) ||
         (p.nameTa && p.nameTa.toLowerCase().includes(q)) ||
         p.category.toLowerCase().includes(q) ||
-        (p.remedy || []).some(r => r.toLowerCase().includes(q))
+        (p.remedy || []).some(r => r.toLowerCase().includes(q)) ||
+        variantMatchIds.has(String(p.id))
       )
     }
 
@@ -139,7 +151,7 @@ export default function Products() {
     else if (sort === 'rating') out.sort((a, b) => b.rating - a.rating)
 
     return out
-  }, [products, search, activeCategory, activeRem, sort])
+  }, [products, search, activeCategory, activeRem, sort, variantsMap])
 
   const SkeletonCard = () => (
     <div className="rounded-2xl border border-[#EAD7B7]/50 bg-white overflow-hidden animate-pulse">

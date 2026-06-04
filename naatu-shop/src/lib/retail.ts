@@ -7,7 +7,9 @@ export type QuantityOption = {
 }
 
 export type StructuredOrderItem = {
-  product_id: string | null   // UUID string — Supabase products.id is UUID
+  product_id:   string | null   // products.id (UUID)
+  variant_id:   string | null   // product_variants.id (UUID) — null for non-variant items
+  variant_name: string | null   // snapshot of variant name at order time
   name: string
   tamil_name: string | null
   quantity: number
@@ -391,7 +393,9 @@ export const calculateStockDeduction = (input: {
 }
 
 export const buildStructuredOrderItem = (input: {
-  productId: string | null   // UUID string
+  productId:   string | null   // products.id UUID — for variant items pass parentProductId
+  variantId?:  string | null   // product_variants.id UUID
+  variantName?: string | null  // snapshot for order history
   name: string
   tamilName?: string | null
   quantity: number
@@ -414,7 +418,9 @@ export const buildStructuredOrderItem = (input: {
   const safeBasePrice = clampTo(toNumber(input.basePrice, 0), 0)
 
   return {
-    product_id: input.productId,
+    product_id:   input.productId,
+    variant_id:   input.variantId   ? String(input.variantId)   : null,
+    variant_name: input.variantName ? String(input.variantName) : null,
     name: String(input.name || 'Product'),
     tamil_name: input.tamilName ? String(input.tamilName) : null,
     quantity: safeQuantity,
@@ -458,7 +464,9 @@ export const normalizeStructuredOrderItem = (raw: Record<string, unknown>): Stru
       : null
 
   return {
-    product_id: productId,
+    product_id:   productId,
+    variant_id:   raw.variant_id   ? String(raw.variant_id)   : null,
+    variant_name: raw.variant_name ? String(raw.variant_name) : null,
     name: String(raw.name || 'Product'),
     tamil_name: raw.tamil_name ? String(raw.tamil_name) : (raw.nameTa ? String(raw.nameTa) : null),
     quantity,
