@@ -4,7 +4,6 @@ import {
   useCartStore,
   useFavStore,
   useProductModalStore,
-  useVariantModalStore,
   useVariantStore,
   type Product,
 } from '../store/store'
@@ -16,14 +15,12 @@ export default function ProductCard({ product }: { product: Product }) {
   const { items, addItem, removeItem, updateQuantity } = useCartStore()
   const { toggle, isFav } = useFavStore()
   const openProduct = useProductModalStore((s) => s.openProduct)
-  const openVariantModal = useVariantModalStore((s) => s.openVariantModal)
-  const { getDefaultVariant, getVariants } = useVariantStore()
+  const { getDefaultVariant } = useVariantStore()
   const { lang } = useLangStore()
   const l = (en: string, ta: string) => (lang === 'ta' ? ta : en)
 
   const fav = isFav(product.id)
   const defaultVariant = product.hasVariants ? getDefaultVariant(String(product.id)) : null
-  const allVariants = product.hasVariants ? getVariants(String(product.id)) : []
 
   // ── Cart state — single source of truth from store ───────────────
   const cartItem = items.find((i) => i.id === product.id)
@@ -64,11 +61,7 @@ export default function ProductCard({ product }: { product: Product }) {
 
   // ── Handlers ──────────────────────────────────────────────────────
   const openModal = () => {
-    if (window.innerWidth >= 1024) {
-      openProduct(product)
-    } else {
-      openVariantModal(product)
-    }
+    openProduct(product)
   }
 
   const handleAdd = () => {

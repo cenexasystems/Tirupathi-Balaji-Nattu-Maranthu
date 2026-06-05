@@ -1,3 +1,6 @@
+import { resolveProductImage } from './productImageResolver'
+export { resolveProductImage }
+
 /**
  * productImages.ts — Single source of truth for product image resolution
  *
@@ -423,6 +426,10 @@ export function getProductImage(
   const w = size === 'tile' ? 200 : size === 'detail' ? 800 : 400
   const q = size === 'tile' ? 70  : 80
 
+  // -1. Local Images_V2 resolver — highest priority for known product photos
+  const localV2 = resolveProductImage(name)
+  if (localV2) return localV2
+
   // 0. Admin-uploaded to Supabase Storage — trust completely
   if (isStorageImage(dbUrl)) {
     return dbUrl.includes('?') ? dbUrl : `${dbUrl}?w=${w}&q=${q}`
@@ -433,8 +440,9 @@ export function getProductImage(
 
   // 0c. Any other DB-provided https:// URL (e.g. Unsplash URLs seeded in DB)
   //     Re-parameterise for the requested size when possible, otherwise use as-is.
-  if (dbUrl && dbUrl.startsWith('https://')) {
-    const base = dbUrl.split('?')[0]
+  const rawUrl = dbUrl as string | null | undefined
+  if (rawUrl && rawUrl.startsWith('https://')) {
+    const base = rawUrl.split('?')[0]
     return `${base}?auto=format&fit=crop&w=${w}&q=${q}`
   }
 

@@ -15,7 +15,7 @@ import {
   normalizeSelectedQuantity,
   type QuantityOption,
 } from '../lib/retail'
-import { getProductImage, onImgError } from '../lib/productImages'
+import { getProductImage, onImgError, resolveProductImage } from '../lib/productImages'
 
 const getUnitOptions = (product: Product) => {
   if (product.unitType === 'weight') {
@@ -266,7 +266,10 @@ export default function ProductDetailModal({
     }
   }
 
-  const heroImage = getProductImage(product.name, product.category, product.imageUrl, 'detail')
+  const variantImageUrl = selectedVariant
+    ? (resolveProductImage(product.name, selectedVariant.variantName) ?? selectedVariant.imageUrl ?? null)
+    : null
+  const heroImage = getProductImage(product.name, product.category, variantImageUrl ?? product.imageUrl, 'detail')
   const galleryImages = [...new Set([
     heroImage,
     getProductImage(product.name, product.category, product.imageUrl, 'card'),
@@ -342,138 +345,277 @@ export default function ProductDetailModal({
                       </span>
                       {discount > 0 && <span className="rounded-full bg-[#2c392a] px-3 py-1.5 text-[11px] font-black text-white">{discount}% OFF</span>}
                     </div>
-                    <p className="mt-1.5 text-[11px] font-bold text-[#95a28f]">{mobileSummary}</p>
+                    <p className="mt-1.5 text-[11px] font-bold text-[#95a28f]">
+                      {selectedVariant ? selectedVariant.variantName : mobileSummary}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#7daa8f]">Price</p>
-                    <p className="text-[1.45rem] font-black leading-none text-[#2c392a]">{formatCurrency(basePrice)}</p>
-                    {hasDiscount && <p className="mt-1 text-[10px] font-bold text-[#b0a89a] line-through">{formatCurrency(product.price)}</p>}
+                    <p className="text-[1.45rem] font-black leading-none text-[#2c392a]">
+                      {formatCurrency(selectedVariant ? selectedVariant.price : basePrice)}
+                    </p>
+                    {hasDiscount && !selectedVariant && <p className="mt-1 text-[10px] font-bold text-[#b0a89a] line-through">{formatCurrency(product.price)}</p>}
                   </div>
                 </div>
               </section>
 
-              <section className="px-4 pt-3 sm:px-6">
-                <div className="rounded-[24px] bg-white/80 px-4 py-3 shadow-sm ring-1 ring-[#ead7b7]/45 backdrop-blur">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">Quantity</p>
-                      <p className="mt-1 text-[11px] font-bold text-[#95a28f]">{mobileQty > 0 ? 'Tap +/- to adjust' : 'Tap Add to start'}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void toggle(product)}
-                      className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
-                        favorite ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-[#ead7b7]/60 bg-white text-[#5f6d59]'
-                      }`}
-                      aria-label={favorite ? 'Remove from favourites' : 'Add to favourites'}
-                    >
-                      <Heart size={14} className={favorite ? 'fill-rose-500 text-rose-500' : 'text-current'} />
-                    </button>
-                  </div>
-
-                  <AnimatePresence mode="wait">
-                    {mobileQty > 0 && (
-                      <motion.div
-                        key="mobile-stepper"
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 6 }}
-                        transition={{ duration: 0.18 }}
-                        className="mt-3 space-y-3"
+              {product.hasVariants ? (
+                <section className="px-4 pt-3 sm:px-6">
+                  <div className="rounded-[24px] bg-white/80 px-4 py-3 shadow-sm ring-1 ring-[#ead7b7]/45 backdrop-blur">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">
+                        {getVariants(String(product.id)).some(v => v.sizeLabel) ? 'Pack Size' : 'Brand'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void toggle(product)}
+                        className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+                          favorite ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-[#ead7b7]/60 bg-white text-[#5f6d59]'
+                        }`}
+                        aria-label={favorite ? 'Remove from favourites' : 'Add to favourites'}
                       >
-                        {compactPackOptions.length > 0 && (product.unitType === 'weight' || product.unitType === 'volume') && (
-                          <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
-                            {compactPackOptions.map((option) => (
-                              <button
-                                key={option.label}
-                                type="button"
-                                onClick={() => handleMobilePackChange(option)}
-                                className={`shrink-0 rounded-full border px-3 py-2 text-[11px] font-black transition-colors ${
-                                  mobilePack?.label === option.label
-                                    ? 'border-[#2c392a] bg-[#2c392a] text-white'
-                                    : 'border-[#ead7b7]/70 bg-[#f7f4ed] text-[#5f6d59]'
-                                }`}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                        <Heart size={13} className={favorite ? 'fill-rose-500 text-rose-500' : 'text-current'} />
+                      </button>
+                    </div>
+                    <div className="space-y-1.5">
+                      {getVariants(String(product.id)).map((v) => {
+                        const isSel = selectedVariant?.id === v.id
+                        const oos = v.stock <= 0
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            disabled={oos}
+                            onClick={() => { if (!oos) { setSelectedVariant(v); setDesktopVariantQty(1) } }}
+                            className={[
+                              'flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left transition-all',
+                              isSel
+                                ? 'bg-[#2C392A]/6 ring-2 ring-[#2C392A]'
+                                : oos
+                                ? 'cursor-not-allowed opacity-40 ring-1 ring-gray-200'
+                                : 'ring-1 ring-[#ead7b7]/70',
+                            ].join(' ')}
+                          >
+                            <span className={[
+                              'flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full border-2',
+                              isSel ? 'border-[#2C392A] bg-[#2C392A]' : 'border-gray-300',
+                            ].join(' ')}>
+                              {isSel && <Check size={9} className="text-white" strokeWidth={3.5} />}
+                            </span>
+                            <span className={`flex-1 text-[13px] font-semibold ${isSel ? 'text-[#2C392A]' : 'text-[#444]'}`}>
+                              {v.variantName}
+                              {v.sizeLabel && v.sizeLabel !== v.variantName && (
+                                <span className="ml-1 text-[11px] font-normal text-[#5F6D59]">· {v.sizeLabel}</span>
+                              )}
+                            </span>
+                            <span className={`text-[14px] font-black tabular-nums shrink-0 ${isSel ? 'text-[#2C392A]' : 'text-[#444]'}`}>
+                              {formatCurrency(v.price)}
+                            </span>
+                            {oos && <span className="text-[10px] font-bold text-red-500">Out of stock</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </section>
+              ) : (
+                <section className="px-4 pt-3 sm:px-6">
+                  <div className="rounded-[24px] bg-white/80 px-4 py-3 shadow-sm ring-1 ring-[#ead7b7]/45 backdrop-blur">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">Quantity</p>
+                        <p className="mt-1 text-[11px] font-bold text-[#95a28f]">{mobileQty > 0 ? 'Tap +/- to adjust' : 'Tap Add to start'}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void toggle(product)}
+                        className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
+                          favorite ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-[#ead7b7]/60 bg-white text-[#5f6d59]'
+                        }`}
+                        aria-label={favorite ? 'Remove from favourites' : 'Add to favourites'}
+                      >
+                        <Heart size={14} className={favorite ? 'fill-rose-500 text-rose-500' : 'text-current'} />
+                      </button>
+                    </div>
 
-                        <div className="inline-flex w-full items-center justify-between gap-2 rounded-full bg-white px-2 py-1.5 shadow-sm ring-1 ring-[#ead7b7]/55">
-                          <button
-                            type="button"
-                            onClick={() => handleMobileChangeQty(mobileQty - 1)}
-                            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59] transition-colors hover:bg-[#ead7b7]/35"
-                          >
-                            <Minus size={13} />
-                          </button>
-                          <span className="min-w-[2rem] text-center text-[14px] font-black text-[#2c392a]">{mobileQty}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleMobileChangeQty(mobileQty + 1)}
-                            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59] transition-colors hover:bg-[#ead7b7]/35"
-                          >
-                            <Plus size={13} />
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </section>
+                    <AnimatePresence mode="wait">
+                      {mobileQty > 0 && (
+                        <motion.div
+                          key="mobile-stepper"
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 6 }}
+                          transition={{ duration: 0.18 }}
+                          className="mt-3 space-y-3"
+                        >
+                          {compactPackOptions.length > 0 && (product.unitType === 'weight' || product.unitType === 'volume') && (
+                            <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
+                              {compactPackOptions.map((option) => (
+                                <button
+                                  key={option.label}
+                                  type="button"
+                                  onClick={() => handleMobilePackChange(option)}
+                                  className={`shrink-0 rounded-full border px-3 py-2 text-[11px] font-black transition-colors ${
+                                    mobilePack?.label === option.label
+                                      ? 'border-[#2c392a] bg-[#2c392a] text-white'
+                                      : 'border-[#ead7b7]/70 bg-[#f7f4ed] text-[#5f6d59]'
+                                  }`}
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="inline-flex w-full items-center justify-between gap-2 rounded-full bg-white px-2 py-1.5 shadow-sm ring-1 ring-[#ead7b7]/55">
+                            <button
+                              type="button"
+                              onClick={() => handleMobileChangeQty(mobileQty - 1)}
+                              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59] transition-colors hover:bg-[#ead7b7]/35"
+                            >
+                              <Minus size={13} />
+                            </button>
+                            <span className="min-w-[2rem] text-center text-[14px] font-black text-[#2c392a]">{mobileQty}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleMobileChangeQty(mobileQty + 1)}
+                              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59] transition-colors hover:bg-[#ead7b7]/35"
+                            >
+                              <Plus size={13} />
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </section>
+              )}
             </div>
 
             <div className="sticky inset-x-0 bottom-0 z-20 border-t border-[#ead7b7]/45 bg-white/92 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur">
-              <div className="mx-auto flex max-w-xl items-center gap-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold text-[#7daa8f]">{mobileQty > 0 ? 'Selected total' : 'Total price'}</p>
-                  <p className="text-[1rem] font-black leading-tight text-[#2c392a]">{formatCurrency(mobileQty > 0 ? mobileLineTotal : basePrice)}</p>
-                  <p className="truncate text-[10px] font-bold text-[#95a28f]">{mobileQty > 0 ? mobileSummary : 'Premium quick view'}</p>
+              {product.hasVariants ? (
+                <div className="mx-auto flex max-w-xl items-center gap-3">
+                  <div className="flex items-center gap-1 rounded-xl border border-[#D5DAD0] bg-[#F7F6F2] overflow-hidden shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setDesktopVariantQty(q => Math.max(1, q - 1))}
+                      disabled={desktopVariantQty <= 1}
+                      className="flex h-10 w-10 items-center justify-center text-[#2c392a] hover:bg-[#E8EDE4] disabled:opacity-40 transition-colors"
+                    >
+                      <Minus size={13} />
+                    </button>
+                    <span className="w-8 text-center text-[14px] font-black text-[#2c392a] tabular-nums">{desktopVariantQty}</span>
+                    <button
+                      type="button"
+                      onClick={() => setDesktopVariantQty(q => q + 1)}
+                      disabled={!selectedVariant || desktopVariantQty >= selectedVariant.stock}
+                      className="flex h-10 w-10 items-center justify-center text-[#2c392a] hover:bg-[#E8EDE4] disabled:opacity-40 transition-colors"
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold text-[#7daa8f]">Total</p>
+                    <p className="text-[1rem] font-black leading-tight text-[#2c392a]">
+                      {selectedVariant ? formatCurrency(selectedVariant.price * desktopVariantQty) : formatCurrency(basePrice)}
+                    </p>
+                  </div>
+
+                  <AnimatePresence mode="wait">
+                    {toast ? (
+                      <motion.div
+                        key="added"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        className="flex h-[46px] shrink-0 items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 text-[13px] font-black text-white"
+                      >
+                        <Check size={15} strokeWidth={3} />
+                        <span>Added!</span>
+                      </motion.div>
+                    ) : (
+                      <motion.button
+                        key="add-btn"
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleAdd}
+                        type="button"
+                        disabled={!selectedVariant}
+                        className="flex h-[46px] shrink-0 items-center justify-center rounded-2xl bg-[#2c392a] px-4 text-[13px] font-black text-white shadow-[0_14px_28px_rgba(44,57,42,0.2)] disabled:opacity-50"
+                      >
+                        <ShoppingCart size={15} />
+                        <span className="ml-2">Add to Cart</span>
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
                 </div>
+              ) : (
+                <div className="mx-auto flex max-w-xl items-center gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold text-[#7daa8f]">{mobileQty > 0 ? 'Selected total' : 'Total price'}</p>
+                    <p className="text-[1rem] font-black leading-tight text-[#2c392a]">{formatCurrency(mobileQty > 0 ? mobileLineTotal : basePrice)}</p>
+                    <p className="truncate text-[10px] font-bold text-[#95a28f]">{mobileQty > 0 ? mobileSummary : 'Premium quick view'}</p>
+                  </div>
 
-                {mobileQty === 0 ? (
-                  <motion.button
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleMobileAdd}
-                    type="button"
-                    className="ml-auto flex h-[46px] flex-1 items-center justify-center rounded-2xl bg-[#2c392a] px-4 text-[13px] font-black text-white shadow-[0_14px_28px_rgba(44,57,42,0.2)]"
-                  >
-                    <ShoppingCart size={15} />
-                    <span className="ml-2">Add to Cart</span>
-                  </motion.button>
-                ) : (
-                  <div className="ml-auto flex flex-1 items-center justify-end gap-2">
-                    <div className="inline-flex items-center gap-1 rounded-full bg-white px-1.5 py-1 shadow-sm ring-1 ring-[#ead7b7]/55">
-                      <button
-                        type="button"
-                        onClick={() => handleMobileChangeQty(mobileQty - 1)}
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59] transition-colors hover:bg-[#ead7b7]/35"
-                      >
-                        <Minus size={13} />
-                      </button>
-                      <span className="min-w-[2rem] text-center text-[13px] font-black text-[#2c392a]">{mobileQty}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleMobileChangeQty(mobileQty + 1)}
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59] transition-colors hover:bg-[#ead7b7]/35"
-                      >
-                        <Plus size={13} />
-                      </button>
-                    </div>
-
+                  {mobileQty === 0 ? (
                     <motion.button
                       whileTap={{ scale: 0.98 }}
-                      onClick={handleAdd}
+                      onClick={handleMobileAdd}
                       type="button"
-                      className="flex h-[46px] items-center justify-center rounded-2xl bg-[#2c392a] px-4 text-[13px] font-black text-white shadow-[0_14px_28px_rgba(44,57,42,0.2)]"
+                      className="ml-auto flex h-[46px] flex-1 items-center justify-center rounded-2xl bg-[#2c392a] px-4 text-[13px] font-black text-white shadow-[0_14px_28px_rgba(44,57,42,0.2)]"
                     >
                       <ShoppingCart size={15} />
                       <span className="ml-2">Add to Cart</span>
                     </motion.button>
-                  </div>
-                )}
-              </div>
+                  ) : (
+                    <div className="ml-auto flex flex-1 items-center justify-end gap-2">
+                      <div className="inline-flex items-center gap-1 rounded-full bg-white px-1.5 py-1 shadow-sm ring-1 ring-[#ead7b7]/55">
+                        <button
+                          type="button"
+                          onClick={() => handleMobileChangeQty(mobileQty - 1)}
+                          className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59] transition-colors hover:bg-[#ead7b7]/35"
+                        >
+                          <Minus size={13} />
+                        </button>
+                        <span className="min-w-[2rem] text-center text-[13px] font-black text-[#2c392a]">{mobileQty}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleMobileChangeQty(mobileQty + 1)}
+                          className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59] transition-colors hover:bg-[#ead7b7]/35"
+                        >
+                          <Plus size={13} />
+                        </button>
+                      </div>
+
+                      <AnimatePresence mode="wait">
+                        {toast ? (
+                          <motion.div
+                            key="added"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            className="flex h-[46px] items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 text-[13px] font-black text-white"
+                          >
+                            <Check size={15} strokeWidth={3} />
+                            <span>Added!</span>
+                          </motion.div>
+                        ) : (
+                          <motion.button
+                            key="add-btn"
+                            whileTap={{ scale: 0.98 }}
+                            onClick={handleAdd}
+                            type="button"
+                            className="flex h-[46px] items-center justify-center rounded-2xl bg-[#2c392a] px-4 text-[13px] font-black text-white shadow-[0_14px_28px_rgba(44,57,42,0.2)]"
+                          >
+                            <ShoppingCart size={15} />
+                            <span className="ml-2">Add to Cart</span>
+                          </motion.button>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </motion.div>
         </div>
