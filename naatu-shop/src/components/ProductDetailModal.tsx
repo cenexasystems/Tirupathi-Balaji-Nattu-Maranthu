@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDown, Flower2, Heart, Leaf, Minus, Plus, ShieldCheck, ShoppingCart, Sparkles, Star, X } from 'lucide-react'
-import { useCartStore, useFavStore, type Product } from '../store/store'
+import { Check, ChevronDown, Flower2, Heart, Leaf, Minus, Plus, ShieldCheck, ShoppingCart, Sparkles, Star, X } from 'lucide-react'
+import { useCartStore, useFavStore, useVariantStore, type Product } from '../store/store'
 import { useLangStore } from '../store/langStore'
+import type { ProductVariant } from '../services/variantService'
 import {
   calculateLineTotal,
   convertQuantityByUnitType,
@@ -34,6 +35,19 @@ const buildUsageNote = (product: Product) => {
 }
 
 const accordionClass = 'rounded-[22px] border border-[#ead7b7]/60 bg-white px-4 py-3 shadow-sm'
+
+function variantToProduct(base: Product, v: ProductVariant): Product {
+  return {
+    ...base,
+    id: v.id,
+    name: `${base.name}${v.sizeLabel || v.variantName !== base.name ? ` - ${v.variantName}` : ''}`,
+    price: v.price,
+    offerPrice: null,
+    stock: v.stock,
+    stockQuantity: v.stock,
+    hasVariants: false,
+  }
+}
 
 const getCompactPackOptions = (product: Product) => {
   if (product.predefinedOptions.length > 0) return product.predefinedOptions
@@ -68,6 +82,7 @@ export default function ProductDetailModal({
 }) {
   const { addItem, removeItem, updateQuantity } = useCartStore()
   const { toggle, isFav } = useFavStore()
+  const { getVariants, getDefaultVariant, fetchVariants } = useVariantStore()
   const { t } = useLangStore()
   const [displayUnit, setDisplayUnit] = useState(() => product?.unitLabel ?? '')
   const [displayQty, setDisplayQty] = useState(() =>
@@ -80,8 +95,11 @@ export default function ProductDetailModal({
       : 1,
   )
   const [mobileQty, setMobileQty] = useState(0)
-    const [mobilePack, setMobilePack] = useState<QuantityOption | null>(null)
+  const [mobilePack, setMobilePack] = useState<QuantityOption | null>(null)
   const [toast, setToast] = useState(false)
+  // Desktop variant selection
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null)
+  const [desktopVariantQty, setDesktopVariantQty] = useState(1)
 
   useEffect(() => {
     if (!open) return
@@ -98,14 +116,24 @@ export default function ProductDetailModal({
   }, [open, onClose])
 
   useEffect(() => {
+    void fetchVariants()
+  }, [fetchVariants])
+
+  useEffect(() => {
     if (!open || !product) return
-    // defer state updates to avoid synchronous setState-in-effect warning
     const id = window.setTimeout(() => {
       setMobileQty(0)
       setMobilePack(getCompactPackOptions(product)[0] ?? null)
+      if (product.hasVariants) {
+        setSelectedVariant(getDefaultVariant(String(product.id)))
+        setDesktopVariantQty(1)
+      } else {
+        setSelectedVariant(null)
+        setDesktopVariantQty(1)
+      }
     }, 0)
     return () => window.clearTimeout(id)
-  }, [open, product])
+  }, [open, product, fetchVariants, getDefaultVariant])
 
   // Reference optional props to avoid ESLint unused-var errors without changing API
   void onSelectProduct
@@ -174,7 +202,19 @@ export default function ProductDetailModal({
   const selectedSummary = formatCompactQuantity(displayQty, selectedUnit)
 
   const handleAdd = () => {
-    addItem(product, normalizedQuantity, selectedUnit)
+    if (product.hasVariants && selectedVariant) {
+      const synthetic = variantToProduct(product, selectedVariant)
+      addItem(
+        synthetic,
+        desktopVariantQty,
+        synthetic.unitLabel,
+        selectedVariant.id,
+        selectedVariant.variantName,
+        String(product.id),
+      )
+    } else {
+      addItem(product, normalizedQuantity, selectedUnit)
+    }
     setToast(true)
     window.setTimeout(() => setToast(false), 1800)
   }
@@ -535,99 +575,184 @@ export default function ProductDetailModal({
                   </div>
                 </section>
 
-                <section className="mt-5 rounded-[26px] bg-white/88 px-4 py-4 shadow-sm ring-1 ring-[#ead7b7]/45 backdrop-blur sm:px-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">Pack size</p>
-                      <p className="mt-1 text-[11px] font-bold text-[#95a28f]">{selectedSummary}</p>
+                {/* Variant radio selector (desktop) OR pack size / qty stepper */}
+                {product.hasVariants ? (
+                  <section className="mt-5 rounded-[26px] bg-white/88 px-4 py-4 shadow-sm ring-1 ring-[#ead7b7]/45 backdrop-blur sm:px-5">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">Select Variant</p>
+                      <button
+                        type="button"
+                        onClick={() => void toggle(product)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black transition-colors ${
+                          favorite ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-[#ead7b7]/70 bg-white text-[#5f6d59]'
+                        }`}
+                        aria-label={favorite ? 'Remove from favourites' : 'Add to favourites'}
+                      >
+                        <Heart size={12} className={favorite ? 'fill-rose-500 text-rose-500' : 'text-current'} />
+                        {favorite ? 'Saved' : 'Save'}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => void toggle(product)}
-                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-black transition-colors ${
-                        favorite ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-[#ead7b7]/70 bg-white text-[#5f6d59]'
-                      }`}
-                      aria-label={favorite ? 'Remove from favourites' : 'Add to favourites'}
-                    >
-                      <Heart size={12} className={favorite ? 'fill-rose-500 text-rose-500' : 'text-current'} />
-                      {favorite ? 'Saved' : 'Save'}
-                    </button>
-                  </div>
 
-                  {compactPackOptions.length > 0 && (product.unitType === 'weight' || product.unitType === 'volume') ? (
-                    <div className="mt-3 flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
-                      {compactPackOptions.map((option) => (
-                        <button
-                          key={option.label}
-                          type="button"
-                          onClick={() => {
-                            setDisplayUnit(product.unitLabel)
-                            setDisplayQty(option.quantity)
-                          }}
-                          className={`shrink-0 rounded-full border px-3 py-2 text-[11px] font-black transition-colors ${
-                            Math.abs(displayQty - option.quantity) < 0.0001 && displayUnit === product.unitLabel
-                              ? 'border-[#2c392a] bg-[#2c392a] text-white'
-                              : 'border-[#ead7b7]/70 bg-[#f7f4ed] text-[#5f6d59]'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
+                    {/* Variant list — radio style */}
+                    <div className="space-y-1.5">
+                      {getVariants(String(product.id)).map((v) => {
+                        const isSel = selectedVariant?.id === v.id
+                        const oos = v.stock <= 0
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            disabled={oos}
+                            onClick={() => { if (!oos) { setSelectedVariant(v); setDesktopVariantQty(1) } }}
+                            className={[
+                              'flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left transition-all',
+                              isSel
+                                ? 'bg-[#2C392A]/6 ring-2 ring-[#2C392A]'
+                                : oos
+                                ? 'cursor-not-allowed opacity-40 ring-1 ring-gray-200'
+                                : 'ring-1 ring-[#ead7b7]/70 hover:ring-[#7DAA8F]',
+                            ].join(' ')}
+                          >
+                            <span className={[
+                              'flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full border-2',
+                              isSel ? 'border-[#2C392A] bg-[#2C392A]' : 'border-gray-300',
+                            ].join(' ')}>
+                              {isSel && <Check size={9} className="text-white" strokeWidth={3.5} />}
+                            </span>
+                            <span className={`flex-1 text-[13px] font-semibold ${isSel ? 'text-[#2C392A]' : 'text-[#444]'}`}>
+                              {v.variantName}
+                              {v.sizeLabel && v.sizeLabel !== v.variantName && (
+                                <span className="ml-1 text-[11px] font-normal text-[#5F6D59]">· {v.sizeLabel}</span>
+                              )}
+                            </span>
+                            <span className={`text-[14px] font-black tabular-nums shrink-0 ${isSel ? 'text-[#2C392A]' : 'text-[#444]'}`}>
+                              {formatCurrency(v.price)}
+                            </span>
+                            {oos && <span className="text-[10px] font-bold text-red-500">Out of stock</span>}
+                          </button>
+                        )
+                      })}
                     </div>
-                  ) : (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      {(product.unitType === 'weight' || product.unitType === 'volume') && unitOptions.length > 1 && (
-                        <div className="flex items-center gap-1 rounded-full bg-[#f7f4ed] p-1 ring-1 ring-[#ead7b7]/50">
-                          {unitOptions.map((unit) => (
-                            <button
-                              key={unit}
-                              type="button"
-                              onClick={() => handleUnitChange(unit)}
-                              className={`rounded-full px-3 py-1.5 text-[11px] font-black transition-colors ${
-                                unit === displayUnit ? 'bg-[#2c392a] text-white' : 'text-[#5f6d59]'
-                              }`}
-                            >
-                              {unit}
-                            </button>
-                          ))}
+
+                    {/* Qty stepper for selected variant */}
+                    {selectedVariant && (
+                      <div className="mt-3 flex items-center gap-2 pt-2 border-t border-[#ead7b7]/40">
+                        <span className="text-[11px] font-bold text-[#5f6d59]">Quantity</span>
+                        <div className="ml-auto inline-flex items-center gap-1 rounded-xl border border-[#D5DAD0] bg-[#F7F6F2] overflow-hidden">
+                          <button type="button"
+                            onClick={() => setDesktopVariantQty(q => Math.max(1, q - 1))}
+                            disabled={desktopVariantQty <= 1}
+                            className="flex h-8 w-8 items-center justify-center text-[#2c392a] hover:bg-[#E8EDE4] disabled:opacity-40 transition-colors"
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <span className="w-8 text-center text-[13px] font-black text-[#2c392a] tabular-nums">{desktopVariantQty}</span>
+                          <button type="button"
+                            onClick={() => setDesktopVariantQty(q => Math.min(q + 1, selectedVariant.stock))}
+                            disabled={desktopVariantQty >= selectedVariant.stock}
+                            className="flex h-8 w-8 items-center justify-center text-[#2c392a] hover:bg-[#E8EDE4] disabled:opacity-40 transition-colors"
+                          >
+                            <Plus size={12} />
+                          </button>
                         </div>
-                      )}
-
-                      <div className="ml-auto inline-flex items-center gap-1 rounded-full bg-white px-1.5 py-1 ring-1 ring-[#ead7b7]/50">
-                        <button
-                          type="button"
-                          onClick={() => setDisplayQty((value) => Math.max(stepDisplay, value - stepDisplay))}
-                          className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59]"
-                        >
-                          <Minus size={12} />
-                        </button>
-                        <input
-                          type="number"
-                          value={Number.isFinite(displayQty) ? displayQty : ''}
-                          min={product.unitType === 'unit' || product.unitType === 'bundle' ? 1 : 0.001}
-                          step={stepDisplay}
-                          onChange={(event) => {
-                            const next = Number(event.target.value)
-                            if (!Number.isFinite(next)) return
-                            setDisplayQty(next)
-                          }}
-                          className="w-14 bg-transparent text-center text-[12px] font-black text-[#2c392a] outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setDisplayQty((value) => value + stepDisplay)}
-                          className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59]"
-                        >
-                          <Plus size={12} />
-                        </button>
                       </div>
+                    )}
+                  </section>
+                ) : (
+                  <section className="mt-5 rounded-[26px] bg-white/88 px-4 py-4 shadow-sm ring-1 ring-[#ead7b7]/45 backdrop-blur sm:px-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">Pack size</p>
+                        <p className="mt-1 text-[11px] font-bold text-[#95a28f]">{selectedSummary}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void toggle(product)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-black transition-colors ${
+                          favorite ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-[#ead7b7]/70 bg-white text-[#5f6d59]'
+                        }`}
+                        aria-label={favorite ? 'Remove from favourites' : 'Add to favourites'}
+                      >
+                        <Heart size={12} className={favorite ? 'fill-rose-500 text-rose-500' : 'text-current'} />
+                        {favorite ? 'Saved' : 'Save'}
+                      </button>
                     </div>
-                  )}
 
-                  <div className="mt-3 text-[11px] font-bold text-[#7daa8f]">
-                    {formatPricePerUnit(basePrice, product.baseQuantity, product.unitLabel, product.unitType)}
-                  </div>
-                </section>
+                    {compactPackOptions.length > 0 && (product.unitType === 'weight' || product.unitType === 'volume') ? (
+                      <div className="mt-3 flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
+                        {compactPackOptions.map((option) => (
+                          <button
+                            key={option.label}
+                            type="button"
+                            onClick={() => {
+                              setDisplayUnit(product.unitLabel)
+                              setDisplayQty(option.quantity)
+                            }}
+                            className={`shrink-0 rounded-full border px-3 py-2 text-[11px] font-black transition-colors ${
+                              Math.abs(displayQty - option.quantity) < 0.0001 && displayUnit === product.unitLabel
+                                ? 'border-[#2c392a] bg-[#2c392a] text-white'
+                                : 'border-[#ead7b7]/70 bg-[#f7f4ed] text-[#5f6d59]'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {(product.unitType === 'weight' || product.unitType === 'volume') && unitOptions.length > 1 && (
+                          <div className="flex items-center gap-1 rounded-full bg-[#f7f4ed] p-1 ring-1 ring-[#ead7b7]/50">
+                            {unitOptions.map((unit) => (
+                              <button
+                                key={unit}
+                                type="button"
+                                onClick={() => handleUnitChange(unit)}
+                                className={`rounded-full px-3 py-1.5 text-[11px] font-black transition-colors ${
+                                  unit === displayUnit ? 'bg-[#2c392a] text-white' : 'text-[#5f6d59]'
+                                }`}
+                              >
+                                {unit}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="ml-auto inline-flex items-center gap-1 rounded-full bg-white px-1.5 py-1 ring-1 ring-[#ead7b7]/50">
+                          <button
+                            type="button"
+                            onClick={() => setDisplayQty((value) => Math.max(stepDisplay, value - stepDisplay))}
+                            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59]"
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <input
+                            type="number"
+                            value={Number.isFinite(displayQty) ? displayQty : ''}
+                            min={product.unitType === 'unit' || product.unitType === 'bundle' ? 1 : 0.001}
+                            step={stepDisplay}
+                            onChange={(event) => {
+                              const next = Number(event.target.value)
+                              if (!Number.isFinite(next)) return
+                              setDisplayQty(next)
+                            }}
+                            className="w-14 bg-transparent text-center text-[12px] font-black text-[#2c392a] outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setDisplayQty((value) => value + stepDisplay)}
+                            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59]"
+                          >
+                            <Plus size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-3 text-[11px] font-bold text-[#7daa8f]">
+                      {formatPricePerUnit(basePrice, product.baseQuantity, product.unitLabel, product.unitType)}
+                    </div>
+                  </section>
+                )}
 
                 <section className="mt-5 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
                   {[
@@ -685,17 +810,32 @@ export default function ProductDetailModal({
               <div className="mx-auto flex max-w-5xl items-center gap-3">
                 <div className="min-w-0">
                   <p className="text-[11px] font-bold text-[#7daa8f]">Total</p>
-                  <p className="text-base font-black leading-tight text-[#2c392a]">{formatCurrency(lineTotal)}</p>
-                  <p className="truncate text-[10px] font-bold text-[#95a28f]">{selectedSummary}</p>
+                  {product.hasVariants && selectedVariant ? (
+                    <>
+                      <p className="text-base font-black leading-tight text-[#2c392a]">
+                        {formatCurrency(selectedVariant.price * desktopVariantQty)}
+                      </p>
+                      <p className="truncate text-[10px] font-bold text-[#95a28f]">
+                        {selectedVariant.variantName}{selectedVariant.sizeLabel ? ` · ${selectedVariant.sizeLabel}` : ''}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-base font-black leading-tight text-[#2c392a]">{formatCurrency(lineTotal)}</p>
+                      <p className="truncate text-[10px] font-bold text-[#95a28f]">{selectedSummary}</p>
+                    </>
+                  )}
                 </div>
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   onClick={handleAdd}
                   type="button"
-                  className="flex-1 rounded-2xl bg-[#2c392a] py-3.5 text-sm font-black text-white shadow-[0_16px_30px_rgba(44,57,42,0.28)] transition-transform hover:-translate-y-0.5"
+                  disabled={product.hasVariants && !selectedVariant}
+                  className="flex-1 rounded-2xl bg-[#2c392a] py-3.5 text-sm font-black text-white shadow-[0_16px_30px_rgba(44,57,42,0.28)] transition-transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span className="inline-flex items-center justify-center gap-2">
-                    <ShoppingCart size={16} /> Add to Cart
+                    <ShoppingCart size={16} />
+                    {product.hasVariants ? 'Add Variant to Cart' : 'Add to Cart'}
                   </span>
                 </motion.button>
               </div>

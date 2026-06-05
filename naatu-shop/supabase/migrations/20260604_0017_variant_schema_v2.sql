@@ -18,7 +18,7 @@ ALTER TABLE public.product_variants
   ADD COLUMN IF NOT EXISTS is_default     BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS image_url      TEXT;        -- variant-specific image (optional)
 
--- Ensure exactly one default per product (enforced via trigger)
+-- Ensure exactly one default per product (AFTER trigger avoids same-command tuple conflict)
 CREATE OR REPLACE FUNCTION public.ensure_one_default_variant()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -26,15 +26,16 @@ BEGIN
     UPDATE public.product_variants
       SET is_default = false
      WHERE product_id = NEW.product_id
-       AND id != NEW.id;
+       AND id != NEW.id
+       AND is_default = true;  -- only touch rows that are still true
   END IF;
-  RETURN NEW;
+  RETURN NULL;  -- AFTER triggers ignore return value
 END;
 $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_one_default_variant ON public.product_variants;
 CREATE TRIGGER trg_one_default_variant
-  BEFORE INSERT OR UPDATE ON public.product_variants
+  AFTER INSERT OR UPDATE ON public.product_variants
   FOR EACH ROW EXECUTE FUNCTION public.ensure_one_default_variant();
 
 -- ─────────────────────────────────────────────────────────────────
