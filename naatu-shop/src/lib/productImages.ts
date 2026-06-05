@@ -19,11 +19,9 @@
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const LOCAL_FALLBACK_IMAGE = '/assets/images/Kungumam.png'
-const U = (id: string) => {
-  void id
-  return LOCAL_FALLBACK_IMAGE
-}
+// Builds a sized Unsplash URL. Used in KEYWORD_MAP / CATEGORY_MAP fallbacks.
+const U = (id: string) =>
+  `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=400&q=80`
 
 /** Returns true only for admin-uploaded images stored in Supabase Storage.
  *  These deserve the highest trust — the admin explicitly chose this image. */
@@ -432,6 +430,13 @@ export function getProductImage(
 
   // 0b. Local static asset stored in public/assets — use directly
   if (isLocalAsset(dbUrl)) return preferWebpAsset(dbUrl)
+
+  // 0c. Any other DB-provided https:// URL (e.g. Unsplash URLs seeded in DB)
+  //     Re-parameterise for the requested size when possible, otherwise use as-is.
+  if (dbUrl && dbUrl.startsWith('https://')) {
+    const base = dbUrl.split('?')[0]
+    return `${base}?auto=format&fit=crop&w=${w}&q=${q}`
+  }
 
   const hay = name.toLowerCase().trim()
 

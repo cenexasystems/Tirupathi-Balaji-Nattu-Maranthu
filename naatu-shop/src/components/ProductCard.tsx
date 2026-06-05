@@ -51,10 +51,10 @@ export default function ProductCard({ product }: { product: Product }) {
     product.offerPrice && product.offerPrice < product.price
       ? Math.round(((product.price - product.offerPrice) / product.price) * 100)
       : 0
-  const minVariantPrice =
-    allVariants.length > 0 ? Math.min(...allVariants.map((v) => v.price)) : null
+  // Use the default variant's price; never show "from ₹X" min-price
   const displayPrice =
-    product.hasVariants && minVariantPrice != null ? minVariantPrice : basePrice
+    product.hasVariants && defaultVariant != null ? defaultVariant.price : basePrice
+  // Weight / size label shown under product name
   const variantLabel = defaultVariant?.sizeLabel || defaultVariant?.variantName || null
 
   const displayName =
@@ -151,9 +151,6 @@ export default function ProductCard({ product }: { product: Product }) {
 
           {/* Price */}
           <div className="mt-1 flex items-baseline gap-1">
-            {product.hasVariants && allVariants.length > 1 && (
-              <span className="text-[10px] text-[#7A846F]">{l('from', 'தொடங்கி')}</span>
-            )}
             <span className="text-[13px] font-black text-[#2C392A] tabular-nums">
               {formatCurrency(displayPrice)}
             </span>
