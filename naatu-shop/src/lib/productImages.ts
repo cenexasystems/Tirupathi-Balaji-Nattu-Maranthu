@@ -426,64 +426,27 @@ export function getProductImage(
   const w = size === 'tile' ? 200 : size === 'detail' ? 800 : 400
   const q = size === 'tile' ? 70  : 80
 
-  // -1. Local Images_V2 resolver — highest priority for known product photos
+  // 1. Local Images_V2 resolver — single source of truth for all product photos
   const localV2 = resolveProductImage(name)
   if (localV2) return localV2
 
-  // 0. Admin-uploaded to Supabase Storage — trust completely
+  // 2. Admin-uploaded to Supabase Storage — actual uploaded files, not seeded URLs
   if (isStorageImage(dbUrl)) {
     return dbUrl.includes('?') ? dbUrl : `${dbUrl}?w=${w}&q=${q}`
   }
 
-  // 0b. Local static asset stored in public/assets — use directly
+  // 3. Local static asset stored in public/assets
   if (isLocalAsset(dbUrl)) return preferWebpAsset(dbUrl)
 
-  // 0c. Any other DB-provided https:// URL (e.g. Unsplash URLs seeded in DB)
-  //     Re-parameterise for the requested size when possible, otherwise use as-is.
-  const rawUrl = dbUrl as string | null | undefined
-  if (rawUrl && rawUrl.startsWith('https://')) {
-    const base = rawUrl.split('?')[0]
-    return `${base}?auto=format&fit=crop&w=${w}&q=${q}`
-  }
-
-  const hay = name.toLowerCase().trim()
-
-  // 1. Explicit product overrides (exact / substring match)
-  for (const [key, url] of Object.entries(PRODUCT_OVERRIDES)) {
-    if (hay === key || hay.includes(key)) return preferWebpAsset(url)
-  }
-
-  // 2. Keyword map
-  for (const { kw, img } of KEYWORD_MAP) {
-    if (kw.some(k => hay.includes(k))) {
-      // Re-parameterise the base Unsplash URL for the requested size
-      return img.replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, `q=${q}`)
-    }
-  }
-
-  // 3. Category map — exact
-  if (CATEGORY_MAP[category]) {
-    return preferWebpAsset(CATEGORY_MAP[category])
-      .replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, `q=${q}`)
-  }
-
-  // 4. Category map — fuzzy (handles "Herbal Spice" matching "Spices & Condiments" etc.)
-  const catLow = category.toLowerCase()
-  for (const [key, url] of Object.entries(CATEGORY_MAP)) {
-    if (catLow.includes(key.toLowerCase().split(' ')[0])) {
-      return preferWebpAsset(url).replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, `q=${q}`)
-    }
-  }
-
-  // 5. Premium neutral placeholder
-  return preferWebpAsset(PLACEHOLDER).replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, `q=${q}`)
+  // No match — return empty string; CSS background handles the visual
+  return ''
 }
 
-/** Stable onError handler — sets final fallback, marks element so it
- *  never fires again (prevents infinite-error-loop on bad fallback URLs). */
+/** Stable onError handler — hides broken image, marks element so it never
+ *  fires again (prevents infinite-error-loop). CSS background shows the slot. */
 export function onImgError(e: React.SyntheticEvent<HTMLImageElement>) {
   const img = e.currentTarget
-  if (img.dataset.errored) return          // already set fallback — stop
+  if (img.dataset.errored) return
   img.dataset.errored = '1'
-  img.src = preferWebpAsset(PLACEHOLDER)
+  img.style.display = 'none'
 }

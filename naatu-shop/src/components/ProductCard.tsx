@@ -126,7 +126,7 @@ export default function ProductCard({ product }: { product: Product }) {
             decoding="async"
             sizes="(max-width: 640px) 50vw, 280px"
             onError={onImgError}
-            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+            className="h-full w-full object-contain transition-transform duration-500 ease-out group-hover:scale-[1.03]"
           />
         </button>
 

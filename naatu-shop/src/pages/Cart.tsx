@@ -4,7 +4,7 @@ import { useCartStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { Link } from 'react-router-dom'
 import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, getQuantityStepForProduct } from '../lib/retail'
-import { PLACEHOLDER as PRODUCT_PLACEHOLDER } from '../lib/productImages'
+import { getProductImage, onImgError } from '../lib/productImages'
 
 export default function Cart() {
   const { items, remove, updateQty, total, count, clear } = useCartStore()
@@ -52,9 +52,11 @@ export default function Cart() {
                   <motion.div key={item.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4 sm:py-5">
                     <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden shrink-0 bg-gray-50 border border-sand/40">
-                      <img src={item.image} alt={item.name}
-                        onError={(e) => { (e.target as HTMLImageElement).src = PRODUCT_PLACEHOLDER }}
-                        className="w-full h-full object-cover" loading="lazy" />
+                      <img
+                        src={getProductImage(item.name, item.category, item.imageUrl, 'tile')}
+                        alt={item.name}
+                        onError={onImgError}
+                        className="w-full h-full object-contain" loading="lazy" />
                     </div>
                     <div className="flex-grow flex flex-col items-start gap-0.5 sm:gap-1 min-w-0">
                       <h3 className="font-bold text-sm sm:text-base text-textMain">

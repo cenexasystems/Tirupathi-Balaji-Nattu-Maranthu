@@ -16,8 +16,8 @@ const VARIANT_MAP: Record<string, string> = {
   'agarbatti|miracle':            'Agarbatti Miracle.jpeg',
 
   // Vibhoothi brands
-  'vibhoothi|sithanathan':        'Viboothi Sithanathan.jpeg',
-  'vibhoothi|baskaran':           'Vibhoothi Baskaran.jpeg',
+  'vibhoothi|sithanathan':        'Viboothi-Sithanathan.jpeg',
+  'vibhoothi|baskaran':           'Vibhoothi-Baskaran.jpeg',
 
   // Deepam Thiri
   'deepam thiri|cotton':          'Deepam Thiri Cotton.jpeg',
@@ -28,6 +28,7 @@ const VARIANT_MAP: Record<string, string> = {
   'navagraha bit|polyester':      'Navagraha Bit Polyster.jpeg',
   'navagraha bit|cotton':         'Navagraha Bit Cotton.jpeg',
   'navagraha bit|cotton 1m':      'Navagraha Bit Cotton.jpeg',
+  'navagraha bit|cloth':          'Navagraha Bit Cloth.jpeg',
 
   // Panchagavyam / Panchakavyam
   'panchagavyam|liquid':          'Panchakavyam Liquid.jpeg',
@@ -63,9 +64,9 @@ const PRODUCT_MAP: Record<string, string> = {
   'kolamaavu':                    'Kolamavu.jpeg',
   'agarbatti':                    'Agarbatti Cycle.jpeg',
   'agarbathy':                    'Agarbatti Cycle.jpeg',
-  'vibhoothi':                    'Viboothi Sithanathan.jpeg',
-  'vibhuti':                      'Viboothi Sithanathan.jpeg',
-  'vibuthi':                      'Viboothi Sithanathan.jpeg',
+  'vibhoothi':                    'Viboothi-Sithanathan.jpeg',
+  'vibhuti':                      'Viboothi-Sithanathan.jpeg',
+  'vibuthi':                      'Viboothi-Sithanathan.jpeg',
   'deepam thiri':                 'Deepam Thiri Cotton.jpeg',
   'deepam':                       'Deepam Thiri Cotton.jpeg',
   'navagraha bit':                'Navagraha Bit Polyster.jpeg',
@@ -112,8 +113,8 @@ const PRODUCT_MAP: Record<string, string> = {
   'murungai seed':                'Murungai Seed.jpeg',
   'murungai vidhai':              'Murungai Seed.jpeg',
   'kandankathiri podi':           'Kandankathiri Podi.jpeg',
-  'kutralam kuliyal podi':        'Kutralam kuliyal podi.jpeg',
-  'kutralam':                     'Kutralam kuliyal podi.jpeg',
+  'kutralam kuliyal podi':        'Bathing Powder.jpeg',
+  'kutralam':                     'Bathing Powder.jpeg',
 
   // ── Herbal Oils ────────────────────────────────────────────────
   'veppa ennai':                  'Veppa ennai.jpeg',
@@ -165,8 +166,8 @@ const PRODUCT_MAP: Record<string, string> = {
   'seeka powder':                 'Herbal Sheekai.jpeg',
   'shikakai':                     'Herbal Sheekai.jpeg',
   'sheekai':                      'Herbal Sheekai.jpeg',
-  'bathing powder':               'Kutralam kuliyal podi.jpeg',
-  'esha bathing powder':          'Kutralam kuliyal podi.jpeg',
+  'bathing powder':               'Bathing Powder.jpeg',
+  'esha bathing powder':          'Bathing Powder.jpeg',
   'face pack':                    'FacePack.jpeg',
   'facepack':                     'FacePack.jpeg',
   'esha face pack':               'FacePack.jpeg',

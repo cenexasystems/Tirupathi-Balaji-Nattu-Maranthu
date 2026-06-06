@@ -15,7 +15,7 @@ import {
   normalizeSelectedQuantity,
   type QuantityOption,
 } from '../lib/retail'
-import { getProductImage, onImgError, resolveProductImage } from '../lib/productImages'
+import { onImgError, resolveProductImage } from '../lib/productImages'
 
 const getUnitOptions = (product: Product) => {
   if (product.unitType === 'weight') {
@@ -266,15 +266,12 @@ export default function ProductDetailModal({
     }
   }
 
-  const variantImageUrl = selectedVariant
-    ? (resolveProductImage(product.name, selectedVariant.variantName) ?? selectedVariant.imageUrl ?? null)
-    : null
-  const heroImage = getProductImage(product.name, product.category, variantImageUrl ?? product.imageUrl, 'detail')
-  const galleryImages = [...new Set([
-    heroImage,
-    getProductImage(product.name, product.category, product.imageUrl, 'card'),
-    getProductImage(product.name, product.category, product.imageUrl, 'tile'),
-  ])]
+  // Variant-specific image takes priority; falls back to product-level Images_V2 path
+  const heroImage =
+    (selectedVariant ? resolveProductImage(product.name, selectedVariant.variantName) : null)
+    ?? resolveProductImage(product.name)
+    ?? ''
+  const galleryImages = [heroImage].filter(Boolean)
 
   return (
     <AnimatePresence>
@@ -292,14 +289,14 @@ export default function ProductDetailModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.99, y: 18 }}
             transition={{ type: 'spring', stiffness: 130, damping: 20, mass: 0.9 }}
-            className="relative flex h-[100dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-[28px] bg-[#fbfaf6] shadow-[0_-10px_42px_rgba(22,35,20,0.16)] sm:h-[min(94dvh,900px)] sm:rounded-[32px]"
+            className="relative flex h-full max-h-[100dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-[28px] bg-[#fbfaf6] shadow-[0_-10px_42px_rgba(22,35,20,0.16)] sm:max-h-[min(94dvh,900px)] sm:rounded-[32px]"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex shrink-0 justify-center pt-2.5">
               <div className="h-1 w-10 rounded-full bg-[#d4cfc6]" />
             </div>
 
-            <div className="flex-1 overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+            <div className="flex-1 min-h-0 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))]">
               <section className="px-0 pt-2">
                 <div className="relative overflow-hidden bg-[#efe9dd]">
                   <button
@@ -322,7 +319,7 @@ export default function ProductDetailModal({
                       loading="lazy"
                       decoding="async"
                       onError={onImgError}
-                      className="h-full w-full object-cover object-center"
+                      className="h-full w-full object-contain"
                     />
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#fbfaf6] to-transparent" />
                   </div>
@@ -377,7 +374,7 @@ export default function ProductDetailModal({
                         <Heart size={13} className={favorite ? 'fill-rose-500 text-rose-500' : 'text-current'} />
                       </button>
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 hide-scrollbar">
                       {getVariants(String(product.id)).map((v) => {
                         const isSel = selectedVariant?.id === v.id
                         const oos = v.stock <= 0
@@ -388,30 +385,16 @@ export default function ProductDetailModal({
                             disabled={oos}
                             onClick={() => { if (!oos) { setSelectedVariant(v); setDesktopVariantQty(1) } }}
                             className={[
-                              'flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left transition-all',
+                              'shrink-0 rounded-full border px-3.5 py-2 text-[12px] font-black transition-all whitespace-nowrap',
                               isSel
-                                ? 'bg-[#2C392A]/6 ring-2 ring-[#2C392A]'
+                                ? 'border-[#2C392A] bg-[#2C392A] text-white'
                                 : oos
-                                ? 'cursor-not-allowed opacity-40 ring-1 ring-gray-200'
-                                : 'ring-1 ring-[#ead7b7]/70',
+                                ? 'cursor-not-allowed opacity-40 border-gray-200 text-[#999]'
+                                : 'border-[#ead7b7]/80 bg-[#f7f4ed] text-[#2C392A]',
                             ].join(' ')}
                           >
-                            <span className={[
-                              'flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full border-2',
-                              isSel ? 'border-[#2C392A] bg-[#2C392A]' : 'border-gray-300',
-                            ].join(' ')}>
-                              {isSel && <Check size={9} className="text-white" strokeWidth={3.5} />}
-                            </span>
-                            <span className={`flex-1 text-[13px] font-semibold ${isSel ? 'text-[#2C392A]' : 'text-[#444]'}`}>
-                              {v.variantName}
-                              {v.sizeLabel && v.sizeLabel !== v.variantName && (
-                                <span className="ml-1 text-[11px] font-normal text-[#5F6D59]">· {v.sizeLabel}</span>
-                              )}
-                            </span>
-                            <span className={`text-[14px] font-black tabular-nums shrink-0 ${isSel ? 'text-[#2C392A]' : 'text-[#444]'}`}>
-                              {formatCurrency(v.price)}
-                            </span>
-                            {oos && <span className="text-[10px] font-bold text-red-500">Out of stock</span>}
+                            {v.variantName}
+                            {!isSel && <span className="ml-1 text-[11px] font-bold opacity-70">{formatCurrency(v.price)}</span>}
                           </button>
                         )
                       })}
@@ -492,7 +475,7 @@ export default function ProductDetailModal({
               )}
             </div>
 
-            <div className="sticky inset-x-0 bottom-0 z-20 border-t border-[#ead7b7]/45 bg-white/92 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur">
+            <div className="shrink-0 z-20 border-t border-[#ead7b7]/45 bg-white/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3">
               {product.hasVariants ? (
                 <div className="mx-auto flex max-w-xl items-center gap-3">
                   <div className="flex items-center gap-1 rounded-xl border border-[#D5DAD0] bg-[#F7F6F2] overflow-hidden shrink-0">
@@ -735,8 +718,8 @@ export default function ProductDetailModal({
                       </button>
                     </div>
 
-                    {/* Variant list — radio style */}
-                    <div className="space-y-1.5">
+                    {/* Variant chips — Blinkit/Zepto style */}
+                    <div className="flex flex-wrap gap-2">
                       {getVariants(String(product.id)).map((v) => {
                         const isSel = selectedVariant?.id === v.id
                         const oos = v.stock <= 0
@@ -747,30 +730,16 @@ export default function ProductDetailModal({
                             disabled={oos}
                             onClick={() => { if (!oos) { setSelectedVariant(v); setDesktopVariantQty(1) } }}
                             className={[
-                              'flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left transition-all',
+                              'rounded-full border px-4 py-2 text-[12px] font-black transition-all whitespace-nowrap',
                               isSel
-                                ? 'bg-[#2C392A]/6 ring-2 ring-[#2C392A]'
+                                ? 'border-[#2C392A] bg-[#2C392A] text-white'
                                 : oos
-                                ? 'cursor-not-allowed opacity-40 ring-1 ring-gray-200'
-                                : 'ring-1 ring-[#ead7b7]/70 hover:ring-[#7DAA8F]',
+                                ? 'cursor-not-allowed opacity-40 border-gray-200 text-[#999]'
+                                : 'border-[#ead7b7]/80 bg-[#f7f4ed] text-[#2C392A] hover:border-[#7DAA8F]',
                             ].join(' ')}
                           >
-                            <span className={[
-                              'flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full border-2',
-                              isSel ? 'border-[#2C392A] bg-[#2C392A]' : 'border-gray-300',
-                            ].join(' ')}>
-                              {isSel && <Check size={9} className="text-white" strokeWidth={3.5} />}
-                            </span>
-                            <span className={`flex-1 text-[13px] font-semibold ${isSel ? 'text-[#2C392A]' : 'text-[#444]'}`}>
-                              {v.variantName}
-                              {v.sizeLabel && v.sizeLabel !== v.variantName && (
-                                <span className="ml-1 text-[11px] font-normal text-[#5F6D59]">· {v.sizeLabel}</span>
-                              )}
-                            </span>
-                            <span className={`text-[14px] font-black tabular-nums shrink-0 ${isSel ? 'text-[#2C392A]' : 'text-[#444]'}`}>
-                              {formatCurrency(v.price)}
-                            </span>
-                            {oos && <span className="text-[10px] font-bold text-red-500">Out of stock</span>}
+                            {v.variantName}
+                            {!isSel && <span className="ml-1 text-[11px] font-semibold opacity-60">{formatCurrency(v.price)}</span>}
                           </button>
                         )
                       })}
