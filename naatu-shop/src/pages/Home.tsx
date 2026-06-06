@@ -51,22 +51,18 @@ function lsSaveReview(r: CustomerReview) {
   localStorage.setItem(LS_KEY, JSON.stringify([r, ...all].slice(0, 50)))
 }
 
-// ── Category image map ────────────────────────────────────────────────
-const CAT_IMAGES: Record<string, string> = {
-  'Pooja Items':         PRODUCT_PLACEHOLDER,
-  'Herbal Powder':       PRODUCT_PLACEHOLDER,
-  'Herbal Oil':          PRODUCT_PLACEHOLDER,
-  'Spices & Condiments': PRODUCT_PLACEHOLDER,
-  'Grains & Pulses':     PRODUCT_PLACEHOLDER,
-  'Honey & Liquids':     PRODUCT_PLACEHOLDER,
-  'Bundle Packages':     PRODUCT_PLACEHOLDER,
-  // Legacy
-  'Herbal Root':    PRODUCT_PLACEHOLDER,
-  'Herbal Leaf':    PRODUCT_PLACEHOLDER,
-  'Herbal Spice':   PRODUCT_PLACEHOLDER,
-  'Herbal Product': PRODUCT_PLACEHOLDER,
+// ── Category collage images (3 dedicated thumbnails per category) ─────
+const V2 = '/assets/Images_V2/'
+const CATEGORY_COLLAGES: Record<string, [string, string, string]> = {
+  'Pooja Items':         [V2 + 'Karpooram.jpeg',          V2 + 'Kungumam.jpeg',           V2 + 'Agarbatti Cycle.jpeg'],
+  'Herbal Powder':       [V2 + 'Manjal Podi.jpeg',         V2 + 'Thulasi Podi.jpeg',        V2 + 'Ashwagandha Podi.jpeg'],
+  'Herbal Oil':          [V2 + 'Veppa ennai.jpeg',         V2 + 'Thenga Ennai.jpeg',        V2 + 'Vilakennai Oil.jpeg'],
+  'Spices & Condiments': [V2 + 'Elakkai.jpeg',             V2 + 'Pattai.jpeg',              V2 + 'Lavangam.jpeg'],
+  'Grains & Pulses':     [V2 + 'Pasi Payiru.jpeg',         V2 + 'Ulundhu White.jpeg',       V2 + 'Kadalai Paruppu.jpeg'],
+  'Honey & Liquids':     [V2 + 'Honey(thaen).jpeg',        V2 + 'Nei Dodla.jpeg',           V2 + 'Panneer 200ml.jpeg'],
+  'Bundle Packages':     [V2 + 'Poornahuthi Saaman.jpeg',  V2 + 'Panchakavyam Liquid.jpeg', V2 + 'Sugar Diabetes Podi.jpeg'],
 }
-const CAT_DEFAULT = PRODUCT_PLACEHOLDER
+const CAT_FALLBACK: [string, string, string] = [V2 + 'Manjal Podi.jpeg', V2 + 'Thulasi Podi.jpeg', V2 + 'Ashwagandha Podi.jpeg']
 
 const REMEDY_MAP: Record<string, { emoji: string; bg: string; border: string }> = {
   'Cold & Cough':       { emoji: '🤧', bg: '#EFF6FF', border: '#93C5FD' },
@@ -229,7 +225,11 @@ export default function Home() {
 
   const derivedCats = useMemo(() => {
     const names = Array.from(new Set(products.filter(p => p.isActive).map(p => p.category))).filter(Boolean)
-    return names.map(name => ({ name, image: CAT_IMAGES[name] || CAT_DEFAULT }))
+    return names.map(name => ({
+      name,
+      thumbnails: CATEGORY_COLLAGES[name] ?? CAT_FALLBACK,
+      count: products.filter(p => p.isActive && p.category === name).length,
+    }))
   }, [products])
 
   const derivedRemedies = useMemo(() => {
@@ -440,23 +440,50 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-4 sm:gap-5">
+        {/* Mobile: horizontal swipe  |  Tablet: 4-col grid  |  Desktop: 7-col strip */}
+        <div className="
+          flex gap-3 overflow-x-auto pb-3 -mx-4 px-4 snap-x snap-mandatory
+          sm:mx-0 sm:px-0 sm:pb-0 sm:grid sm:grid-cols-4 sm:gap-4 sm:overflow-x-clip
+          lg:grid-cols-7 lg:gap-5
+        ">
           {derivedCats.slice(0, 6).map((c, idx) => (
-            <motion.div key={idx}
+            <motion.div
+              key={idx}
+              className="shrink-0 w-36 snap-start sm:shrink sm:w-auto"
               whileHover={{ y: -4 }}
               transition={{ type: 'spring', stiffness: 340, damping: 24 }}
             >
               <Link to={`/products?cat=${encodeURIComponent(c.name)}`} className="flex flex-col items-center group">
-                <div className="w-full aspect-square rounded-2xl overflow-hidden bg-[#EAD7B7]/20
-                  border border-[#EAD7B7]/30 shadow-sm group-hover:shadow-md
+                {/* Collage: large left image + two stacked right images */}
+                <div className="w-full aspect-square rounded-2xl overflow-hidden relative
+                  border border-[#EAD7B7]/30 shadow-sm
+                  group-hover:shadow-[0_8px_28px_rgba(44,57,42,0.16)]
                   transition-shadow duration-300 mb-2.5">
-                  <img
-                    src={c.image}
-                    alt={c.name}
-                    loading="lazy"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    onError={e => { (e.target as HTMLImageElement).src = CAT_DEFAULT }}
-                  />
+                  <div className="grid h-full gap-px" style={{ gridTemplateColumns: '60% 40%' }}>
+                    <div className="overflow-hidden">
+                      <img src={c.thumbnails[0]} alt="" loading="lazy"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.07]" />
+                    </div>
+                    <div className="grid gap-px" style={{ gridTemplateRows: '1fr 1fr' }}>
+                      <div className="overflow-hidden">
+                        <img src={c.thumbnails[1]} alt="" loading="lazy"
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.07]" />
+                      </div>
+                      <div className="overflow-hidden">
+                        <img src={c.thumbnails[2]} alt="" loading="lazy"
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.07]" />
+                      </div>
+                    </div>
+                  </div>
+                  {/* Hover overlay with product count badge */}
+                  <div className="absolute inset-0 flex items-center justify-center
+                    bg-[#2C392A]/0 group-hover:bg-[#2C392A]/30 transition-colors duration-300">
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300
+                      bg-white/95 text-[#2C392A] text-[11px] font-black px-3 py-1.5 rounded-full
+                      shadow-[0_2px_12px_rgba(44,57,42,0.18)]">
+                      {c.count} items
+                    </span>
+                  </div>
                 </div>
                 <span className="text-[10px] sm:text-[11px] font-bold text-[#2C392A] text-center leading-tight
                   group-hover:text-[#7DAA8F] transition-colors duration-200">
@@ -468,12 +495,13 @@ export default function Home() {
 
           {/* All Products tile */}
           <motion.div
+            className="shrink-0 w-36 snap-start sm:shrink sm:w-auto"
             whileHover={{ y: -4 }}
             transition={{ type: 'spring', stiffness: 340, damping: 24 }}
           >
             <Link to="/products" className="flex flex-col items-center group">
               <div className="w-full aspect-square rounded-2xl bg-[#2C392A] flex items-center justify-center
-                shadow-sm group-hover:shadow-md transition-shadow duration-300 mb-2.5">
+                shadow-sm group-hover:shadow-[0_8px_28px_rgba(44,57,42,0.22)] transition-shadow duration-300 mb-2.5">
                 <div className="text-center">
                   <ChevronRight size={26} className="text-white mx-auto mb-1 opacity-90" />
                   <p className="text-white text-[9px] font-black uppercase tracking-wider opacity-75">All</p>
