@@ -60,6 +60,7 @@ const PRODUCT_MAP: Record<string, string> = {
   'camphor':                      'Karpooram.jpeg',
   'sandhanam':                    'Sandhanam.jpeg',
   'special sandhanam':            'Special Sandhanam.jpeg',
+  'sandal water':                 'Sandhanam.jpeg',
   'kolamavu':                     'Kolamavu.jpeg',
   'kolamaavu':                    'Kolamavu.jpeg',
   'agarbatti':                    'Agarbatti Cycle.jpeg',
@@ -67,6 +68,8 @@ const PRODUCT_MAP: Record<string, string> = {
   'vibhoothi':                    'Viboothi-Sithanathan.jpeg',
   'vibhuti':                      'Viboothi-Sithanathan.jpeg',
   'vibuthi':                      'Viboothi-Sithanathan.jpeg',
+  'thiru neeru':                  'Viboothi-Sithanathan.jpeg',
+  'thiru neer':                   'Viboothi-Sithanathan.jpeg',
   'deepam thiri':                 'Deepam Thiri Cotton.jpeg',
   'deepam':                       'Deepam Thiri Cotton.jpeg',
   'navagraha bit':                'Navagraha Bit Polyster.jpeg',
@@ -75,17 +78,22 @@ const PRODUCT_MAP: Record<string, string> = {
   'panchakavyam':                 'Panchakavyam Liquid.jpeg',
   'poornahuthi saaman':           'Poornahuthi Saaman.jpeg',
   'poornahuthi':                  'Poornahuthi Saaman.jpeg',
+  'daily pooja combo':            'Poornahuthi Saaman.jpeg',
+  'wedding ritual pack':          'Poornahuthi Saaman.jpeg',
+  'pazha vagaigal set':           'Panchakavyam Liquid.jpeg',
 
   // ── Herbal Powders ─────────────────────────────────────────────
   'manjal podi':                  'Manjal Podi.jpeg',
   'manja podi':                   'Manjal Podi.jpeg',
   'thulasi podi':                 'Thulasi Podi.jpeg',
   'tulasi podi':                  'Thulasi Podi.jpeg',
+  'tulsi extract':                'Thulasi Podi.jpeg',
   'veppalai podi':                'Veppalai Podi.jpeg',
   'vendhayam podi':               'Vendhayam Podi.jpeg',
   'omam podi':                    'Omam Podi.jpeg',
   'ashwagandha podi':             'Ashwagandha Podi.jpeg',
   'aswagandha podi':              'Ashwagandha Podi.jpeg',
+  'herbal wellness pack':         'Ashwagandha Podi.jpeg',
   'sukku podi':                   'Sukku Podi.jpeg',
   'chukku podi':                  'Sukku Podi.jpeg',
   'athimathuram podi':            'Athimathuram Podi.jpeg',
@@ -108,6 +116,7 @@ const PRODUCT_MAP: Record<string, string> = {
   'amla podi':                    'Amala Podi.jpeg',
   'nellikkai podi':               'Amala Podi.jpeg',
   'murungai elai podi':           'Murungai Elai Podi.jpeg',
+  'murungai podi':                'Murungai Elai Podi.jpeg',
   'murungai poo podi':            'Murungai Poo Podi.jpeg',
   'murungai poo':                 'Murungai Poo Podi.jpeg',
   'murungai seed':                'Murungai Seed.jpeg',
@@ -115,6 +124,8 @@ const PRODUCT_MAP: Record<string, string> = {
   'kandankathiri podi':           'Kandankathiri Podi.jpeg',
   'kutralam kuliyal podi':        'Bathing Powder.jpeg',
   'kutralam':                     'Bathing Powder.jpeg',
+  'arugu pul':                    'Veppalai Podi.jpeg',
+  'arugampul':                    'Veppalai Podi.jpeg',
 
   // ── Herbal Oils ────────────────────────────────────────────────
   'veppa ennai':                  'Veppa ennai.jpeg',
@@ -125,8 +136,10 @@ const PRODUCT_MAP: Record<string, string> = {
   'thenga ennai':                 'Thenga Ennai.jpeg',
   'santhanathi oil':              'Santhanathi Oil.jpeg',
   'santhanathi':                  'Santhanathi Oil.jpeg',
-  'the marthandam':               'Santhanathi Oil.jpeg',  // oil bottle — closest match
+  'the marthandam':               'Santhanathi Oil.jpeg',
   'marthandam':                   'Santhanathi Oil.jpeg',
+  'keelanelli ennai':             'Santhanathi Oil.jpeg',
+  'sandal oil':                   'Santhanathi Oil.jpeg',
 
   // ── Spices ──────────────────────────────────────────────────────
   'kalkandu':                     'Kalkandu.jpeg',
@@ -138,6 +151,8 @@ const PRODUCT_MAP: Record<string, string> = {
   'jathikai':                     'Jathikkai.jpeg',
   'vasambu':                      'Vasambu.jpeg',
   'karuseerakam':                 'Karuseerakam.jpeg',
+  'kalonji':                      'Karuseerakam.jpeg',
+  'sombu':                        'Omam Podi.jpeg',
 
   // ── Grains & Pulses ─────────────────────────────────────────────
   'pacha arisi':                  'Pacha Arisi.jpeg',
@@ -148,6 +163,8 @@ const PRODUCT_MAP: Record<string, string> = {
   'ulundhu':                      'Ulundhu White.jpeg',
   'kadalai paruppu':              'Kadalai Paruppu.jpeg',
   'pasi payiru':                  'Pasi Payiru.jpeg',
+  'pasi paruppu':                 'Pasi Payiru.jpeg',
+  'thovar paruppu':               'Kadalai Paruppu.jpeg',
 
   // ── Honey & Liquids ─────────────────────────────────────────────
   'nei dodla':                    'Nei Dodla.jpeg',
