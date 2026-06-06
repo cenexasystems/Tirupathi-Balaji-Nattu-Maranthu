@@ -12,6 +12,7 @@ import Cart from './pages/Cart'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Favorites from './pages/Favorites'
+import Gallery from './pages/Gallery'
 import ProductDetails from './pages/ProductDetails'
 import { useAuthStore, useProductModalStore, useProductStore, useVariantModalStore, useVariantStore } from './store/store'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
@@ -174,6 +175,7 @@ function AppShell() {
             </ProtectedRoute>
           } />
           <Route path="/favorites" element={<Favorites />} />
+          <Route path="/gallery" element={<Gallery />} />
           <Route path="/profile" element={
             <ProtectedRoute>
               <Suspense fallback={<LoadingSpinner />}><Profile /></Suspense>

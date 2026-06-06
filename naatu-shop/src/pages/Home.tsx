@@ -20,6 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useProductStore, useAuthStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import ProductCard from '../components/ProductCard'
+import InsideOurStore from '../components/home/InsideOurStore'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { PLACEHOLDER as PRODUCT_PLACEHOLDER } from '../lib/productImages'
 import {
@@ -486,6 +487,9 @@ export default function Home() {
           </motion.div>
         </div>
       </section>
+
+      {/* ═══ INSIDE OUR STORE ═══ */}
+      <InsideOurStore />
 
       {/* ═══ HEALTH CONCERNS ═══ */}
       <section id="concerns" className="bg-white py-16 sm:py-24 border-y border-[#EAD7B7]/30 scroll-mt-20">
