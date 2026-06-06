@@ -99,6 +99,7 @@ export default function ProductDetailModal({
   const [toast, setToast] = useState(false)
   // Desktop variant selection
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null)
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null)
   const [desktopVariantQty, setDesktopVariantQty] = useState(1)
 
   useEffect(() => {
@@ -125,10 +126,13 @@ export default function ProductDetailModal({
       setMobileQty(0)
       setMobilePack(getCompactPackOptions(product)[0] ?? null)
       if (product.hasVariants) {
-        setSelectedVariant(getDefaultVariant(String(product.id)))
+        const defaultVar = getDefaultVariant(String(product.id))
+        setSelectedVariant(defaultVar)
+        setSelectedGroup(defaultVar?.groupName ?? null)
         setDesktopVariantQty(1)
       } else {
         setSelectedVariant(null)
+        setSelectedGroup(null)
         setDesktopVariantQty(1)
       }
     }, 0)
@@ -266,9 +270,10 @@ export default function ProductDetailModal({
     }
   }
 
-  // Variant-specific image takes priority; falls back to product-level Images_V2 path
+  // Priority: variant's own imageUrl → resolver(product+variant) → resolver(product) → empty
   const heroImage =
-    (selectedVariant ? resolveProductImage(product.name, selectedVariant.variantName) : null)
+    selectedVariant?.imageUrl
+    ?? (selectedVariant ? resolveProductImage(product.name, selectedVariant.variantName) : null)
     ?? resolveProductImage(product.name)
     ?? ''
   const galleryImages = [heroImage].filter(Boolean)
@@ -358,48 +363,97 @@ export default function ProductDetailModal({
 
               {product.hasVariants ? (
                 <section className="px-4 pt-3 sm:px-6">
-                  <div className="rounded-[24px] bg-white/80 px-4 py-3 shadow-sm ring-1 ring-[#ead7b7]/45 backdrop-blur">
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">
-                        {getVariants(String(product.id)).some(v => v.sizeLabel) ? 'Pack Size' : 'Brand'}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => void toggle(product)}
-                        className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
-                          favorite ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-[#ead7b7]/60 bg-white text-[#5f6d59]'
-                        }`}
-                        aria-label={favorite ? 'Remove from favourites' : 'Add to favourites'}
-                      >
-                        <Heart size={13} className={favorite ? 'fill-rose-500 text-rose-500' : 'text-current'} />
-                      </button>
-                    </div>
-                    <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 hide-scrollbar">
-                      {getVariants(String(product.id)).map((v) => {
-                        const isSel = selectedVariant?.id === v.id
-                        const oos = v.stock <= 0
-                        return (
+                  {(() => {
+                    const variants = getVariants(String(product.id))
+                    const groups = [...new Set(variants.filter(v => v.groupName).map(v => v.groupName!))]
+                    const isGrouped = groups.length > 0
+                    const activeGroupVariants = isGrouped && selectedGroup
+                      ? variants.filter(v => v.groupName === selectedGroup)
+                      : isGrouped ? [] : variants
+
+                    return (
+                      <div className="rounded-[24px] bg-white/80 px-4 py-3 shadow-sm ring-1 ring-[#ead7b7]/45 backdrop-blur space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">
+                            {isGrouped ? 'Brand' : variants.some(v => v.sizeLabel) ? 'Pack Size' : 'Variant'}
+                          </p>
                           <button
-                            key={v.id}
                             type="button"
-                            disabled={oos}
-                            onClick={() => { if (!oos) { setSelectedVariant(v); setDesktopVariantQty(1) } }}
-                            className={[
-                              'shrink-0 rounded-full border px-3.5 py-2 text-[12px] font-black transition-all whitespace-nowrap',
-                              isSel
-                                ? 'border-[#2C392A] bg-[#2C392A] text-white'
-                                : oos
-                                ? 'cursor-not-allowed opacity-40 border-gray-200 text-[#999]'
-                                : 'border-[#ead7b7]/80 bg-[#f7f4ed] text-[#2C392A]',
-                            ].join(' ')}
+                            onClick={() => void toggle(product)}
+                            className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+                              favorite ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-[#ead7b7]/60 bg-white text-[#5f6d59]'
+                            }`}
+                            aria-label={favorite ? 'Remove from favourites' : 'Add to favourites'}
                           >
-                            {v.variantName}
-                            {!isSel && <span className="ml-1 text-[11px] font-bold opacity-70">{formatCurrency(v.price)}</span>}
+                            <Heart size={13} className={favorite ? 'fill-rose-500 text-rose-500' : 'text-current'} />
                           </button>
-                        )
-                      })}
-                    </div>
-                  </div>
+                        </div>
+
+                        {/* Step 1: Group/Brand selector */}
+                        {isGrouped && (
+                          <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 hide-scrollbar">
+                            {groups.map((g) => {
+                              const isSel = selectedGroup === g
+                              return (
+                                <button
+                                  key={g}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedGroup(g)
+                                    const first = variants.find(v => v.groupName === g && v.stock > 0)
+                                      ?? variants.find(v => v.groupName === g)
+                                    setSelectedVariant(first ?? null)
+                                    setDesktopVariantQty(1)
+                                  }}
+                                  className={[
+                                    'shrink-0 rounded-full border px-4 py-2 text-[12px] font-black transition-all whitespace-nowrap',
+                                    isSel ? 'border-[#2C392A] bg-[#2C392A] text-white'
+                                          : 'border-[#ead7b7]/80 bg-[#f7f4ed] text-[#2C392A]',
+                                  ].join(' ')}
+                                >
+                                  {g}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {/* Step 2: Weight/Size selector (or flat list for non-grouped) */}
+                        {(isGrouped ? (selectedGroup !== null) : true) && (
+                          <>
+                            {isGrouped && (
+                              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">Size</p>
+                            )}
+                            <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 hide-scrollbar">
+                              {activeGroupVariants.map((v) => {
+                                const isSel = selectedVariant?.id === v.id
+                                const oos = v.stock <= 0
+                                return (
+                                  <button
+                                    key={v.id}
+                                    type="button"
+                                    disabled={oos}
+                                    onClick={() => { if (!oos) { setSelectedVariant(v); setDesktopVariantQty(1) } }}
+                                    className={[
+                                      'shrink-0 rounded-full border px-3.5 py-2 text-[12px] font-black transition-all whitespace-nowrap',
+                                      isSel
+                                        ? 'border-[#2C392A] bg-[#2C392A] text-white'
+                                        : oos
+                                        ? 'cursor-not-allowed opacity-40 border-gray-200 text-[#999]'
+                                        : 'border-[#ead7b7]/80 bg-[#f7f4ed] text-[#2C392A]',
+                                    ].join(' ')}
+                                  >
+                                    {v.variantName}
+                                    {!isSel && <span className="ml-1 text-[11px] font-bold opacity-70">{formatCurrency(v.price)}</span>}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </section>
               ) : (
                 <section className="px-4 pt-3 sm:px-6">
@@ -692,82 +746,137 @@ export default function ProductDetailModal({
                 <section className="mt-5 rounded-[26px] bg-white/88 px-4 py-4 shadow-sm ring-1 ring-[#ead7b7]/45 backdrop-blur sm:px-5">
                   <div className="flex items-end justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">Price</p>
-                      <p className="mt-1 text-[2rem] font-black leading-none text-[#2c392a]">{formatCurrency(basePrice)}</p>
-                      {hasDiscount && <p className="mt-1 text-[11px] font-bold text-[#b0a89a] line-through">{formatCurrency(product.price)}</p>}
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">
+                        {product.hasVariants && !selectedVariant ? 'Starting From' : 'Price'}
+                      </p>
+                      <p className="mt-1 text-[2rem] font-black leading-none text-[#2c392a]">
+                        {formatCurrency(selectedVariant ? selectedVariant.price : basePrice)}
+                      </p>
+                      {hasDiscount && !selectedVariant && <p className="mt-1 text-[11px] font-bold text-[#b0a89a] line-through">{formatCurrency(product.price)}</p>}
                     </div>
                     <p className="max-w-[12rem] text-right text-[11px] font-bold text-[#95a28f]">Inclusive of taxes</p>
                   </div>
                 </section>
 
-                {/* Variant radio selector (desktop) OR pack size / qty stepper */}
+                {/* Variant selector (desktop) — supports Type D (Brand+Weight) 2-level flow */}
                 {product.hasVariants ? (
                   <section className="mt-5 rounded-[26px] bg-white/88 px-4 py-4 shadow-sm ring-1 ring-[#ead7b7]/45 backdrop-blur sm:px-5">
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">Select Variant</p>
-                      <button
-                        type="button"
-                        onClick={() => void toggle(product)}
-                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black transition-colors ${
-                          favorite ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-[#ead7b7]/70 bg-white text-[#5f6d59]'
-                        }`}
-                        aria-label={favorite ? 'Remove from favourites' : 'Add to favourites'}
-                      >
-                        <Heart size={12} className={favorite ? 'fill-rose-500 text-rose-500' : 'text-current'} />
-                        {favorite ? 'Saved' : 'Save'}
-                      </button>
-                    </div>
+                    {(() => {
+                      const variants = getVariants(String(product.id))
+                      const groups = [...new Set(variants.filter(v => v.groupName).map(v => v.groupName!))]
+                      const isGrouped = groups.length > 0
+                      const activeGroupVariants = isGrouped && selectedGroup
+                        ? variants.filter(v => v.groupName === selectedGroup)
+                        : isGrouped ? [] : variants
 
-                    {/* Variant chips — Blinkit/Zepto style */}
-                    <div className="flex flex-wrap gap-2">
-                      {getVariants(String(product.id)).map((v) => {
-                        const isSel = selectedVariant?.id === v.id
-                        const oos = v.stock <= 0
-                        return (
-                          <button
-                            key={v.id}
-                            type="button"
-                            disabled={oos}
-                            onClick={() => { if (!oos) { setSelectedVariant(v); setDesktopVariantQty(1) } }}
-                            className={[
-                              'rounded-full border px-4 py-2 text-[12px] font-black transition-all whitespace-nowrap',
-                              isSel
-                                ? 'border-[#2C392A] bg-[#2C392A] text-white'
-                                : oos
-                                ? 'cursor-not-allowed opacity-40 border-gray-200 text-[#999]'
-                                : 'border-[#ead7b7]/80 bg-[#f7f4ed] text-[#2C392A] hover:border-[#7DAA8F]',
-                            ].join(' ')}
-                          >
-                            {v.variantName}
-                            {!isSel && <span className="ml-1 text-[11px] font-semibold opacity-60">{formatCurrency(v.price)}</span>}
-                          </button>
-                        )
-                      })}
-                    </div>
+                      return (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">
+                              {isGrouped ? 'Select Brand' : 'Select Variant'}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => void toggle(product)}
+                              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black transition-colors ${
+                                favorite ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-[#ead7b7]/70 bg-white text-[#5f6d59]'
+                              }`}
+                              aria-label={favorite ? 'Remove from favourites' : 'Add to favourites'}
+                            >
+                              <Heart size={12} className={favorite ? 'fill-rose-500 text-rose-500' : 'text-current'} />
+                              {favorite ? 'Saved' : 'Save'}
+                            </button>
+                          </div>
 
-                    {/* Qty stepper for selected variant */}
-                    {selectedVariant && (
-                      <div className="mt-3 flex items-center gap-2 pt-2 border-t border-[#ead7b7]/40">
-                        <span className="text-[11px] font-bold text-[#5f6d59]">Quantity</span>
-                        <div className="ml-auto inline-flex items-center gap-1 rounded-xl border border-[#D5DAD0] bg-[#F7F6F2] overflow-hidden">
-                          <button type="button"
-                            onClick={() => setDesktopVariantQty(q => Math.max(1, q - 1))}
-                            disabled={desktopVariantQty <= 1}
-                            className="flex h-8 w-8 items-center justify-center text-[#2c392a] hover:bg-[#E8EDE4] disabled:opacity-40 transition-colors"
-                          >
-                            <Minus size={12} />
-                          </button>
-                          <span className="w-8 text-center text-[13px] font-black text-[#2c392a] tabular-nums">{desktopVariantQty}</span>
-                          <button type="button"
-                            onClick={() => setDesktopVariantQty(q => Math.min(q + 1, selectedVariant.stock))}
-                            disabled={desktopVariantQty >= selectedVariant.stock}
-                            className="flex h-8 w-8 items-center justify-center text-[#2c392a] hover:bg-[#E8EDE4] disabled:opacity-40 transition-colors"
-                          >
-                            <Plus size={12} />
-                          </button>
+                          {/* Step 1: Brand/Group selector */}
+                          {isGrouped && (
+                            <div className="flex flex-wrap gap-2">
+                              {groups.map((g) => {
+                                const isSel = selectedGroup === g
+                                return (
+                                  <button
+                                    key={g}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedGroup(g)
+                                      const first = variants.find(v => v.groupName === g && v.stock > 0)
+                                        ?? variants.find(v => v.groupName === g)
+                                      setSelectedVariant(first ?? null)
+                                      setDesktopVariantQty(1)
+                                    }}
+                                    className={[
+                                      'rounded-full border px-4 py-2 text-[12px] font-black transition-all whitespace-nowrap',
+                                      isSel ? 'border-[#2C392A] bg-[#2C392A] text-white'
+                                            : 'border-[#ead7b7]/80 bg-[#f7f4ed] text-[#2C392A] hover:border-[#7DAA8F]',
+                                    ].join(' ')}
+                                  >
+                                    {g}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
+
+                          {/* Step 2: Size/Weight chips */}
+                          {(isGrouped ? (selectedGroup !== null) : true) && activeGroupVariants.length > 0 && (
+                            <div>
+                              {isGrouped && (
+                                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">Select Size</p>
+                              )}
+                              <div className="flex flex-wrap gap-2">
+                                {activeGroupVariants.map((v) => {
+                                  const isSel = selectedVariant?.id === v.id
+                                  const oos = v.stock <= 0
+                                  return (
+                                    <button
+                                      key={v.id}
+                                      type="button"
+                                      disabled={oos}
+                                      onClick={() => { if (!oos) { setSelectedVariant(v); setDesktopVariantQty(1) } }}
+                                      className={[
+                                        'rounded-full border px-4 py-2 text-[12px] font-black transition-all whitespace-nowrap',
+                                        isSel
+                                          ? 'border-[#2C392A] bg-[#2C392A] text-white'
+                                          : oos
+                                          ? 'cursor-not-allowed opacity-40 border-gray-200 text-[#999]'
+                                          : 'border-[#ead7b7]/80 bg-[#f7f4ed] text-[#2C392A] hover:border-[#7DAA8F]',
+                                      ].join(' ')}
+                                    >
+                                      {v.variantName}
+                                      {!isSel && <span className="ml-1 text-[11px] font-semibold opacity-60">{formatCurrency(v.price)}</span>}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Qty stepper */}
+                          {selectedVariant && (
+                            <div className="flex items-center gap-2 pt-2 border-t border-[#ead7b7]/40">
+                              <span className="text-[11px] font-bold text-[#5f6d59]">Quantity</span>
+                              <div className="ml-auto inline-flex items-center gap-1 rounded-xl border border-[#D5DAD0] bg-[#F7F6F2] overflow-hidden">
+                                <button type="button"
+                                  onClick={() => setDesktopVariantQty(q => Math.max(1, q - 1))}
+                                  disabled={desktopVariantQty <= 1}
+                                  className="flex h-8 w-8 items-center justify-center text-[#2c392a] hover:bg-[#E8EDE4] disabled:opacity-40 transition-colors"
+                                >
+                                  <Minus size={12} />
+                                </button>
+                                <span className="w-8 text-center text-[13px] font-black text-[#2c392a] tabular-nums">{desktopVariantQty}</span>
+                                <button type="button"
+                                  onClick={() => setDesktopVariantQty(q => Math.min(q + 1, selectedVariant.stock))}
+                                  disabled={desktopVariantQty >= selectedVariant.stock}
+                                  className="flex h-8 w-8 items-center justify-center text-[#2c392a] hover:bg-[#E8EDE4] disabled:opacity-40 transition-colors"
+                                >
+                                  <Plus size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
+                      )
+                    })()}
                   </section>
                 ) : (
                   <section className="mt-5 rounded-[26px] bg-white/88 px-4 py-4 shadow-sm ring-1 ring-[#ead7b7]/45 backdrop-blur sm:px-5">

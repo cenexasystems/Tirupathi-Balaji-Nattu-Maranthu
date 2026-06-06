@@ -14,6 +14,7 @@ export type ProductVariant = {
   isActive: boolean
   sortOrder: number
   imageUrl: string | null
+  groupName: string | null   // Brand name for Type D (Brand+Weight) products e.g. "Sithanathan"
 }
 
 export type VariantInput = {
@@ -31,7 +32,7 @@ export type VariantInput = {
 }
 
 const VARIANT_COLS =
-  'id, product_id, variant_name, size_label, weight_value, weight_unit, sku, price, stock, is_default, is_active, sort_order, image_url'
+  'id, product_id, variant_name, size_label, weight_value, weight_unit, sku, price, stock, is_default, is_active, sort_order, image_url, group_name'
 
 function mapVariant(r: Record<string, unknown>): ProductVariant {
   return {
@@ -48,6 +49,7 @@ function mapVariant(r: Record<string, unknown>): ProductVariant {
     isActive:    r.is_active !== false,
     sortOrder:   Number(r.sort_order ?? 0),
     imageUrl:    r.image_url ? String(r.image_url) : null,
+    groupName:   r.group_name ? String(r.group_name) : null,
   }
 }
 

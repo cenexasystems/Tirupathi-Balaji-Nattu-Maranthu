@@ -124,8 +124,7 @@ const PRODUCT_MAP: Record<string, string> = {
   'kandankathiri podi':           'Kandankathiri Podi.jpeg',
   'kutralam kuliyal podi':        'Bathing Powder.jpeg',
   'kutralam':                     'Bathing Powder.jpeg',
-  'arugu pul':                    'Veppalai Podi.jpeg',
-  'arugampul':                    'Veppalai Podi.jpeg',
+  // arugu pul has no dedicated image — let it fall through to placeholder
 
   // ── Herbal Oils ────────────────────────────────────────────────
   'veppa ennai':                  'Veppa ennai.jpeg',
@@ -136,10 +135,8 @@ const PRODUCT_MAP: Record<string, string> = {
   'thenga ennai':                 'Thenga Ennai.jpeg',
   'santhanathi oil':              'Santhanathi Oil.jpeg',
   'santhanathi':                  'Santhanathi Oil.jpeg',
-  'the marthandam':               'Santhanathi Oil.jpeg',
-  'marthandam':                   'Santhanathi Oil.jpeg',
-  'keelanelli ennai':             'Santhanathi Oil.jpeg',
   'sandal oil':                   'Santhanathi Oil.jpeg',
+  // keelanelli ennai has no dedicated image — falls through to placeholder
 
   // ── Spices ──────────────────────────────────────────────────────
   'kalkandu':                     'Kalkandu.jpeg',
@@ -151,8 +148,7 @@ const PRODUCT_MAP: Record<string, string> = {
   'jathikai':                     'Jathikkai.jpeg',
   'vasambu':                      'Vasambu.jpeg',
   'karuseerakam':                 'Karuseerakam.jpeg',
-  'kalonji':                      'Karuseerakam.jpeg',
-  'sombu':                        'Omam Podi.jpeg',
+  // kalonji, sombu: no matching Images_V2 file — use placeholder, NOT Karuseerakam/Omam
 
   // ── Grains & Pulses ─────────────────────────────────────────────
   'pacha arisi':                  'Pacha Arisi.jpeg',
@@ -164,7 +160,7 @@ const PRODUCT_MAP: Record<string, string> = {
   'kadalai paruppu':              'Kadalai Paruppu.jpeg',
   'pasi payiru':                  'Pasi Payiru.jpeg',
   'pasi paruppu':                 'Pasi Payiru.jpeg',
-  'thovar paruppu':               'Kadalai Paruppu.jpeg',
+  // thovar paruppu has no dedicated image — NOT Kadalai
 
   // ── Honey & Liquids ─────────────────────────────────────────────
   'nei dodla':                    'Nei Dodla.jpeg',

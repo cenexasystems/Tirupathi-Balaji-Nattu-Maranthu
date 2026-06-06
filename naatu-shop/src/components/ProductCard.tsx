@@ -94,7 +94,7 @@ export default function ProductCard({ product }: { product: Product }) {
       {/* Fav button — desktop only */}
       <motion.button
         whileTap={{ scale: 0.95 }}
-        onClick={() => void toggle(product)}
+        onClick={(e) => { e.stopPropagation(); void toggle(product) }}
         className={`absolute right-1.5 top-1.5 z-10 hidden xl:flex h-7 w-7 items-center justify-center rounded-full border transition-colors ${
           fav ? 'border-rose-200 bg-rose-50' : 'border-[#EAD7B7] bg-white/90'
         }`}
@@ -111,10 +111,10 @@ export default function ProductCard({ product }: { product: Product }) {
       )}
 
       <div className="flex flex-1 flex-col gap-2 p-2.5 sm:p-3">
-        {/* Image */}
+        {/* Image — click opens modal */}
         <button
           type="button"
-          onClick={handleAdd}
+          onClick={openModal}
           tabIndex={-1}
           aria-label={`View ${product.name}`}
           className="block aspect-square w-full overflow-hidden rounded-xl bg-[#E8EDE4] focus:outline-none"
@@ -132,10 +132,16 @@ export default function ProductCard({ product }: { product: Product }) {
 
         {/* Info */}
         <div className="flex flex-1 flex-col">
-          {/* Name */}
-          <h3 className="line-clamp-2 min-h-[2.4rem] text-[12px] font-semibold leading-[1.4] text-[#2C392A] ta-text">
-            {displayName}
-          </h3>
+          {/* Name — click opens modal */}
+          <button
+            type="button"
+            onClick={openModal}
+            className="text-left w-full focus:outline-none"
+          >
+            <h3 className="line-clamp-2 min-h-[2.4rem] text-[12px] font-semibold leading-[1.4] text-[#2C392A] ta-text hover:text-[#1e2817]">
+              {displayName}
+            </h3>
+          </button>
 
           {/* Variant/unit label */}
           <p className="mt-0.5 min-h-[1rem] text-[10px] leading-none text-[#7A846F]">
