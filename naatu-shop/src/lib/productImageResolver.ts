@@ -158,6 +158,7 @@ const PRODUCT_MAP: Record<string, string> = {
   'pacharisi':                    'Pacha Arisi.jpeg',
   'ulundhu white':                'Ulundhu White.jpeg',
   'ulundhu black':                'Ulundhu Black.jpeg',
+  'karuppu ulundhu':              'Ulundhu Black.jpeg',
   'ulundhu':                      'Ulundhu White.jpeg',
   'kadalai paruppu':              'Kadalai Paruppu.jpeg',
   'pasi payiru':                  'Pasi Payiru.jpeg',
