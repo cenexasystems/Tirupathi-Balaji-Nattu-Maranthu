@@ -132,7 +132,7 @@ export default function Cart() {
               </p>
             </div>
 
-            <div className="flex flex-col gap-3">
+            <div className="hidden lg:flex flex-col gap-3">
               <Link to="/checkout"
                 className={`flex items-center justify-center gap-2 font-bold py-3.5 rounded-xl transition-colors text-sm ${
                   items.length ? 'bg-sageDark hover:bg-sageDeep text-white cursor-pointer' : 'bg-gray-100 text-gray-400 cursor-not-allowed pointer-events-none'

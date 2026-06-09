@@ -27,7 +27,7 @@ import {
   BRAND_TA,
   BRAND_EN,
   BRAND_LOCATION_LINK,
-  BRAND_PHONE_DISPLAY,
+  BRAND_WHATSAPP,
   BRAND_WHATSAPP_LINK,
 } from '../lib/brand'
 
@@ -886,7 +886,7 @@ export default function Home() {
                   </div>
                   <div>
                     <p className="font-bold text-[13px] text-[#2C392A] leading-tight">Call / WhatsApp</p>
-                    <p className="text-[13px] text-[#5F6D59] mt-0.5">{BRAND_PHONE_DISPLAY}</p>
+                    <p className="text-[13px] text-[#5F6D59] mt-0.5">{BRAND_WHATSAPP}</p>
                   </div>
                 </div>
               </div>

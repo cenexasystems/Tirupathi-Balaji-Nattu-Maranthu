@@ -141,6 +141,12 @@ export default function Checkout() {
       setError('Please enter a valid Indian WhatsApp number (e.g. 9876543210 or +91 9876543210)')
       return
     }
+
+    if (!form.address.trim()) {
+      setError('Please enter your delivery address')
+      return
+    }
+
     const normalizedPhone = normalizeIndianPhone(form.phone)!
     const phoneDigits = getSubscriberDigits(form.phone)!
 
@@ -351,10 +357,11 @@ export default function Checkout() {
 
               <div>
                 <label className="block text-sm font-bold text-textMain mb-1.5">
-                  Delivery Address <span className="text-textMuted font-normal">(optional)</span>
+                  Delivery Address *
                 </label>
                 <textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })}
-                  rows={3} placeholder="House no., street, city, pincode — or confirm via WhatsApp"
+                  rows={3} placeholder="House no., street, city, pincode"
+                  required
                   className="w-full px-4 py-2.5 sm:py-3 border-2 border-sand focus:border-sageDark rounded-xl outline-none transition-colors resize-none" />
               </div>
 
@@ -411,7 +418,7 @@ export default function Checkout() {
               )}
 
               <button onClick={handleCheckout} disabled={loading}
-                className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3.5 sm:py-4 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 mt-2">
+                className="hidden lg:flex w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3.5 sm:py-4 rounded-xl transition-colors disabled:opacity-60 items-center justify-center gap-2 mt-2">
                 {loading ? (
                   <><span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending…</>
                 ) : (

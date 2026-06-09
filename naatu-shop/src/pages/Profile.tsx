@@ -522,7 +522,6 @@ export default function Profile() {
 
                               <div className="mt-4 pt-4 border-t border-sand text-sm space-y-1 text-right">
                                   <p className="text-textMuted">Subtotal: {formatCurrency(o.subtotal)}</p>
-                                  <p className="text-textMuted">Shipping: {o.shipping === 0 ? 'FREE' : formatCurrency(o.shipping)}</p>
                                   <p className="font-bold text-textMain text-base">Total: {formatCurrency(o.total)}</p>
                               </div>
                             </div>

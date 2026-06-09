@@ -11,6 +11,8 @@ const BASE = '/assets/Images_V2/'
 const VARIANT_MAP: Record<string, string> = {
   // Agarbatti brands
   'agarbatti|cycle':              'Agarbatti Cycle.jpeg',
+  'agarbatti|bindhu':             'Agarbatti Cycle.jpeg',
+  'agarbatti|bindhu agarbatti':   'Agarbatti Cycle.jpeg',
   'agarbatti|z black':            'Agarbatti Z Black.jpeg',
   'agarbatti|z-black':            'Agarbatti Z Black.jpeg',
   'agarbatti|miracle':            'Agarbatti Miracle.jpeg',
