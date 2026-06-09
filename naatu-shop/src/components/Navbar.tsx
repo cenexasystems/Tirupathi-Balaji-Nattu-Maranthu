@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useCartStore, useFavStore, useAuthStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { CartDrawer, FavoritesDrawer } from './Drawers'
-import { BRAND_EN, BRAND_SUBTITLE, BRAND_PHONE_DISPLAY } from '../lib/brand'
+import { BRAND_EN, BRAND_SUBTITLE, BRAND_WHATSAPP } from '../lib/brand'
 
 export default function Navbar() {
   const [query, setQuery] = useState('')
@@ -33,7 +33,7 @@ export default function Navbar() {
   return (
     <>
       <div className="flex items-center justify-center gap-3 overflow-x-auto bg-forestDark/95 px-3 py-2 text-center text-[11px] sm:text-xs font-medium tracking-wide text-sage shadow-soft">
-        <span className="whitespace-nowrap">🌿 {t('nav.free_shipping')} &nbsp;·&nbsp; WhatsApp: {BRAND_PHONE_DISPLAY}</span>
+        <span className="whitespace-nowrap">🌿 {t('nav.free_shipping')} &nbsp;·&nbsp; WhatsApp: {BRAND_WHATSAPP}</span>
         <button onClick={() => setLang(lang === 'en' ? 'ta' : 'en')} className="hidden sm:inline-flex items-center rounded-full bg-white/8 p-0.5 text-[10px] font-bold text-white transition-colors shadow-soft">
           <span className={`px-2 py-0.5 rounded-full transition-colors ${lang === 'en' ? 'bg-white text-forestDark' : 'text-white/70'}`}>EN</span>
           <span className={`px-2 py-0.5 rounded-full transition-colors ${lang === 'ta' ? 'bg-white text-forestDark' : 'text-white/70'}`}>தமிழ்</span>
