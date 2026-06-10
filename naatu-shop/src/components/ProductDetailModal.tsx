@@ -1052,6 +1052,11 @@ export default function ProductDetailModal({
                         {selectedVariant.variantName}{selectedVariant.sizeLabel ? ` · ${selectedVariant.sizeLabel}` : ''}
                       </p>
                     </>
+                  ) : product.hasVariants ? (
+                    <>
+                      <p className="text-base font-black leading-tight text-[#2c392a]">{formatCurrency(basePrice)}</p>
+                      <p className="truncate text-[10px] font-bold text-[#95a28f]">Select a variant</p>
+                    </>
                   ) : (
                     <>
                       <p className="text-base font-black leading-tight text-[#2c392a]">{formatCurrency(lineTotal)}</p>
