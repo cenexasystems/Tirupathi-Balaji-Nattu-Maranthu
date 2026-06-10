@@ -9,7 +9,6 @@ import {
   convertQuantityByUnitType,
   formatCompactQuantity,
   formatCurrency,
-  formatPricePerUnit,
   getDefaultQuantityForProduct,
   getQuantityStepForProduct,
   normalizeSelectedQuantity,
@@ -478,7 +477,7 @@ export default function ProductDetails() {
             )}
 
             <div className="mt-3 text-[11px] font-bold text-[#7daa8f]">
-              {formatPricePerUnit(basePrice, product.baseQuantity, product.unitLabel, product.unitType)}
+              {selectedUnit} • {formatCurrency(basePrice)}
             </div>
           </div>
         </section>

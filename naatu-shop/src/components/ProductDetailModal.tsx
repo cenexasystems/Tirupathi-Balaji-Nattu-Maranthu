@@ -9,7 +9,6 @@ import {
   convertQuantityByUnitType,
   formatCompactQuantity,
   formatCurrency,
-  formatPricePerUnit,
   getDefaultQuantityForProduct,
   getQuantityStepForProduct,
   normalizeSelectedQuantity,
@@ -45,7 +44,11 @@ function variantToProduct(base: Product, v: ProductVariant): Product {
     offerPrice: null,
     stock: v.stock,
     stockQuantity: v.stock,
+    // Treat variants as independent SKUs for pricing/quantity logic
     hasVariants: false,
+    unitType: 'unit',
+    unitLabel: v.sizeLabel || base.unitLabel,
+    baseQuantity: 1,
   }
 }
 
@@ -147,6 +150,10 @@ export default function ProductDetailModal({
     ? (product.offerPrice && product.offerPrice < product.price ? product.offerPrice : product.price)
     : 0
 
+  const effectivePrice = product && product.hasVariants && selectedVariant ? selectedVariant.price : basePrice
+  const effectiveBaseQuantity = product && product.hasVariants && selectedVariant ? 1 : (product?.baseQuantity ?? 1)
+  const effectiveUnitLabel = product && product.hasVariants && selectedVariant ? (selectedVariant.sizeLabel || selectedVariant.variantName || product.unitLabel) : (product?.unitLabel ?? '')
+
   const hasDiscount = !!(product && product.offerPrice && product.offerPrice < product.price)
   const discount = product && hasDiscount
     ? Math.round(((product.price - product.offerPrice!) / product.price) * 100)
@@ -177,19 +184,25 @@ export default function ProductDetailModal({
     : 0
 
   const lineTotal = product
-    ? calculateLineTotal(normalizedQuantity, product.unitType, product.baseQuantity, basePrice)
+    ? calculateLineTotal(
+        normalizedQuantity,
+        product.hasVariants && selectedVariant ? 'unit' : product.unitType,
+        effectiveBaseQuantity,
+        effectivePrice,
+      )
     : 0
 
   const mobileSelectedQuantity = mobilePack ? mobileQty * mobilePack.quantity : mobileQty
   const mobileSelectedUnit = mobilePack?.unit || product?.unitLabel || ''
+  const mobileQtyForCalc = product && mobileQty > 0
+    ? (product.hasVariants && selectedVariant
+        ? Math.max(1, Math.round(mobileSelectedQuantity))
+        : (product.unitType === 'unit' || product.unitType === 'bundle' ? Math.max(1, Math.round(mobileSelectedQuantity)) : mobileSelectedQuantity))
+    : 0
+
   const mobileLineTotal = product && mobileQty > 0
-    ? calculateLineTotal(
-        product.unitType === 'unit' || product.unitType === 'bundle' ? Math.max(1, Math.round(mobileSelectedQuantity)) : mobileSelectedQuantity,
-        product.unitType,
-        product.baseQuantity,
-        basePrice,
-      )
-    : basePrice
+    ? calculateLineTotal(mobileQtyForCalc, product.hasVariants && selectedVariant ? 'unit' : product.unitType, effectiveBaseQuantity, effectivePrice)
+    : effectivePrice
   const mobileSummary = mobileQty > 0
     ? formatCompactQuantity(mobileSelectedQuantity, mobileSelectedUnit)
     : formatCompactQuantity(getDefaultQuantityForProduct({
@@ -969,7 +982,7 @@ export default function ProductDetailModal({
                     )}
 
                     <div className="mt-3 text-[11px] font-bold text-[#7daa8f]">
-                      {formatPricePerUnit(basePrice, product.baseQuantity, product.unitLabel, product.unitType)}
+                      {effectiveUnitLabel} • {formatCurrency(effectivePrice)}
                     </div>
                   </section>
                 )}

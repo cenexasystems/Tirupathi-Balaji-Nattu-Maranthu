@@ -5,7 +5,7 @@ import { useLangStore } from '../store/langStore'
 import { Package, User, LogOut, ChevronDown, ChevronUp, ShoppingBag, Settings, Edit2, Check, X, Camera } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { getLocalOrdersForUser } from '../lib/ordersFallback'
-import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, normalizeStructuredOrderItem } from '../lib/retail'
+import { formatCurrency, formatQuantityDisplay, normalizeStructuredOrderItem } from '../lib/retail'
 
 const PHONE_RE = /^[6-9]\d{9}$/
 
@@ -515,7 +515,7 @@ export default function Profile() {
                               <div className="mt-3 space-y-1">
                                 {(o.items || []).map((item, i: number) => (
                                   <p key={`meta-${i}`} className="text-[11px] text-textMuted">
-                                    {(lang === 'ta' && item.tamil_name ? item.tamil_name : item.name)}: {formatPricePerUnit(item.base_price, item.base_quantity, item.unit, item.unit_type)}
+                                    {(lang === 'ta' && item.tamil_name ? item.tamil_name : item.name)}: {item.unit} • {formatCurrency(item.base_price)}
                                   </p>
                                 ))}
                               </div>

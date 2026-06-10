@@ -3,7 +3,7 @@ import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft } from 'lucide-react'
 import { useCartStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { Link } from 'react-router-dom'
-import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, getQuantityStepForProduct } from '../lib/retail'
+import { formatCurrency, formatQuantityDisplay, getQuantityStepForProduct } from '../lib/retail'
 import { getProductImage, onImgError } from '../lib/productImages'
 
 export default function Cart() {
@@ -63,7 +63,7 @@ export default function Cart() {
                         {lang === 'ta' && item.nameTa ? item.nameTa : item.name}
                       </h3>
                       <p className="text-xs text-sageDark font-bold">{t('cat.' + item.category)}</p>
-                      <p className="text-[11px] text-gray-400">{formatPricePerUnit(item.basePrice, item.baseQuantity, item.unitLabel, item.unitType)}</p>
+                      <p className="text-[11px] text-gray-400">{item.unitLabel} • {formatCurrency(item.basePrice)}</p>
                     </div>
                     <div className="flex items-center gap-3 sm:gap-4 flex-wrap w-full sm:w-auto">
                       <div className="flex items-center gap-0 border-2 border-sand rounded-lg overflow-hidden bg-white">

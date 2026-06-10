@@ -1,6 +1,6 @@
 import React from 'react'
 import { BRAND_EN, BRAND_TA, BRAND_SUBTITLE, BRAND_EMAIL, BRAND_LOCATION_LINK, BRAND_WHATSAPP, BRAND_WHATSAPP_LINK } from '../lib/brand'
-import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, normalizeStructuredOrderItem } from '../lib/retail'
+import { formatCurrency, formatQuantityDisplay, normalizeStructuredOrderItem } from '../lib/retail'
 
 export interface InvoiceItem {
   id?: number | string
@@ -153,7 +153,7 @@ export const Invoice: React.FC<InvoiceProps> = ({
                       <div style={{ fontSize: 10, color: '#aaa', textDecoration: 'line-through', marginTop: 2 }}>MRP ₹{item.price}</div>
                     )}
                     <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>
-                      {formatPricePerUnit(normalized.base_price, normalized.base_quantity, normalized.unit, normalized.unit_type)}
+                      {normalized.unit} · {formatCurrency(normalized.base_price)}
                     </div>
                   </td>
                   <td style={{ padding: '12px', fontSize: 13, fontWeight: 600, textAlign: 'center', verticalAlign: 'top' }}>{formatQuantityDisplay(normalized.quantity, normalized.unit, normalized.unit_type)}</td>

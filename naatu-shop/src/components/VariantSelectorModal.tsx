@@ -17,6 +17,10 @@ function variantToProduct(base: Product, v: ProductVariant): Product {
     stock: v.stock,
     stockQuantity: v.stock,
     hasVariants: false,
+    // Treat variant as independent SKU: single unit with exact price
+    baseQuantity: 1,
+    unitType: 'unit',
+    unitLabel: v.sizeLabel || base.unitLabel || 'piece',
   }
 }
 

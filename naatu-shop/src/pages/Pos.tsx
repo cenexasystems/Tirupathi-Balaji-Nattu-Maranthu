@@ -14,7 +14,6 @@ import {
   buildStructuredOrderItem,
   calculateLineTotal,
   formatCurrency,
-  formatPricePerUnit,
   formatQuantityDisplay,
   getDefaultQuantityForProduct,
   normalizeSelectedQuantity,
@@ -744,9 +743,6 @@ export default function Pos() {
                           ) : (
                             <>
                               {formatCurrency(price)}
-                              <span className="text-[9px] font-medium text-[#5F6D59] ml-0.5">
-                                /{product.unitType === 'unit' ? 'pc' : product.unitType === 'bundle' ? 'bundle' : product.unitLabel}
-                              </span>
                             </>
                           )}
                         </p>
@@ -882,9 +878,7 @@ export default function Pos() {
                     <div className="flex items-start justify-between gap-1 mb-1.5">
                       <div className="flex-1 min-w-0">
                         <p className="text-[11px] font-bold text-[#2C392A] leading-tight truncate">{item.name}</p>
-                        <p className="text-[9px] text-[#5F6D59] mt-0.5">
-                          {formatPricePerUnit(item.basePrice, item.baseQuantity, item.unitLabel, item.unitType)}
-                        </p>
+                        <p className="text-[9px] text-[#5F6D59] mt-0.5">{item.unitLabel} • {formatCurrency(item.basePrice)}</p>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <p className="text-[12px] font-black text-[#2C392A]">{formatCurrency(item.lineTotal)}</p>

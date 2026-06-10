@@ -3,7 +3,7 @@ import { X, Trash2, Plus, Minus, ShoppingBag } from 'lucide-react'
 import { useCartStore, useFavStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
 import { Link } from 'react-router-dom'
-import { formatCurrency, formatPricePerUnit, formatQuantityDisplay, getDefaultQuantityForProduct } from '../lib/retail'
+import { formatCurrency, formatQuantityDisplay, getDefaultQuantityForProduct } from '../lib/retail'
 import { PLACEHOLDER as PRODUCT_PLACEHOLDER } from '../lib/productImages'
 
 export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -54,7 +54,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                           {lang === 'ta' && item.nameTa ? item.nameTa : item.name}
                         </h4>
                         <p className="text-xs text-gray-400 mb-2">{t('cat.' + item.category)}</p>
-                        <p className="text-[11px] text-sageDark font-bold mb-2">{formatPricePerUnit(item.basePrice, item.baseQuantity, item.unitLabel, item.unitType)}</p>
+                        <p className="text-[11px] text-sageDark font-bold mb-2">{item.unitLabel} • {formatCurrency(item.basePrice)}</p>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-0.5 border border-sand rounded-lg bg-white overflow-hidden">
                             <button onClick={() => updateQty(item.id, item.qty - getStep(item))} className="w-7 h-7 flex items-center justify-center hover:bg-gray-50 text-gray-500"><Minus size={11} /></button>
@@ -123,7 +123,7 @@ export function FavoritesDrawer({ open, onClose }: { open: boolean; onClose: () 
                         </h4>
                         <p className="text-xs text-sageDark font-bold">{t('cat.' + item.category)}</p>
                         <div className="flex items-center justify-between mt-2">
-                          <span className="font-bold text-textMain">{formatPricePerUnit(item.offerPrice || item.price, item.baseQuantity, item.unitLabel, item.unitType)}</span>
+                          <span className="font-bold text-textMain">{item.unitLabel} • {formatCurrency(item.offerPrice || item.price)}</span>
                           <button onClick={() => { add(item); onClose() }} className="flex items-center gap-1 bg-sageDark hover:bg-sageDeep text-white text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors">
                             <ShoppingBag size={11} /> {t('drawer.add')}
                           </button>

@@ -1166,9 +1166,7 @@ export default function Dashboard() {
                                                 : unitType === 'volume'
                                                   ? qty >= 1000 ? `${qty / 1000}L` : `${qty}ml`
                                                   : `${qty} ${unit}`
-                                              const priceLabel = unitType === 'weight' || unitType === 'volume'
-                                                ? `${formatCurrency(basePrice)}/${baseQty}${unit}`
-                                                : formatCurrency(basePrice)
+                                              const priceLabel = formatCurrency(basePrice)
                                               return (
                                                 <tr key={idx} className="hover:bg-blue-50/20">
                                                   <td className="px-4 py-2.5 font-bold text-[#2C392A]">{prodName}</td>

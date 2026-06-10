@@ -296,13 +296,14 @@ export const calculateLineTotal = (
 ) => {
   const safeQuantity = toNumber(quantity, 0)
   const safePrice = clampTo(toNumber(basePrice, 0), 0)
-  const safeBaseQuantity = normalizeBaseQuantity(baseQuantity, unitType)
-
+  // Pricing is fixed per SKU. Treat `basePrice` as the exact price for one unit
+  // (for variants that represent weight/volume, the variant's price is already
+  // the exact price for that size). Multiply price by quantity units selected.
   if (unitType === 'unit' || unitType === 'bundle') {
     return roundTo(safePrice * Math.max(0, Math.round(safeQuantity)), 2)
   }
 
-  return roundTo((safeQuantity / safeBaseQuantity) * safePrice, 2)
+  return roundTo(safePrice * safeQuantity, 2)
 }
 
 export const formatCurrency = (value: number) => `₹${INR_CURRENCY.format(roundTo(value, 2))}`
@@ -332,19 +333,6 @@ export const formatQuantityDisplay = (
   }
 
   return `${q} ${unit || DEFAULT_UNIT_LABEL[unitType]}`
-}
-
-export const formatPricePerUnit = (
-  basePrice: number,
-  baseQuantity: number,
-  unitLabel: string,
-  unitType: UnitType,
-) => {
-  const qty = unitType === 'unit' || unitType === 'bundle'
-    ? Math.max(1, Math.round(baseQuantity || 1))
-    : normalizeBaseQuantity(baseQuantity, unitType)
-
-  return `${formatCurrency(basePrice)} / ${formatCompactQuantity(qty, unitLabel)}`
 }
 
 export const getDefaultQuantityForProduct = (input: {
