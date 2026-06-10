@@ -112,9 +112,12 @@ export default function Cart() {
                 {items.map(i => {
                   const dbName = lang === 'ta' && i.nameTa ? i.nameTa : i.name;
                   return (
-                    <div key={i.id} className="flex justify-between text-sm gap-2">
-                      <span className="text-textMuted truncate">{dbName} <span className="text-xs">({formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)})</span></span>
-                      <span className="font-bold text-textMain shrink-0">{formatCurrency(i.lineTotal)}</span>
+                    <div key={i.id} className="flex justify-between text-sm gap-2 items-center">
+                      <span className="text-textMuted truncate flex items-center gap-1">
+                        <span>{dbName}</span>
+                        <span className="text-xs font-semibold">x{formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)}</span>
+                      </span>
+                      <span className="font-bold text-textMain shrink-0 whitespace-nowrap">{formatCurrency(i.lineTotal)}</span>
                     </div>
                   )
                 })}
