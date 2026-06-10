@@ -46,7 +46,6 @@ export default function Login() {
   const [name,      setName]      = useState('')
   const [phone,     setPhone]     = useState('')
   const [emailStep, setEmailStep] = useState<EmailStep>('input')
-  const [otp,       setOtp]       = useState('')
 
   /* ── Google ──────────────────────────────────────────────────── */
   const handleGoogle = async () => {
@@ -89,20 +88,6 @@ export default function Login() {
     setLoading(false)
     if (e2) { setError(e2.message); return }
     setEmailStep('sent')
-  }
-
-  /* ── Email: verify OTP code ──────────────────────────────────── */
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (otp.trim().length < 6) { setError('Enter the 6-digit code from your email.'); return }
-    setLoading(true); setError('')
-    const { error: e2 } = await supabase.auth.verifyOtp({
-      email: email.trim().toLowerCase(),
-      token: otp.trim(),
-      type: 'email',
-    })
-    if (e2) { setLoading(false); setError(e2.message); return }
-    setLoading(false)
   }
 
   /* ── Render ───────────────────────────────────────────────────── */
@@ -230,23 +215,8 @@ export default function Login() {
               Valid for 60 minutes. Check spam if not received.
             </p>
 
-            <details className="text-left border border-sand/60 rounded-xl p-4">
-              <summary className="text-[11px] text-sageDark font-bold cursor-pointer select-none list-none flex items-center gap-1.5">
-                <span>›</span> {l('Received a 6-digit code instead?', '6 இலக்க குறியீடு கிடைத்ததா?')}
-              </summary>
-              <form onSubmit={handleVerifyOtp} className="mt-3 space-y-3">
-                <input type="text" inputMode="numeric" maxLength={6} placeholder="000000"
-                  className="w-full text-center text-2xl font-bold tracking-[0.4em] py-3 bg-gray-50 border-2 border-sand focus:border-sageDark rounded-xl outline-none"
-                  value={otp} onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); setError('') }} />
-                <button type="submit" disabled={loading || otp.length < 6}
-                  className="w-full bg-sageDark text-white font-bold py-3 rounded-xl disabled:opacity-60 flex items-center justify-center gap-2">
-                  {loading ? <><Spinner /> {l('Verifying…', 'சரிபார்க்கிறது...')}</> : l('Verify & Sign In', 'சரிபார்த்து உள்நுழைவு')}
-                </button>
-              </form>
-            </details>
-
             <button type="button"
-              onClick={() => { setEmailStep('input'); setError(''); setOtp('') }}
+              onClick={() => { setEmailStep('input'); setError('') }}
               className="flex items-center justify-center gap-1.5 text-[12px] text-textMuted hover:text-textMain mx-auto">
               <ArrowLeft size={13} /> {l('Use a different email', 'வேறு மின்னஞ்சல்')}
             </button>

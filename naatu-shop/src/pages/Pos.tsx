@@ -758,14 +758,14 @@ export default function Pos() {
             )}
           </div>
 
-          {/* ── Variant Picker Overlay (inline, within catalogue panel) ── */}
+          {/* ── Variant Picker Overlay ── */}
           {variantPickerProduct && (
-            <div className="absolute inset-0 z-20 flex items-end bg-black/30 backdrop-blur-sm">
-              <div className="w-full bg-white rounded-t-2xl shadow-2xl border-t border-[#D5DAD0] p-4 space-y-3">
+            <div className="absolute inset-0 z-20 flex items-end md:items-center md:justify-center bg-black/40 backdrop-blur-sm p-0 md:p-6">
+              <div className="w-full md:w-auto md:min-w-[420px] md:max-w-[520px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border-t md:border border-[#D5DAD0] p-5 space-y-4 max-h-[85vh] overflow-y-auto">
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-[#E8EDE4]">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#E8EDE4]">
                       <img
                         src={getProductImage(variantPickerProduct.name, variantPickerProduct.category, variantPickerProduct.imageUrl, 'tile')}
                         alt={variantPickerProduct.name}
@@ -773,35 +773,35 @@ export default function Pos() {
                         className="h-full w-full object-cover"
                       />
                     </div>
-                    <div>
-                      <p className="text-[13px] font-black text-[#2C392A]">{variantPickerProduct.name}</p>
-                      <p className="text-[11px] text-[#5F6D59]">{l('Select a variant', 'வகை தேர்வு செய்யுங்கள்')}</p>
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-black text-[#2C392A] leading-tight truncate">{variantPickerProduct.name}</p>
+                      <p className="text-[12px] text-[#5F6D59] mt-0.5">{l('Select a variant to add', 'வகை தேர்வு செய்யுங்கள்')}</p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => { setVariantPickerProduct(null); setSelectedVariant(null) }}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F0F2EE]"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F0F2EE] hover:bg-[#E0E4DC] transition-colors"
                   >
-                    <X size={14} />
+                    <X size={15} />
                   </button>
                 </div>
 
                 {/* Variant chips */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
                   {getVariants(String(variantPickerProduct.id)).map((v) => (
                     <button
                       key={v.id}
                       type="button"
                       onClick={() => setSelectedVariant(v)}
-                      className={`flex flex-col items-start rounded-xl border-2 px-3 py-2 text-left transition-all ${
+                      className={`flex flex-col items-start rounded-xl border-2 px-3.5 py-3 text-left transition-all hover:shadow-sm active:scale-[0.98] ${
                         selectedVariant?.id === v.id
-                          ? 'border-[#2C392A] bg-[#2C392A] text-white'
-                          : 'border-[#D5DAD0] bg-[#F0F2EE] text-[#2C392A]'
+                          ? 'border-[#2C392A] bg-[#2C392A] text-white shadow-md'
+                          : 'border-[#D5DAD0] bg-[#F7F8F5] text-[#2C392A] hover:border-[#7DAA8F]'
                       }`}
                     >
-                      <span className="text-[12px] font-black">{v.variantName}</span>
-                      <span className={`text-[11px] font-bold ${selectedVariant?.id === v.id ? 'text-white/80' : 'text-[#5F6D59]'}`}>
+                      <span className="text-[13px] font-black leading-tight">{v.variantName}</span>
+                      <span className={`text-[12px] font-bold mt-0.5 ${selectedVariant?.id === v.id ? 'text-white/80' : 'text-[#5F6D59]'}`}>
                         {formatCurrency(v.price)}
                       </span>
                     </button>
@@ -813,9 +813,10 @@ export default function Pos() {
                   type="button"
                   onClick={addVariantToItems}
                   disabled={!selectedVariant}
-                  className="w-full py-3 bg-[#2C392A] text-white rounded-xl font-black text-[13px] disabled:opacity-40"
+                  className="w-full py-3.5 bg-[#2C392A] hover:bg-[#1e2817] text-white rounded-xl font-black text-[14px] disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
                 >
-                  {l('Add to Bill', 'பில்லில் சேர்')} — {selectedVariant ? formatCurrency(selectedVariant.price) : '—'}
+                  {l('Add to Bill', 'பில்லில் சேர்')}
+                  {selectedVariant && <span className="opacity-80 font-bold">— {formatCurrency(selectedVariant.price)}</span>}
                 </button>
               </div>
             </div>
@@ -866,7 +867,7 @@ export default function Pos() {
           </div>
 
           {/* Items list */}
-          <div className="flex-1 min-h-[60px] overflow-y-auto px-2 py-2 space-y-1">
+          <div className="flex-1 min-h-[80px] overflow-y-auto px-2 py-2 space-y-1">
             {items.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-8 text-[#5F6D59]">
                 <ShoppingBag size={32} className="opacity-20 mb-2" />
@@ -934,7 +935,7 @@ export default function Pos() {
           </div>
 
           {/* Totals + Generate bill */}
-          <div className="border-t border-[#E8EDE4] px-3 py-3 shrink-0 space-y-2 overflow-y-auto max-h-[56vh] md:max-h-none md:overflow-visible">
+          <div className="border-t border-[#E8EDE4] px-3 py-3 shrink-0 space-y-2 overflow-y-auto max-h-[55vh]">
             {error && (
               <p className="text-[11px] text-red-500 font-bold bg-red-50 px-3 py-2 rounded-lg">{error}</p>
             )}
