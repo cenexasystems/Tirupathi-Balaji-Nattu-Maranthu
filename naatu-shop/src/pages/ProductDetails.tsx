@@ -544,7 +544,6 @@ export default function ProductDetails() {
           <div className="min-w-0">
             <p className="text-[11px] font-bold text-[#7daa8f]">Total</p>
             <p className="text-base font-black leading-tight text-[#2c392a]">{formatCurrency(lineTotal)}</p>
-            <p className="truncate text-[10px] font-bold text-[#95a28f]">{formatCompactQuantity(displayQty, selectedUnit || product.unitLabel)}</p>
           </div>
           <button
             onClick={handleAdd}

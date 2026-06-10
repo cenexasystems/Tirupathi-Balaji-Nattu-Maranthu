@@ -1058,7 +1058,6 @@ export default function ProductDetailModal({
                   ) : (
                     <>
                       <p className="text-base font-black leading-tight text-[#2c392a]">{formatCurrency(lineTotal)}</p>
-                      <p className="truncate text-[10px] font-bold text-[#95a28f]">{selectedSummary}</p>
                     </>
                   )}
                 </div>
