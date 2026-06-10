@@ -199,6 +199,10 @@ export default function Pos() {
       stock: selectedVariant.stock,
       stockQuantity: selectedVariant.stock,
       hasVariants: false,
+      // Treat variant as independent SKU — never inherit weight/volume pricing from parent
+      unitType: 'unit',
+      baseQuantity: 1,
+      unitLabel: selectedVariant.sizeLabel || variantPickerProduct.unitLabel || 'piece',
     }
     setItems(cur => {
       const ex = cur.find(i => i.id === variantProduct.id)

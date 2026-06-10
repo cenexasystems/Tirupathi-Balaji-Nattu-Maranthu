@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Minus, Plus, X, Check, ShoppingCart } from 'lucide-react'
 import { useCartStore, useVariantStore, type Product } from '../store/store'
-import { formatCurrency } from '../lib/retail'
+import { formatCurrency, variantLineTotal } from '../lib/retail'
 import { getProductImage, onImgError } from '../lib/productImages'
 import { useLangStore } from '../store/langStore'
 import type { ProductVariant } from '../services/variantService'
@@ -89,7 +89,7 @@ export default function VariantSelectorModal({
 
   const variants = getVariants(String(product.id))
   const hasStock = selected ? selected.stock > 0 : false
-  const totalPrice = selected ? selected.price * qty : 0
+  const totalPrice = selected ? variantLineTotal(selected.price, qty) : 0
 
   return (
     <AnimatePresence>

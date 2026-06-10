@@ -12,6 +12,7 @@ import {
   getDefaultQuantityForProduct,
   getQuantityStepForProduct,
   normalizeSelectedQuantity,
+  variantLineTotal,
   type QuantityOption,
 } from '../lib/retail'
 import { onImgError, resolveProductImage } from '../lib/productImages'
@@ -183,13 +184,10 @@ export default function ProductDetailModal({
       )
     : 0
 
-  const lineTotal = product
-    ? calculateLineTotal(
-        normalizedQuantity,
-        product.hasVariants && selectedVariant ? 'unit' : product.unitType,
-        effectiveBaseQuantity,
-        effectivePrice,
-      )
+  // lineTotal is for non-variant products only.
+  // Variant products use variantLineTotal(selectedVariant.price, desktopVariantQty) at render time.
+  const lineTotal = product && !product.hasVariants
+    ? calculateLineTotal(normalizedQuantity, product.unitType, product.baseQuantity, basePrice)
     : 0
 
   const mobileSelectedQuantity = mobilePack ? mobileQty * mobilePack.quantity : mobileQty
@@ -568,7 +566,7 @@ export default function ProductDetailModal({
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-bold text-[#7daa8f]">Total</p>
                     <p className="text-[1rem] font-black leading-tight text-[#2c392a]">
-                      {selectedVariant ? formatCurrency(selectedVariant.price * desktopVariantQty) : formatCurrency(basePrice)}
+                      {selectedVariant ? formatCurrency(variantLineTotal(selectedVariant.price, desktopVariantQty)) : formatCurrency(basePrice)}
                     </p>
                   </div>
 
@@ -1046,10 +1044,10 @@ export default function ProductDetailModal({
                   {product.hasVariants && selectedVariant ? (
                     <>
                       <p className="text-base font-black leading-tight text-[#2c392a]">
-                        {formatCurrency(selectedVariant.price * desktopVariantQty)}
+                        {formatCurrency(variantLineTotal(selectedVariant.price, desktopVariantQty))}
                       </p>
                       <p className="truncate text-[10px] font-bold text-[#95a28f]">
-                        {selectedVariant.variantName}{selectedVariant.sizeLabel ? ` · ${selectedVariant.sizeLabel}` : ''}
+                        {selectedVariant.variantName}{selectedVariant.sizeLabel && selectedVariant.sizeLabel !== selectedVariant.variantName ? ` · ${selectedVariant.sizeLabel}` : ''}
                       </p>
                     </>
                   ) : product.hasVariants ? (

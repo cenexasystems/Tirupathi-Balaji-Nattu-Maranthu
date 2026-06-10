@@ -68,7 +68,7 @@ export default function Cart() {
                     <div className="flex items-center gap-3 sm:gap-4 flex-wrap w-full sm:w-auto">
                       <div className="flex items-center gap-0 border-2 border-sand rounded-lg overflow-hidden bg-white">
                         <button onClick={() => updateQty(item.id, item.qty - getStep(item))} className="touch-target w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-textMuted hover:bg-bgMain hover:text-textMain transition-colors"><Minus size={14} /></button>
-                        <span className="min-w-12 sm:min-w-14 px-1 sm:px-2 text-center font-bold text-sm text-textMain">{formatQuantityDisplay(item.qty, item.selectedUnit, item.unitType)}</span>
+                        <span className="min-w-12 sm:min-w-14 px-1 sm:px-2 text-center font-bold text-sm text-textMain">{item.variantId ? String(item.qty) : formatQuantityDisplay(item.qty, item.selectedUnit, item.unitType)}</span>
                         <button onClick={() => updateQty(item.id, item.qty + getStep(item))} className="touch-target w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-textMuted hover:bg-bgMain hover:text-textMain transition-colors"><Plus size={14} /></button>
                       </div>
                       <span className="text-lg font-bold text-textMain font-headline w-24 text-right whitespace-nowrap">{formatCurrency(item.lineTotal)}</span>
@@ -115,7 +115,7 @@ export default function Cart() {
                     <div key={i.id} className="flex justify-between text-sm gap-2 items-center">
                       <span className="text-textMuted truncate flex items-center gap-1">
                         <span>{dbName}</span>
-                        <span className="text-xs font-semibold">x{formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)}</span>
+                        <span className="text-xs font-semibold">×{i.variantId ? String(i.qty) : formatQuantityDisplay(i.qty, i.selectedUnit, i.unitType)}</span>
                       </span>
                       <span className="font-bold text-textMain shrink-0 whitespace-nowrap">{formatCurrency(i.lineTotal)}</span>
                     </div>

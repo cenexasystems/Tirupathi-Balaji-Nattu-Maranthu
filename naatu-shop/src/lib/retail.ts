@@ -306,6 +306,12 @@ export const calculateLineTotal = (
   return roundTo(safePrice * safeQuantity, 2)
 }
 
+// Single source of truth for variant product pricing.
+// Variant = independent SKU: price is the flat price for that size; qty is number of units.
+// NEVER multiply by weight/volume/baseQuantity.
+export const variantLineTotal = (price: number, cartQty: number): number =>
+  roundTo(price * Math.max(0, Math.round(cartQty)), 2)
+
 export const formatCurrency = (value: number) => `₹${INR_CURRENCY.format(roundTo(value, 2))}`
 
 export const formatCompactQuantity = (quantity: number, unitLabel: string) => {

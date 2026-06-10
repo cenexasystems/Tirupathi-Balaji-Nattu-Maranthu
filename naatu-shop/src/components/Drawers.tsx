@@ -58,7 +58,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-0.5 border border-sand rounded-lg bg-white overflow-hidden">
                             <button onClick={() => updateQty(item.id, item.qty - getStep(item))} className="w-7 h-7 flex items-center justify-center hover:bg-gray-50 text-gray-500"><Minus size={11} /></button>
-                            <span className="min-w-12 px-1 text-center text-xs font-bold text-textMain">{formatQuantityDisplay(item.qty, item.selectedUnit, item.unitType)}</span>
+                            <span className="min-w-12 px-1 text-center text-xs font-bold text-textMain">{item.variantId ? String(item.qty) : formatQuantityDisplay(item.qty, item.selectedUnit, item.unitType)}</span>
                             <button onClick={() => updateQty(item.id, item.qty + getStep(item))} className="w-7 h-7 flex items-center justify-center hover:bg-gray-50 text-gray-500"><Plus size={11} /></button>
                           </div>
                           <span className="font-bold text-textMain text-sm">{formatCurrency(item.lineTotal)}</span>
