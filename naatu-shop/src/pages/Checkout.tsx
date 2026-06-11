@@ -470,13 +470,6 @@ export default function Checkout() {
               </p>
             </div>
 
-            {/* Phone display near CTA */}
-            {user?.mobile && (
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800 flex items-center gap-2">
-                <MessageCircle size={13} className="shrink-0" />
-                <span>Order notifications via WhatsApp to <strong>+91 {user.mobile}</strong></span>
-              </div>
-            )}
           </div>
 
           {/* ── Mobile sticky CTA bar ── */}
