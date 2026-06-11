@@ -928,11 +928,7 @@ export default function Home() {
           {t('more.title')}
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-5 mb-10">
-          {featured.map(p => (
-            <div key={p.id}>
-              <ProductCard product={p} />
-            </div>
-          ))}
+          {featured.map(p => <ProductCard key={p.id} product={p} />)}
         </div>
         <Link
           to="/products"
