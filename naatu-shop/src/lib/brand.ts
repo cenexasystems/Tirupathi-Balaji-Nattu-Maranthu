@@ -1,4 +1,4 @@
-export const BRAND_EN = 'Thirupathi Balaji Herbal Store'
+export const BRAND_EN = 'Tirupathi Balaji Herbal Store'
 export const BRAND_TA = 'திருப்பதி பாலாஜி நாட்டு மருந்து கடை'
 export const BRAND_SUBTITLE = 'Traditional Siddha Herbal Store'
 

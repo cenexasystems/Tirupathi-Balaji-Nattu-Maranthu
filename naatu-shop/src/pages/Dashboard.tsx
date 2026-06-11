@@ -3,9 +3,8 @@ import {
   BarChart2, Trash2, Edit2, List, ShoppingCart, LayoutDashboard,
   Box, AlertCircle, ArrowUp, ArrowDown, Power, Download, TrendingUp,
   Package, IndianRupee, Search, RefreshCw, Users, ShieldCheck, ShieldOff, Trophy,
-  MessageCircle, Image,
+  MessageCircle,
 } from 'lucide-react'
-import ImageMappingTool from '../components/dashboard/ImageMappingTool'
 import { Link, useLocation } from 'react-router-dom'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { debounce } from '../lib/debounce'
@@ -47,7 +46,7 @@ type DashboardCoupon = {
   usage_count: number
   min_order_value: number
 }
-type TabKey = 'overview' | 'whatsapp' | 'pos_analytics' | 'billing' | 'products' | 'categories' | 'coupons' | 'users' | 'image_mapping'
+type TabKey = 'overview' | 'whatsapp' | 'pos_analytics' | 'billing' | 'products' | 'categories' | 'coupons' | 'users'
 type PosAnalyticsTab = 'revenue' | 'products' | 'categories' | 'coupons'
 type ProfileUser = { id: string; email: string; name: string; mobile: string; role: string; created_at: string }
 
@@ -847,7 +846,6 @@ export default function Dashboard() {
     { id: 'categories',    icon: <List size={17} />,             label: l('Categories', 'வகைகள்') },
     { id: 'coupons',       icon: <Trophy size={17} />,           label: l('Coupons', 'கூப்பன்') },
     { id: 'users',         icon: <Users size={17} />,            label: l('Users', 'பயனர்') },
-    { id: 'image_mapping', icon: <Image size={17} />,            label: l('Images', 'படங்கள்') },
   ]
 
   return (
@@ -2298,12 +2296,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── IMAGE MAPPING TAB ── */}
-        {tab === 'image_mapping' && (
-          <div className="space-y-6">
-            <ImageMappingTool />
-          </div>
-        )}
 
       </main>
     </div>

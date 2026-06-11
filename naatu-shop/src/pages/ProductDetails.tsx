@@ -6,12 +6,8 @@ import { useCartStore, useFavStore, useProductStore, type Product } from '../sto
 import { useLangStore } from '../store/langStore'
 import {
   calculateLineTotal,
-  convertQuantityByUnitType,
   formatCompactQuantity,
   formatCurrency,
-  getDefaultQuantityForProduct,
-  getQuantityStepForProduct,
-  normalizeSelectedQuantity,
 } from '../lib/retail'
 import { getProductImage, onImgError } from '../lib/productImages'
 
@@ -65,8 +61,7 @@ export default function ProductDetails() {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [displayUnit, setDisplayUnit] = useState('')
-  const [displayQty, setDisplayQty] = useState(1)
+  const [selectedPackOption, setSelectedPackOption] = useState<{ quantity: number; unit: string; label: string } | null>(null)
   const [mobileQty, setMobileQty] = useState(0)
   const [mobilePack, setMobilePack] = useState<{ quantity: number; unit: string; label: string } | null>(null)
 
@@ -106,53 +101,21 @@ export default function ProductDetails() {
 
   useEffect(() => {
     if (!product) return
-    setDisplayUnit(product.unitLabel)
-    setDisplayQty(
-      getDefaultQuantityForProduct({
-        unitType: product.unitType,
-        baseQuantity: product.baseQuantity,
-        predefinedOptions: product.predefinedOptions,
-      }),
-    )
+    const packOpts = getCompactPackOptions(product)
+    setSelectedPackOption(packOpts[0] ?? null)
     setMobileQty(0)
-    setMobilePack(product.predefinedOptions[0] ?? null)
+    setMobilePack(packOpts[0] ?? null)
   }, [product])
 
   const displayName = lang === 'ta' && product?.nameTa ? product.nameTa : product?.name ?? ''
   const displayDesc = lang === 'ta' && product?.descriptionTa ? product.descriptionTa : product?.description ?? ''
   const displayBen = lang === 'ta' && product?.benefitsTa ? product.benefitsTa : product?.benefits ?? ''
 
-  const unitOptions = useMemo(() => (product ? getUnitOptions(product) : []), [product])
-
-  const stepBase = product
-    ? getQuantityStepForProduct({
-        unitType: product.unitType,
-        baseQuantity: product.baseQuantity,
-        allowDecimalQuantity: product.allowDecimalQuantity,
-      })
-    : 1
-  const stepDisplay = product
-    ? convertQuantityByUnitType(stepBase, product.unitLabel, displayUnit || product.unitLabel, product.unitType)
-    : 1
-
-  const normalizedQuantity = product
-    ? normalizeSelectedQuantity(
-        product.unitType === 'unit' || product.unitType === 'bundle'
-          ? Math.max(1, Math.round(displayQty))
-          : convertQuantityByUnitType(displayQty, displayUnit || product.unitLabel, product.unitLabel, product.unitType),
-        product.unitType,
-        product.allowDecimalQuantity,
-        product.unitType === 'unit' || product.unitType === 'bundle' ? 1 : Math.max(product.baseQuantity, 0.001),
-      )
-    : 0
-
-  const selectedUnit = product ? displayUnit || product.unitLabel : ''
   const basePrice = product
     ? (product.offerPrice && product.offerPrice < product.price ? product.offerPrice : product.price)
     : 0
-  const lineTotal = product
-    ? calculateLineTotal(normalizedQuantity, product.unitType, product.baseQuantity, basePrice)
-    : 0
+  // qty = 1 pack; lineTotal = price × 1
+  const lineTotal = calculateLineTotal(1, product?.unitType ?? 'unit', 1, basePrice)
   const hasDiscount = !!(product && product.offerPrice && product.offerPrice < product.price)
   const discount = product && hasDiscount
     ? Math.round(((product.price - product.offerPrice!) / product.price) * 100)
@@ -174,13 +137,12 @@ export default function ProductDetails() {
 
   const favorite = isFav(product.id)
   const handleAdd = () => {
-    addItem(product, normalizedQuantity, selectedUnit)
+    addItem(product, 1, selectedPackOption?.label ?? product.unitLabel)
   }
 
   const handleMobileAdd = () => {
-    const pack = mobilePack
-    const quantity = pack ? pack.quantity : 1
-    addItem(product, quantity, pack?.unit ?? product.unitLabel)
+    const pack = mobilePack ?? getCompactPackOptions(product)[0] ?? null
+    addItem(product, 1, pack?.label ?? product.unitLabel)
     setMobileQty(1)
   }
 
@@ -190,16 +152,13 @@ export default function ProductDetails() {
       setMobileQty(0)
       return
     }
-
-    const pack = mobilePack
-    const quantity = pack ? nextQty * pack.quantity : nextQty
-
+    const pack = mobilePack ?? getCompactPackOptions(product)[0] ?? null
+    const unit = pack?.label ?? product.unitLabel
     if (mobileQty <= 0) {
-      addItem(product, quantity, pack?.unit ?? product.unitLabel)
+      addItem(product, nextQty, unit)
     } else {
-      updateQuantity(product.id, quantity)
+      updateQuantity(product.id, nextQty)
     }
-
     setMobileQty(nextQty)
   }
 
@@ -209,7 +168,7 @@ export default function ProductDetails() {
     setMobilePack(option)
     if (currentQty > 0) {
       removeItem(product.id)
-      addItem(product, currentQty * option.quantity, option.unit)
+      addItem(product, currentQty, option.label)
     }
   }
 
@@ -392,27 +351,24 @@ export default function ProductDetails() {
           <div className="rounded-[24px] bg-white/95 p-3.5 shadow-sm ring-1 ring-[#ead7b7]/55 sm:p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">Pack & quantity</p>
-                <p className="mt-1 text-[11px] font-bold text-[#95a28f]">{formatCompactQuantity(displayQty, selectedUnit || product.unitLabel)}</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7daa8f]">Pack size</p>
+                <p className="mt-1 text-[11px] font-bold text-[#95a28f]">{selectedPackOption?.label ?? product.unitLabel}</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-bold text-[#7daa8f]">Selected total</p>
+                <p className="text-[10px] font-bold text-[#7daa8f]">Price</p>
                 <p className="text-lg font-black text-[#2c392a]">{formatCurrency(lineTotal)}</p>
               </div>
             </div>
 
-            {product.predefinedOptions.length > 0 && (product.unitType === 'weight' || product.unitType === 'volume') ? (
+            {getCompactPackOptions(product).length > 0 ? (
               <div className="mt-3 flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
-                {product.predefinedOptions.map((option) => (
+                {getCompactPackOptions(product).map((option) => (
                   <button
                     key={option.label}
                     type="button"
-                    onClick={() => {
-                      setDisplayUnit(product.unitLabel)
-                      setDisplayQty(option.quantity)
-                    }}
+                    onClick={() => setSelectedPackOption(option)}
                     className={`shrink-0 rounded-full border px-3 py-2 text-[11px] font-black transition-colors ${
-                      Math.abs(displayQty - option.quantity) < 0.0001 && displayUnit === product.unitLabel
+                      selectedPackOption?.label === option.label
                         ? 'border-[#2c392a] bg-[#2c392a] text-white'
                         : 'border-[#ead7b7]/70 bg-[#f7f4ed] text-[#5f6d59]'
                     }`}
@@ -421,63 +377,10 @@ export default function ProductDetails() {
                   </button>
                 ))}
               </div>
-            ) : (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {(product.unitType === 'weight' || product.unitType === 'volume') && unitOptions.length > 1 && (
-                  <div className="flex items-center gap-1 rounded-full bg-[#f7f4ed] p-1 ring-1 ring-[#ead7b7]/50">
-                    {unitOptions.map((unit) => (
-                      <button
-                        key={unit}
-                        type="button"
-                        onClick={() => {
-                          if (unit === displayUnit) return
-                          const base = convertQuantityByUnitType(displayQty, displayUnit || product.unitLabel, product.unitLabel, product.unitType)
-                          setDisplayUnit(unit)
-                          setDisplayQty(convertQuantityByUnitType(base, product.unitLabel, unit, product.unitType))
-                        }}
-                        className={`rounded-full px-3 py-1.5 text-[11px] font-black transition-colors ${
-                          unit === displayUnit ? 'bg-[#2c392a] text-white' : 'text-[#5f6d59]'
-                        }`}
-                      >
-                        {unit}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="ml-auto inline-flex items-center gap-1 rounded-full bg-white px-1.5 py-1 ring-1 ring-[#ead7b7]/50">
-                  <button
-                    type="button"
-                    onClick={() => setDisplayQty((value) => Math.max(stepDisplay, value - stepDisplay))}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59]"
-                  >
-                    <Minus size={12} />
-                  </button>
-                  <input
-                    type="number"
-                    value={Number.isFinite(displayQty) ? displayQty : ''}
-                    min={product.unitType === 'unit' || product.unitType === 'bundle' ? 1 : 0.001}
-                    step={stepDisplay}
-                    onChange={(event) => {
-                      const next = Number(event.target.value)
-                      if (!Number.isFinite(next)) return
-                      setDisplayQty(next)
-                    }}
-                    className="w-14 bg-transparent text-center text-[12px] font-black text-[#2c392a] outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setDisplayQty((value) => value + stepDisplay)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59]"
-                  >
-                    <Plus size={12} />
-                  </button>
-                </div>
-              </div>
-            )}
+            ) : null}
 
             <div className="mt-3 text-[11px] font-bold text-[#7daa8f]">
-              {selectedUnit} • {formatCurrency(basePrice)}
+              {selectedPackOption?.label ?? product.unitLabel} • {formatCurrency(basePrice)}
             </div>
           </div>
         </section>

@@ -15,8 +15,6 @@ import {
   calculateLineTotal,
   formatCurrency,
   formatQuantityDisplay,
-  getDefaultQuantityForProduct,
-  normalizeSelectedQuantity,
 } from '../lib/retail'
 import { getProductImage, onImgError } from '../lib/productImages'
 import { normalizeIndianPhone, toWhatsAppUrl } from '../lib/phone'
@@ -62,28 +60,15 @@ const toProductId = (v: string | number): string | null => {
   const s = String(v ?? '').trim(); return s || null
 }
 
-const defaultQty = (p: Product) =>
-  normalizeSelectedQuantity(
-    getDefaultQuantityForProduct({ unitType: p.unitType, baseQuantity: p.baseQuantity, predefinedOptions: p.predefinedOptions }),
-    p.unitType, p.allowDecimalQuantity,
-    p.unitType === 'unit' || p.unitType === 'bundle' ? 1 : Math.max(p.baseQuantity, 0.001),
-  )
-
 const makePosItem = (p: Product, qty?: number): PosItem => {
   const basePrice = p.offerPrice || p.price
-  const q = normalizeSelectedQuantity(
-    qty ?? defaultQty(p), p.unitType, p.allowDecimalQuantity,
-    p.unitType === 'unit' || p.unitType === 'bundle' ? 1 : Math.max(p.baseQuantity, 0.001),
-  )
-  return { ...p, qty: q, selectedUnit: p.unitLabel, basePrice, lineTotal: calculateLineTotal(q, p.unitType, p.baseQuantity, basePrice) }
+  const q = Math.max(1, Math.round(qty ?? 1))
+  const packLabel = p.predefinedOptions[0]?.label ?? p.unitLabel
+  return { ...p, qty: q, selectedUnit: packLabel, basePrice, lineTotal: calculateLineTotal(q, p.unitType, p.baseQuantity, basePrice) }
 }
 
 const recalc = (item: PosItem, nextQty: number): PosItem => {
-  const q = Math.max(
-    item.unitType === 'unit' || item.unitType === 'bundle' ? 1 : 0.001,
-    normalizeSelectedQuantity(nextQty, item.unitType, item.allowDecimalQuantity,
-      item.unitType === 'unit' || item.unitType === 'bundle' ? 1 : Math.max(item.baseQuantity, 0.001)),
-  )
+  const q = Math.max(1, Math.round(nextQty))
   return { ...item, qty: q, lineTotal: calculateLineTotal(q, item.unitType, item.baseQuantity, item.basePrice) }
 }
 
@@ -122,6 +107,7 @@ export default function Pos() {
   const [orderMode, setOrderMode] = useState<'online' | 'offline'>('offline')
   const [variantPickerProduct, setVariantPickerProduct] = useState<Product | null>(null)
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null)
+  const [variantPickerQty, setVariantPickerQty] = useState(1)
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -174,6 +160,7 @@ export default function Pos() {
       if (variants.length > 0) {
         setVariantPickerProduct(product)
         setSelectedVariant(variants[0])
+        setVariantPickerQty(1)
         return
       }
     }
@@ -182,8 +169,7 @@ export default function Pos() {
     setItems(cur => {
       const ex = cur.find(i => i.id === product.id)
       if (!ex) return [...cur, makePosItem(product)]
-      const inc = ex.unitType === 'unit' || ex.unitType === 'bundle' ? 1 : ex.baseQuantity
-      return cur.map(i => i.id === product.id ? recalc(i, i.qty + inc) : i)
+      return cur.map(i => i.id === product.id ? recalc(i, i.qty + 1) : i)
     })
   }
 
@@ -199,24 +185,25 @@ export default function Pos() {
       stock: selectedVariant.stock,
       stockQuantity: selectedVariant.stock,
       hasVariants: false,
-      // Treat variant as independent SKU — never inherit weight/volume pricing from parent
       unitType: 'unit',
       baseQuantity: 1,
       unitLabel: selectedVariant.sizeLabel || variantPickerProduct.unitLabel || 'piece',
     }
+    const addQty = Math.max(1, variantPickerQty)
     setItems(cur => {
       const ex = cur.find(i => i.id === variantProduct.id)
       if (!ex) {
-        const item = makePosItem(variantProduct)
+        const item = makePosItem(variantProduct, addQty)
         item.variantId       = selectedVariant.id
         item.variantName     = selectedVariant.variantName
         item.parentProductId = String(variantPickerProduct.id)
         return [...cur, item]
       }
-      return cur.map(i => i.id === variantProduct.id ? recalc(i, i.qty + 1) : i)
+      return cur.map(i => i.id === variantProduct.id ? recalc(i, i.qty + addQty) : i)
     })
     setVariantPickerProduct(null)
     setSelectedVariant(null)
+    setVariantPickerQty(1)
     setMobilePanelView('catalogue')
   }
 
@@ -690,7 +677,7 @@ export default function Pos() {
                 {products.length === 0 ? l('No products loaded.', 'பொருட்கள் ஏற்றவில்லை.') : l('No products match your search.', 'பொருட்கள் கிடைக்கவில்லை.')}
               </div>
             ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-2">
                 {filtered.map(product => {
                   const qty = itemQtyMap[product.id]
                   const price = product.offerPrice || product.price
@@ -760,12 +747,25 @@ export default function Pos() {
 
           {/* ── Variant Picker Overlay ── */}
           {variantPickerProduct && (
-            <div className="absolute inset-0 z-20 flex items-end md:items-center md:justify-center bg-black/40 backdrop-blur-sm p-0 md:p-6">
-              <div className="w-full md:w-auto md:min-w-[420px] md:max-w-[520px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border-t md:border border-[#D5DAD0] p-5 space-y-4 max-h-[85vh] overflow-y-auto">
+            <div
+              className="absolute inset-0 z-20 flex items-end md:items-center md:justify-center bg-black/40 backdrop-blur-sm p-0 md:p-6"
+              onClick={() => { setVariantPickerProduct(null); setSelectedVariant(null); setVariantPickerQty(1) }}
+            >
+              {/* Sheet — flex-col so footer stays pinned */}
+              <div
+                className="w-full md:w-auto md:min-w-[420px] md:max-w-[520px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border-t md:border border-[#D5DAD0] flex flex-col"
+                style={{ maxHeight: '85svh' }}
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Drag handle (mobile only) */}
+                <div className="flex justify-center pt-2.5 pb-0 shrink-0 md:hidden">
+                  <div className="h-1 w-9 rounded-full bg-gray-200" />
+                </div>
+
                 {/* Header */}
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-3 px-5 pt-3 pb-3 border-b border-[#E8EDE4] shrink-0">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#E8EDE4]">
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-[#E8EDE4]">
                       <img
                         src={getProductImage(variantPickerProduct.name, variantPickerProduct.category, variantPickerProduct.imageUrl, 'tile')}
                         alt={variantPickerProduct.name}
@@ -774,50 +774,96 @@ export default function Pos() {
                       />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[15px] font-black text-[#2C392A] leading-tight truncate">{variantPickerProduct.name}</p>
-                      <p className="text-[12px] text-[#5F6D59] mt-0.5">{l('Select a variant to add', 'வகை தேர்வு செய்யுங்கள்')}</p>
+                      <p className="text-[14px] font-black text-[#2C392A] leading-tight line-clamp-1">{variantPickerProduct.name}</p>
+                      <p className="text-[11px] text-[#5F6D59] mt-0.5">{l('Select a variant', 'வகை தேர்வு செய்யுங்கள்')}</p>
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => { setVariantPickerProduct(null); setSelectedVariant(null) }}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F0F2EE] hover:bg-[#E0E4DC] transition-colors"
+                    onClick={() => { setVariantPickerProduct(null); setSelectedVariant(null); setVariantPickerQty(1) }}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F0F2EE] hover:bg-[#E0E4DC] transition-colors"
                   >
-                    <X size={15} />
+                    <X size={14} />
                   </button>
                 </div>
 
-                {/* Variant chips */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
-                  {getVariants(String(variantPickerProduct.id)).map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => setSelectedVariant(v)}
-                      className={`flex flex-col items-start rounded-xl border-2 px-3.5 py-3 text-left transition-all hover:shadow-sm active:scale-[0.98] ${
-                        selectedVariant?.id === v.id
-                          ? 'border-[#2C392A] bg-[#2C392A] text-white shadow-md'
-                          : 'border-[#D5DAD0] bg-[#F7F8F5] text-[#2C392A] hover:border-[#7DAA8F]'
-                      }`}
-                    >
-                      <span className="text-[13px] font-black leading-tight">{v.variantName}</span>
-                      <span className={`text-[12px] font-bold mt-0.5 ${selectedVariant?.id === v.id ? 'text-white/80' : 'text-[#5F6D59]'}`}>
-                        {formatCurrency(v.price)}
-                      </span>
-                    </button>
-                  ))}
+                {/* Scrollable variant chips */}
+                <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+                    {getVariants(String(variantPickerProduct.id)).map((v) => {
+                      const outOfStock = v.stock <= 0
+                      return (
+                        <button
+                          key={v.id}
+                          type="button"
+                          disabled={outOfStock}
+                          onClick={() => { setSelectedVariant(v); setVariantPickerQty(1) }}
+                          className={`flex flex-col items-start rounded-xl border-2 px-3 py-2.5 text-left transition-all active:scale-[0.97] ${
+                            outOfStock
+                              ? 'cursor-not-allowed opacity-40 border-[#D5DAD0] bg-[#F7F8F5]'
+                              : selectedVariant?.id === v.id
+                              ? 'border-[#2C392A] bg-[#2C392A] text-white shadow-md'
+                              : 'border-[#D5DAD0] bg-[#F7F8F5] text-[#2C392A] hover:border-[#7DAA8F]'
+                          }`}
+                        >
+                          <span className="text-[12px] font-black leading-tight">{v.variantName}</span>
+                          <span className={`text-[12px] font-bold mt-0.5 ${selectedVariant?.id === v.id ? 'text-white/80' : 'text-[#5F6D59]'}`}>
+                            {formatCurrency(v.price)}
+                          </span>
+                          {outOfStock && (
+                            <span className="text-[9px] font-bold text-red-400 mt-0.5">{l('Out of stock', 'இல்லை')}</span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
 
-                {/* Add button */}
-                <button
-                  type="button"
-                  onClick={addVariantToItems}
-                  disabled={!selectedVariant}
-                  className="w-full py-3.5 bg-[#2C392A] hover:bg-[#1e2817] text-white rounded-xl font-black text-[14px] disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
+                {/* Sticky footer — qty stepper + Add to Bill */}
+                <div
+                  className="shrink-0 border-t border-[#E8EDE4] bg-white px-5 pt-3"
+                  style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}
                 >
-                  {l('Add to Bill', 'பில்லில் சேர்')}
-                  {selectedVariant && <span className="opacity-80 font-bold">— {formatCurrency(selectedVariant.price)}</span>}
-                </button>
+                  <div className="flex items-center gap-3">
+                    {/* Qty stepper */}
+                    <div className="flex items-center overflow-hidden rounded-xl border border-[#D5DAD0] bg-[#F7F6F2] shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setVariantPickerQty(q => Math.max(1, q - 1))}
+                        disabled={variantPickerQty <= 1}
+                        className="flex h-10 w-10 items-center justify-center text-[#2C392A] hover:bg-[#E8EDE4] disabled:opacity-40 transition-colors"
+                        aria-label={l('Decrease', 'குறை')}
+                      >
+                        <Minus size={13} />
+                      </button>
+                      <span className="w-9 text-center text-[14px] font-black text-[#2C392A] tabular-nums select-none">
+                        {variantPickerQty}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setVariantPickerQty(q => selectedVariant ? Math.min(q + 1, selectedVariant.stock) : q + 1)}
+                        disabled={selectedVariant ? variantPickerQty >= selectedVariant.stock : !selectedVariant}
+                        className="flex h-10 w-10 items-center justify-center text-[#2C392A] hover:bg-[#E8EDE4] disabled:opacity-40 transition-colors"
+                        aria-label={l('Increase', 'கூட்டு')}
+                      >
+                        <Plus size={13} />
+                      </button>
+                    </div>
+
+                    {/* Add to Bill */}
+                    <button
+                      type="button"
+                      onClick={addVariantToItems}
+                      disabled={!selectedVariant || (selectedVariant?.stock ?? 0) <= 0}
+                      className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[#2C392A] hover:bg-[#1e2817] text-white font-black text-[13px] disabled:opacity-40 transition-colors"
+                    >
+                      {l('Add to Bill', 'பில்லில் சேர்')}
+                      {selectedVariant && (
+                        <span className="opacity-80 font-bold">· {formatCurrency(selectedVariant.price * variantPickerQty)}</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

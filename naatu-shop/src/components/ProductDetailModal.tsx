@@ -6,12 +6,8 @@ import { useLangStore } from '../store/langStore'
 import type { ProductVariant } from '../services/variantService'
 import {
   calculateLineTotal,
-  convertQuantityByUnitType,
   formatCompactQuantity,
   formatCurrency,
-  getDefaultQuantityForProduct,
-  getQuantityStepForProduct,
-  normalizeSelectedQuantity,
   variantLineTotal,
   type QuantityOption,
 } from '../lib/retail'
@@ -88,16 +84,7 @@ export default function ProductDetailModal({
   const { toggle, isFav } = useFavStore()
   const { getVariants, getDefaultVariant, fetchVariants } = useVariantStore()
   const { t } = useLangStore()
-  const [displayUnit, setDisplayUnit] = useState(() => product?.unitLabel ?? '')
-  const [displayQty, setDisplayQty] = useState(() =>
-    product
-      ? getDefaultQuantityForProduct({
-          unitType: product.unitType,
-          baseQuantity: product.baseQuantity,
-          predefinedOptions: product.predefinedOptions,
-        })
-      : 1,
-  )
+  const [selectedPackOption, setSelectedPackOption] = useState<QuantityOption | null>(null)
   const [mobileQty, setMobileQty] = useState(0)
   const [mobilePack, setMobilePack] = useState<QuantityOption | null>(null)
   const [toast, setToast] = useState(false)
@@ -128,7 +115,9 @@ export default function ProductDetailModal({
     if (!open || !product) return
     const id = window.setTimeout(() => {
       setMobileQty(0)
-      setMobilePack(getCompactPackOptions(product)[0] ?? null)
+      const packOpts = getCompactPackOptions(product)
+      setMobilePack(packOpts[0] ?? null)
+      setSelectedPackOption(packOpts[0] ?? null)
       if (product.hasVariants) {
         const defaultVar = getDefaultVariant(String(product.id))
         setSelectedVariant(defaultVar)
@@ -160,61 +149,23 @@ export default function ProductDetailModal({
     ? Math.round(((product.price - product.offerPrice!) / product.price) * 100)
     : 0
 
-  const unitOptions = useMemo(() => (product ? getUnitOptions(product) : []), [product])
   const compactPackOptions = useMemo(() => (product ? getCompactPackOptions(product) : []), [product])
-  const stepBase = product
-    ? getQuantityStepForProduct({
-        unitType: product.unitType,
-        baseQuantity: product.baseQuantity,
-        allowDecimalQuantity: product.allowDecimalQuantity,
-      })
-    : 1
-  const stepDisplay = product
-    ? convertQuantityByUnitType(stepBase, product.unitLabel, displayUnit || product.unitLabel, product.unitType)
-    : 1
 
-  const normalizedQuantity = product
-    ? normalizeSelectedQuantity(
-        product.unitType === 'unit' || product.unitType === 'bundle'
-          ? Math.max(1, Math.round(displayQty))
-          : convertQuantityByUnitType(displayQty, displayUnit || product.unitLabel, product.unitLabel, product.unitType),
-        product.unitType,
-        product.allowDecimalQuantity,
-        product.unitType === 'unit' || product.unitType === 'bundle' ? 1 : Math.max(product.baseQuantity, 0.001),
-      )
-    : 0
-
-  // lineTotal is for non-variant products only.
-  // Variant products use variantLineTotal(selectedVariant.price, desktopVariantQty) at render time.
-  const lineTotal = product && !product.hasVariants
-    ? calculateLineTotal(normalizedQuantity, product.unitType, product.baseQuantity, basePrice)
-    : 0
-
-  const mobileSelectedQuantity = mobilePack ? mobileQty * mobilePack.quantity : mobileQty
-  const mobileSelectedUnit = mobilePack?.unit || product?.unitLabel || ''
-  const mobileQtyForCalc = product && mobileQty > 0
-    ? (product.hasVariants && selectedVariant
-        ? Math.max(1, Math.round(mobileSelectedQuantity))
-        : (product.unitType === 'unit' || product.unitType === 'bundle' ? Math.max(1, Math.round(mobileSelectedQuantity)) : mobileSelectedQuantity))
-    : 0
-
+  // qty = number of packs/units; weight/volume labels are display-only
   const mobileLineTotal = product && mobileQty > 0
-    ? calculateLineTotal(mobileQtyForCalc, product.hasVariants && selectedVariant ? 'unit' : product.unitType, effectiveBaseQuantity, effectivePrice)
+    ? calculateLineTotal(Math.max(1, mobileQty), product.unitType, 1, effectivePrice)
     : effectivePrice
-  const mobileSummary = mobileQty > 0
-    ? formatCompactQuantity(mobileSelectedQuantity, mobileSelectedUnit)
-    : formatCompactQuantity(getDefaultQuantityForProduct({
-        unitType: product?.unitType ?? 'unit',
-        baseQuantity: product?.baseQuantity ?? 1,
-        predefinedOptions: product?.predefinedOptions ?? [],
-      }), product?.unitLabel ?? '')
+  const mobileSummary = mobilePack
+    ? (mobileQty > 0 ? `${mobileQty} × ${mobilePack.label}` : mobilePack.label)
+    : formatCompactQuantity(mobileQty > 0 ? mobileQty : 1, product?.unitLabel ?? '')
+  // desktop non-variant line total: selectedPackOption is display-only, qty = 1 pack
+  const desktopPackLineTotal = calculateLineTotal(1, product?.unitType ?? 'unit', 1, basePrice)
 
   if (!open || !product) return null
 
   const tamilName = product.nameTa || product.tamilName
   const favorite = isFav(product.id)
-  const selectedUnit = displayUnit || product.unitLabel
-  const selectedSummary = formatCompactQuantity(displayQty, selectedUnit)
+  const selectedSummary = selectedPackOption?.label ?? product.unitLabel
 
   const handleAdd = () => {
     if (product.hasVariants && selectedVariant) {
@@ -228,27 +179,16 @@ export default function ProductDetailModal({
         String(product.id),
       )
     } else {
-      addItem(product, normalizedQuantity, selectedUnit)
+      // qty = 1 pack; pack label is the unit label for display
+      addItem(product, 1, selectedPackOption?.label ?? product.unitLabel)
     }
     setToast(true)
     window.setTimeout(() => setToast(false), 1800)
   }
 
-  const handleUnitChange = (unit: string) => {
-    if (unit === displayUnit) return
-    if (product.unitType === 'unit' || product.unitType === 'bundle') {
-      setDisplayUnit(unit)
-      return
-    }
-    const base = convertQuantityByUnitType(displayQty, displayUnit || product.unitLabel, product.unitLabel, product.unitType)
-    setDisplayUnit(unit)
-    setDisplayQty(convertQuantityByUnitType(base, product.unitLabel, unit, product.unitType))
-  }
-
   const handleMobileAdd = () => {
     const pack = mobilePack ?? compactPackOptions[0] ?? null
-    const quantity = pack ? pack.quantity : 1
-    addItem(product, quantity, pack?.unit ?? product.unitLabel)
+    addItem(product, 1, pack?.label ?? product.unitLabel)
     setMobileQty(1)
   }
 
@@ -258,26 +198,23 @@ export default function ProductDetailModal({
       setMobileQty(0)
       return
     }
-
     const pack = mobilePack ?? compactPackOptions[0] ?? null
-    const quantity = pack ? nextQty * pack.quantity : nextQty
-
+    const unit = pack?.label ?? product.unitLabel
     if (mobileQty <= 0) {
-      addItem(product, quantity, pack?.unit ?? product.unitLabel)
+      addItem(product, nextQty, unit)
     } else {
-      updateQuantity(product.id, quantity)
+      updateQuantity(product.id, nextQty)
     }
-
     setMobileQty(nextQty)
   }
 
-  const handleMobilePackChange = (option: { quantity: number; unit: string; label: string }) => {
+  const handleMobilePackChange = (option: QuantityOption) => {
     if (option.label === mobilePack?.label) return
     const currentQty = mobileQty
     setMobilePack(option)
     if (currentQty > 0) {
       removeItem(product.id)
-      addItem(product, currentQty * option.quantity, option.unit)
+      addItem(product, currentQty, option.label)
     }
   }
 
@@ -909,18 +846,15 @@ export default function ProductDetailModal({
                       </button>
                     </div>
 
-                    {compactPackOptions.length > 0 && (product.unitType === 'weight' || product.unitType === 'volume') ? (
+                    {compactPackOptions.length > 0 && (
                       <div className="mt-3 flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
                         {compactPackOptions.map((option) => (
                           <button
                             key={option.label}
                             type="button"
-                            onClick={() => {
-                              setDisplayUnit(product.unitLabel)
-                              setDisplayQty(option.quantity)
-                            }}
+                            onClick={() => setSelectedPackOption(option)}
                             className={`shrink-0 rounded-full border px-3 py-2 text-[11px] font-black transition-colors ${
-                              Math.abs(displayQty - option.quantity) < 0.0001 && displayUnit === product.unitLabel
+                              selectedPackOption?.label === option.label
                                 ? 'border-[#2c392a] bg-[#2c392a] text-white'
                                 : 'border-[#ead7b7]/70 bg-[#f7f4ed] text-[#5f6d59]'
                             }`}
@@ -928,54 +862,6 @@ export default function ProductDetailModal({
                             {option.label}
                           </button>
                         ))}
-                      </div>
-                    ) : (
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {(product.unitType === 'weight' || product.unitType === 'volume') && unitOptions.length > 1 && (
-                          <div className="flex items-center gap-1 rounded-full bg-[#f7f4ed] p-1 ring-1 ring-[#ead7b7]/50">
-                            {unitOptions.map((unit) => (
-                              <button
-                                key={unit}
-                                type="button"
-                                onClick={() => handleUnitChange(unit)}
-                                className={`rounded-full px-3 py-1.5 text-[11px] font-black transition-colors ${
-                                  unit === displayUnit ? 'bg-[#2c392a] text-white' : 'text-[#5f6d59]'
-                                }`}
-                              >
-                                {unit}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                        <div className="ml-auto inline-flex items-center gap-1 rounded-full bg-white px-1.5 py-1 ring-1 ring-[#ead7b7]/50">
-                          <button
-                            type="button"
-                            onClick={() => setDisplayQty((value) => Math.max(stepDisplay, value - stepDisplay))}
-                            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59]"
-                          >
-                            <Minus size={12} />
-                          </button>
-                          <input
-                            type="number"
-                            value={Number.isFinite(displayQty) ? displayQty : ''}
-                            min={product.unitType === 'unit' || product.unitType === 'bundle' ? 1 : 0.001}
-                            step={stepDisplay}
-                            onChange={(event) => {
-                              const next = Number(event.target.value)
-                              if (!Number.isFinite(next)) return
-                              setDisplayQty(next)
-                            }}
-                            className="w-14 bg-transparent text-center text-[12px] font-black text-[#2c392a] outline-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setDisplayQty((value) => value + stepDisplay)}
-                            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f7f4ed] text-[#5f6d59]"
-                          >
-                            <Plus size={12} />
-                          </button>
-                        </div>
                       </div>
                     )}
 
@@ -1057,7 +943,7 @@ export default function ProductDetailModal({
                     </>
                   ) : (
                     <>
-                      <p className="text-base font-black leading-tight text-[#2c392a]">{formatCurrency(lineTotal)}</p>
+                      <p className="text-base font-black leading-tight text-[#2c392a]">{formatCurrency(desktopPackLineTotal)}</p>
                     </>
                   )}
                 </div>

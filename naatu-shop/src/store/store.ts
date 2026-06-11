@@ -347,7 +347,7 @@ export const useCartStore = create<CartState>()(
             existing.qty + qty,
             existing.unitType,
             existing.allowDecimalQuantity,
-            existing.unitType === 'unit' || existing.unitType === 'bundle' ? 1 : Math.max(existing.baseQuantity, 0.001),
+            1,
           )
           existing.qty = mergedQty
           existing.lineTotal = calculateLineTotal(mergedQty, existing.unitType, existing.baseQuantity, basePrice)
@@ -374,7 +374,7 @@ export const useCartStore = create<CartState>()(
               qty,
               item.unitType,
               item.allowDecimalQuantity,
-              item.unitType === 'unit' || item.unitType === 'bundle' ? 1 : Math.max(item.baseQuantity, 0.001),
+              1,
             )
             return {
               ...item,
@@ -390,18 +390,8 @@ export const useCartStore = create<CartState>()(
       totalItems: () => get().items.length,
       cartSubtotal: () => get().items.reduce((sum, item) => sum + item.lineTotal, 0),
       add: (product) => {
-        const defaultQty = getDefaultQuantityForProduct({
-          unitType: product.unitType,
-          baseQuantity: product.baseQuantity,
-          predefinedOptions: product.predefinedOptions,
-        })
-        const qty = normalizeSelectedQuantity(
-          defaultQty,
-          product.unitType,
-          product.allowDecimalQuantity,
-          product.unitType === 'unit' || product.unitType === 'bundle' ? 1 : Math.max(product.baseQuantity, 0.001),
-        )
-        get().addItem(product, qty, product.unitLabel)
+        const packLabel = product.predefinedOptions[0]?.label ?? product.unitLabel
+        get().addItem(product, 1, packLabel)
       },
       remove: (productId) => get().removeItem(productId),
       updateQty: (productId, quantity) => get().updateQuantity(productId, quantity),

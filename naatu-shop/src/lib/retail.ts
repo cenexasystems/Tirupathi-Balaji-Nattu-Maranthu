@@ -288,22 +288,18 @@ export const normalizeSelectedQuantity = (
   return Math.max(0.001, roundTo(parsed, 3))
 }
 
+// qty = number of packs/units the customer is buying.
+// basePrice is the admin-entered price for ONE pack/unit — the exact selling price.
+// weight/volume labels (g, ml, kg, l) are display metadata only; they never enter this formula.
 export const calculateLineTotal = (
   quantity: number,
-  unitType: UnitType,
-  baseQuantity: number,
+  _unitType: UnitType,
+  _baseQuantity: number,
   basePrice: number,
 ) => {
   const safeQuantity = toNumber(quantity, 0)
   const safePrice = clampTo(toNumber(basePrice, 0), 0)
-  // Pricing is fixed per SKU. Treat `basePrice` as the exact price for one unit
-  // (for variants that represent weight/volume, the variant's price is already
-  // the exact price for that size). Multiply price by quantity units selected.
-  if (unitType === 'unit' || unitType === 'bundle') {
-    return roundTo(safePrice * Math.max(0, Math.round(safeQuantity)), 2)
-  }
-
-  return roundTo(safePrice * safeQuantity, 2)
+  return roundTo(safePrice * Math.max(0, Math.round(safeQuantity)), 2)
 }
 
 // Single source of truth for variant product pricing.
@@ -341,30 +337,15 @@ export const formatQuantityDisplay = (
   return `${q} ${unit || DEFAULT_UNIT_LABEL[unitType]}`
 }
 
-export const getDefaultQuantityForProduct = (input: {
-  unitType: UnitType
-  baseQuantity: number
-  predefinedOptions?: QuantityOption[]
-}) => {
-  if (input.unitType === 'unit' || input.unitType === 'bundle') return 1
-  const predefined = input.predefinedOptions || []
-  if (predefined.length > 0) {
-    return predefined[0].quantity
-  }
-  return normalizeBaseQuantity(input.baseQuantity, input.unitType)
-}
+// qty always means "how many packs/units" — always starts at 1.
+export const getDefaultQuantityForProduct = (
+  _input: { unitType: UnitType; baseQuantity: number; predefinedOptions?: QuantityOption[] },
+) => 1
 
-export const getQuantityStepForProduct = (input: {
-  unitType: UnitType
-  baseQuantity: number
-  allowDecimalQuantity: boolean
-}) => {
-  if (input.unitType === 'unit' || input.unitType === 'bundle') return 1
-  if (input.allowDecimalQuantity) {
-    return Math.max(0.001, roundTo(input.baseQuantity > 0 ? input.baseQuantity : 0.1, 3))
-  }
-  return Math.max(1, Math.round(input.baseQuantity || 1))
-}
+// Step is always 1 pack/unit — weight/volume labels are display-only.
+export const getQuantityStepForProduct = (
+  _input: { unitType: UnitType; baseQuantity: number; allowDecimalQuantity: boolean },
+) => 1
 
 export const calculateStockDeduction = (input: {
   quantity: number

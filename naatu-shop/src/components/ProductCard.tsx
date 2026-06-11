@@ -28,14 +28,8 @@ export default function ProductCard({ product }: { product: Product }) {
     ? items.filter((i) => i.parentProductId === String(product.id))
     : []
 
-  // step = 1 for unit/bundle; baseQuantity (e.g. 100g) for weight/volume
-  const effectiveStep =
-    product.unitType === 'unit' || product.unitType === 'bundle'
-      ? 1
-      : Math.max(product.baseQuantity, 1)
-
-  // display count = how many "packs" the user has in cart
-  const packQty = cartItem ? Math.max(1, Math.round(cartItem.qty / effectiveStep)) : 0
+  // qty = number of packs/units; weight/volume labels are display-only
+  const packQty = cartItem ? Math.max(1, Math.round(cartItem.qty)) : 0
   const inCart = packQty > 0
   const variantInCart = variantCartItems.length > 0
 
@@ -68,7 +62,8 @@ export default function ProductCard({ product }: { product: Product }) {
     if (product.hasVariants) {
       openModal()
     } else {
-      addItem(product, effectiveStep, product.unitLabel)
+      const packLabel = product.predefinedOptions[0]?.label ?? product.unitLabel
+      addItem(product, 1, packLabel)
     }
   }
 
@@ -76,12 +71,12 @@ export default function ProductCard({ product }: { product: Product }) {
     if (packQty <= 1) {
       removeItem(product.id)
     } else {
-      updateQuantity(product.id, (packQty - 1) * effectiveStep)
+      updateQuantity(product.id, packQty - 1)
     }
   }
 
   const handleIncrement = () => {
-    updateQuantity(product.id, (packQty + 1) * effectiveStep)
+    updateQuantity(product.id, packQty + 1)
   }
 
   return (

@@ -167,7 +167,7 @@ export default function Gallery() {
           transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
         >
           <p className="text-[10px] font-black uppercase tracking-[0.26em] text-[#7DAA8F] mb-4">
-            Thirupathi Balaji Herbal Store
+            Tirupathi Balaji Herbal Store
           </p>
           <h1 className="text-[2.8rem] sm:text-[3.6rem] font-black text-[#2C392A] tracking-tight leading-[1.02] mb-4">
             Inside Our Store
