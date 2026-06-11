@@ -123,7 +123,7 @@ export default function Footer() {
       </div>
       <div className="border-t border-white/10 py-5 text-center text-xs space-y-1.5">
         <div className="text-gray-200 font-medium">{t('footer.rights')}</div>
-        <div className="text-gray-400">{t('footer.powered_by')}</div>
+        <div className="text-gray-200 font-bold">{t('footer.powered_by')}</div>
       </div>
     </footer>
   )
