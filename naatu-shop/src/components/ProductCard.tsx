@@ -126,7 +126,7 @@ export default function ProductCard({ product }: { product: Product }) {
         </button>
 
         {/* Info */}
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col text-left">
           {/* Name — click opens modal */}
           <button
             type="button"
