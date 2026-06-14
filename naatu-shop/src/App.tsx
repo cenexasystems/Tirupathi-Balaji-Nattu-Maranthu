@@ -158,7 +158,7 @@ function AppShell() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen print:block print:min-h-0">
+    <div className="flex flex-col min-h-screen w-full max-w-[100vw] overflow-x-hidden print:block print:min-h-0">
       {!isAuthPage && <div className="print-hidden"><Navbar /></div>}
       <main className="flex-grow print:block">
         <Routes>
