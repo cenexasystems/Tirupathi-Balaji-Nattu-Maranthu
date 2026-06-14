@@ -102,7 +102,7 @@ const PRODUCT_MAP: Record<string, string> = {
   'herbal wellness pack':         'Ashwagandha Podi.jpeg',
   'sukku podi':                   'Sukku Podi.jpeg',
   'chukku podi':                  'Sukku Podi.jpeg',
-  'athimathuram podi':            'Athimathuram Podi.jpeg',
+  'athimathuram':                 'Athimathuram Podi.jpeg',
   'thripala podi':                'Thripala Podi.jpeg',
   'tripala podi':                 'Thripala Podi.jpeg',
   'thiripala podi':               'Thripala Podi.jpeg',
