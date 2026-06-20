@@ -44,8 +44,10 @@ export default function Navbar() {
 
       <header className="sticky top-0 z-40 glass border-b border-sand/40 shadow-sm">
         <nav className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-2.5 sm:px-4 sm:py-3 lg:gap-4">
-          <Link to="/" className="group flex shrink-0 items-center gap-2 min-w-0">
-            <img src="/logo.jpg" alt="Logo" className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover shadow-sm group-hover:opacity-90 transition-opacity" />
+          <Link to="/" className="group flex shrink-0 items-center gap-2 sm:gap-2.5 min-w-0">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-sm shrink-0 border border-sand/40 group-hover:opacity-90 transition-opacity">
+              <img src="/logo.jpg" alt="Logo" className="w-full h-full object-contain p-0.5" />
+            </div>
             <div className="flex min-w-0 flex-col leading-none">
               <p className="truncate text-[12px] sm:text-[13px] font-bold leading-tight tracking-tight text-textMain md:text-[15px] font-headline">{BRAND_EN}</p>
               <p className="hidden text-[9px] font-bold uppercase tracking-[0.15em] text-sageDark md:block">{BRAND_SUBTITLE}</p>
