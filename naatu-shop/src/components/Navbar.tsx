@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ShoppingCart, Heart, Search, Menu, X, Leaf } from 'lucide-react'
+import { ShoppingCart, Heart, Search, Menu, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useCartStore, useFavStore, useAuthStore } from '../store/store'
 import { useLangStore } from '../store/langStore'
@@ -45,9 +45,7 @@ export default function Navbar() {
       <header className="sticky top-0 z-40 glass border-b border-sand/40 shadow-sm">
         <nav className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-2.5 sm:px-4 sm:py-3 lg:gap-4">
           <Link to="/" className="group flex shrink-0 items-center gap-2 min-w-0">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-sage rounded-xl flex items-center justify-center group-hover:bg-sageDark transition-colors">
-              <Leaf size={16} className="text-white sm:size-[18px]" />
-            </div>
+            <img src="/logo.jpg" alt="Logo" className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover shadow-sm group-hover:opacity-90 transition-opacity" />
             <div className="flex min-w-0 flex-col leading-none">
               <p className="truncate text-[12px] sm:text-[13px] font-bold leading-tight tracking-tight text-textMain md:text-[15px] font-headline">{BRAND_EN}</p>
               <p className="hidden text-[9px] font-bold uppercase tracking-[0.15em] text-sageDark md:block">{BRAND_SUBTITLE}</p>
